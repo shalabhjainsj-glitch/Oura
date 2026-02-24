@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 st.set_page_config(page_title="Oura", page_icon="🛍️")
-st.image("banner.jpg", use_column_width=True)
 import pandas as pd
 import os
 import urllib.parse
