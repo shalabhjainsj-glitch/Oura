@@ -152,7 +152,7 @@ else:
                                 st.image(row["Image_Path"], use_container_width=True)
                             st.markdown(f"**{row['Name']}**")
                             st.markdown(f"🏷️ ₹{row['Price']}")
-                            qty = st.number_input("मात्रा", min_value=1, value=1, key=f"c_qty_{row['ID']}")
+                            if st.button("कार्ट में डालें", key=f"btn_{cat}_{row['ID']}"):
                             if st.button("कार्ट में डालें", key=f"c_btn_{row['ID']}"):
                                 st.session_state.cart[row['ID']] = {"name": row['Name'], "price": row['Price'], "qty": qty}
                                 st.success("बास्केट में जुड़ गया! 🛒")
