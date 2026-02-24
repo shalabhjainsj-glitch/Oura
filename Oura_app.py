@@ -199,10 +199,6 @@ else:
         "General 📦",
         "Premium 🌟",
         "Offers 🎁"
-    ]
-}
-ID,Name,Price,Category,Image_Path
-streamlit
-pandas
+    
 
 
