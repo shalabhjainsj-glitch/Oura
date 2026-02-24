@@ -1,5 +1,4 @@
-
-    import streamlit as st
+import streamlit as st
 import pandas as pd
 import os
 import urllib.parse
@@ -11,7 +10,6 @@ st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="w
 BANNER_FILE = "banner.png" 
 CONFIG_FILE = "config.json"
 DATA_FILE = "oura_products.csv"
-# आपकी गिटहब रिपॉजिटरी का लिंक (ताकि फोटो का URL बन सके)
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/shalabhjainsj-glitch/Oura/main/"
 
 def load_config():
@@ -31,7 +29,7 @@ def save_config(config):
 
 current_config = load_config()
 
-# डेटाबेस सेटअप (होलसेल रेट के साथ)
+# डेटाबेस सेटअप
 if not os.path.exists("images"):
     os.makedirs("images")
 
@@ -41,7 +39,6 @@ def init_db():
         df.to_csv(DATA_FILE, index=False)
     else:
         df = pd.read_csv(DATA_FILE)
-        # अगर पुरानी फाइल है, तो नए कॉलम जोड़ें
         if "Wholesale_Price" not in df.columns:
             df["Wholesale_Price"] = df["Price"]
             df["Wholesale_Qty"] = 1
@@ -71,7 +68,7 @@ else:
         st.session_state.admin_logged_in = False
         st.rerun()
     
-    with st.sidebar.expander("⚙️ ऐप सेटिंग्स (कैटगरी यहाँ से बदलें)"):
+    with st.sidebar.expander("⚙️ ऐप सेटिंग्स"):
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
         cats_str = st.text_area("कैटगरी (कॉमा लगाकर लिखें)", value=", ".join(current_config.get("categories", [])))
         new_banner = st.file_uploader("बैनर बदलें", type=["jpg", "png", "jpeg"])
@@ -87,7 +84,8 @@ else:
             st.success("सेटिंग्स सेव!")
             st.rerun()
 
-    st.sidebar.subheader("➕ नया उत्पाद (होलसेल रेट के साथ)")
+    # --- नया सामान जोड़ने का सेक्शन ---
+    st.sidebar.subheader("➕ नया उत्पाद जोड़ें")
     with st.sidebar.form("add_product", clear_on_submit=True):
         new_id = st.text_input("ID (यूनिक रखें)")
         new_name = st.text_input("नाम")
@@ -107,6 +105,26 @@ else:
             df.to_csv(DATA_FILE, index=False)
             st.sidebar.success("✅ प्रोडक्ट जुड़ गया!")
             st.rerun()
+
+    # --- सामान डिलीट करने का नया सेक्शन ---
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
+    df_del = load_products()
+    if not df_del.empty:
+        # आईडी और नाम की एक लिस्ट बनाना
+        product_list = df_del['ID'].astype(str) + " - " + df_del['Name']
+        item_to_delete = st.sidebar.selectbox("हटाने के लिए उत्पाद चुनें:", product_list)
+        
+        if st.sidebar.button("❌ पक्का डिलीट करें"):
+            # चुनी हुई ID को अलग करना
+            del_id = item_to_delete.split(" - ")[0]
+            # उस ID वाले प्रोडक्ट को हटाकर बाकी को सेव करना
+            df_updated = df_del[df_del['ID'].astype(str) != del_id]
+            df_updated.to_csv(DATA_FILE, index=False)
+            st.sidebar.success(f"उत्पाद हटा दिया गया!")
+            st.rerun()
+    else:
+        st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
 # 3. कस्टमर व्यू
 if os.path.exists(BANNER_FILE):
@@ -134,7 +152,6 @@ else:
                             st.image(row["Image_Path"], use_container_width=True)
                         st.write(f"**{row['Name']}**")
                         
-                        # होलसेल और रिटेल रेट दिखाना
                         w_qty = int(row.get('Wholesale_Qty', 1))
                         w_price = int(row.get('Wholesale_Price', row['Price']))
                         
@@ -146,7 +163,6 @@ else:
                         qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{cat}_{idx}")
                         
                         if st.button("कार्ट में डालें", key=f"b_{cat}_{idx}"):
-                            # रेट तय करना (मात्रा के हिसाब से)
                             final_price = w_price if qty >= w_qty else row['Price']
                             img_link = GITHUB_RAW_URL + urllib.parse.quote(row['Image_Path'])
                             
@@ -182,6 +198,7 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
 
 
 
