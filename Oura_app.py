@@ -18,7 +18,7 @@ def load_config():
         with open(CONFIG_FILE, 'r') as f:
             return json.load(f)
     return {
-        "admin_whatsapp": "919876543210", # अपना WhatsApp नंबर यहाँ सेट करें
+        "admin_whatsapp": "919891587437", # अपना WhatsApp नंबर यहाँ सेट करें
         "upi_id": "", 
         "payment_options": "UPI, Bank Transfer",
         "categories": ["General 📦", "Premium 🌟", "Offers 🎁"] 
@@ -58,7 +58,7 @@ if 'admin_logged_in' not in st.session_state:
 if not st.session_state.admin_logged_in:
     password = st.sidebar.text_input("बदलाव करने के लिए पासवर्ड डालें", type="password")
     if st.sidebar.button("लॉगिन"):
-        if password == "oura123": # यहाँ अपना पासवर्ड बदल सकते हैं
+        if password == "shalabh021208": # यहाँ अपना पासवर्ड बदल सकते हैं
             st.session_state.admin_logged_in = True
             st.rerun()
         else:
