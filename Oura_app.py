@@ -1,4 +1,5 @@
 import streamlit as st
+st.set_page_config(page_title="Oura", page_icon="🛍️")
 import pandas as pd
 import os
 import urllib.parse
