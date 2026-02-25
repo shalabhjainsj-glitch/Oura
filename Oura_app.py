@@ -4,7 +4,6 @@ import os
 import urllib.parse
 import json
 import shutil
-
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
 
