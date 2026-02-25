@@ -37,7 +37,10 @@ current_config = load_config()
 if not os.path.exists("images"):
     os.makedirs("images")
 
-expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"]
+expected_columns = [
+    "ID", "Name", "Price", "Wholesale_Price", 
+    "Wholesale_Qty", "Category", "Image_Path"
+]
 
 def init_db():
     if not os.path.exists(DATA_FILE):
@@ -121,7 +124,10 @@ else:
                 f.write(img.getbuffer())
                 
             df = load_products()
-            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, new_cat, path]], columns=expected_columns)
+            new_row = pd.DataFrame(
+                [[new_id, new_name, new_price, new_w_price, new_w_qty, new_cat, path]], 
+                columns=expected_columns
+            )
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
             st.sidebar.success("✅ प्रोडक्ट जुड़ गया!")
@@ -176,7 +182,6 @@ else:
     categories = current_config.get("categories", ["General"])
     valid_categories = []
     
-    # केटेगरी चेक करने का आसान तरीका (बिना किसी स्पेस एरर के)
     if "Category" in products_df.columns:
         for c in products_df['Category'].unique():
             if pd.notna(c) and c in categories:
@@ -201,7 +206,6 @@ else:
                 for idx, row in cat_products.reset_index().iterrows():
                     with cols[idx % 3]:
                         with st.container(border=True):
-                            # फोटो दिखाना
                             image_path = row.get("Image_Path", "")
                             if pd.notna(image_path) and os.path.exists(str(image_path)):
                                 try:
@@ -213,14 +217,76 @@ else:
                                 
                             st.write(f"**{row.get('Name', 'Unknown')}**")
                             
-                            # रेट और मात्रा
                             try:
                                 w_qty = int(float(row.get('Wholesale_Qty', 1)))
-                                w_price = int(float(row.get('Wholesale_Price', row.get('Price', 0))))
                                 retail_price = row.get('Price', 0)
+                                w_price_raw = row.get('Wholesale_Price', retail_price)
+                                w_price = int(float(w_price_raw))
                             except:
                                 w_qty = 1
-                                w_price = row.get('Price',
+                                retail_price = row.get('Price', 0)
+                                w_price = retail_price
+                            
+                            if w_qty > 1:
+                                st.markdown(
+                                    f"**रिटेल:** ₹{retail_price} <br> "
+                                    f"**होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", 
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.markdown(f"**रेट:** ₹{retail_price}")
+                                
+                            qty = st.number_input(
+                                "मात्रा (पीस)", 
+                                min_value=1, 
+                                value=1, 
+                                key=f"q_{cat}_{idx}"
+                            )
+                            
+                            if st.button("कार्ट में डालें", key=f"b_{cat}_{idx}"):
+                                final_price = w_price if qty >= w_qty else retail_price
+                                img_link = GITHUB_RAW_URL + urllib.parse.quote(str(image_path))
+                                
+                                st.session_state.cart[f"{cat}_{idx}"] = {
+                                    "name": row.get('Name', 'Item'), 
+                                    "price": final_price, 
+                                    "qty": qty,
+                                    "img_link": img_link
+                                }
+                                st.success("कार्ट में जुड़ गया! 🛒")
+
+st.markdown("---")
+st.header("🛒 आपकी बास्केट (कच्चा बिल)")
+if st.session_state.cart:
+    total = 0
+    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
+    
+    count = 1
+    for k, item in st.session_state.cart.items():
+        subtotal = item['price'] * item['qty']
+        total += subtotal
+        st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
+        
+        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+        msg += f"   🖼️ {item['img_link']}\n"
+        count += 1
+    
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n"
+    msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
+    
+    st.subheader(f"कुल बिल: ₹{total}")
+    st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
+    
+    if st.button("WhatsApp पर ऑर्डर भेजें"):
+        encoded_msg = urllib.parse.quote(msg)
+        wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
+        st.write(f"👉 [यहाँ क्लिक करके WhatsApp भेजें]({wa_link})")
+    
+    if st.button("बास्केट खाली करें"):
+        st.session_state.cart = {}
+        st.rerun()
+
+
 
 
 
