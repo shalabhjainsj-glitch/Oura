@@ -128,15 +128,12 @@ else:
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
-    # नया क्लीनअप फीचर (पूरा डेटाबेस साफ करने के लिए)
     st.sidebar.markdown("---")
     st.sidebar.subheader("🧨 पूरा डेटाबेस साफ करें")
-    st.sidebar.caption("अगर ऐप अटक जाए या पुराना कचरा न जाए, तो इसे दबाएं।")
+    st.sidebar.caption("अगर ऐप अटक जाए, तो इसे दबाएं।")
     if st.sidebar.button("सब कुछ डिलीट करें (Reset)"):
-        # डेटा फाइल खाली करें
         df_empty = pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
         df_empty.to_csv(DATA_FILE, index=False)
-        # पुरानी इमेजेज उड़ा दें
         if os.path.exists("images"):
             shutil.rmtree("images")
         os.makedirs("images")
@@ -160,29 +157,37 @@ if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     app_categories = current_config.get("categories", ["General"])
-    # स्मार्ट फिल्टर: सिर्फ वही केटेगरी दिखाएं जो सेटिंग्स में हैं
-    tabs = st.tabs(app_categories)
+    all_saved_cats = products_df['Category'].dropna().unique()
+    missing_cats = [c for c in all_saved_cats if c not in app_categories]
     
-    for i, tab_name in enumerate(app_categories):
+    display_tabs = app_categories.copy()
+    if missing_cats:
+        display_tabs.append("अन्य (पुराने उत्पाद)")
+
+    tabs = st.tabs(display_tabs)
+    
+    for i, tab_name in enumerate(display_tabs):
         with tabs[i]:
-            cat_products = products_df[products_df['Category'] == tab_name]
-            
-            # ऑटो-हाइड: उन प्रोडक्ट्स को लिस्ट से बाहर कर दें जिनकी फोटो फाइल नहीं मिल रही
-            valid_products = []
-            for _, r in cat_products.iterrows():
-                if os.path.isfile(str(r.get("Image_Path", ""))):
-                    valid_products.append(r)
-            
-            if not valid_products:
-                st.write("इस केटेगरी में अभी कोई नया उत्पाद नहीं है।")
+            if tab_name == "अन्य (पुराने उत्पाद)":
+                cat_products = products_df[products_df['Category'].isin(missing_cats)]
             else:
-                valid_df = pd.DataFrame(valid_products)
+                cat_products = products_df[products_df['Category'] == tab_name]
+            
+            if cat_products.empty:
+                st.write("इस केटेगरी में अभी कोई उत्पाद नहीं है।")
+            else:
                 cols = st.columns(3)
-                for idx, row in valid_df.reset_index().iterrows():
+                for idx, row in cat_products.reset_index().iterrows():
                     with cols[idx % 3]:
                         with st.container(border=True):
                             img_path = str(row.get("Image_Path", ""))
-                            st.image(img_path, use_container_width=True)
+                            if os.path.isfile(img_path):
+                                try:
+                                    st.image(img_path, use_container_width=True)
+                                except:
+                                    st.warning("⚠️ फोटो में खराबी")
+                            else:
+                                st.warning("⚠️ फोटो उपलब्ध नहीं")
                                 
                             st.write(f"**{row['Name']}**")
                             
@@ -203,47 +208,8 @@ else:
                                 
                             qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{idx}_{row['ID']}")
                             
-                            if st.button("कार्ट में डालें", key=f"b_{idx}_{row['ID']}"):
-                                final_price = w_price if qty >= w_qty else row['Price']
-                                img_link = GITHUB_RAW_URL + urllib.parse.quote(img_path)
-                                
-                                st.session_state.cart[f"{idx}_{row['ID']}"] = {
-                                    "name": row['Name'], 
-                                    "price": final_price, 
-                                    "qty": qty,
-                                    "img_link": img_link
-                                }
-                                st.success("कार्ट में जुड़ गया! 🛒")
+                            if st.button("कार्ट में डालें", key=f"b
 
-st.markdown("---")
-st.header("🛒 आपकी बास्केट (कच्चा बिल)")
-if st.session_state.cart:
-    total = 0
-    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
-    
-    count = 1
-    for k, item in st.session_state.cart.items():
-        subtotal = item['price'] * item['qty']
-        total += subtotal
-        st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
-        
-        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
-        msg += f"   🖼️ {item['img_link']}\n"
-        count += 1
-    
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n"
-    msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
-    
-    st.subheader(f"कुल बिल: ₹{total}")
-    st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
-    
-    if st.button("WhatsApp पर ऑर्डर भेजें"):
-        encoded_msg = urllib.parse.quote(msg)
-        st.write(f"👉 [यहाँ क्लिक करके WhatsApp भेजें](https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg})")
-    
-    if st.button("बास्केट खाली करें"):
-        st.session_state.cart = {}
-        st.rerun()
 
 
 
