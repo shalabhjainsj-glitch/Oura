@@ -4,6 +4,7 @@ import os
 import urllib.parse
 import json
 import shutil
+
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
 
@@ -45,7 +46,6 @@ def init_db():
     else:
         try:
             df = pd.read_csv(DATA_FILE)
-            # अगर कोई पुराना कॉलम नहीं है, तो उसे जोड़ें
             for col in expected_columns:
                 if col not in df.columns:
                     df[col] = None
@@ -59,7 +59,6 @@ init_db()
 def load_products():
     try:
         df = pd.read_csv(DATA_FILE)
-        # बुलेटप्रूफ चेक: डेटा लोड करते समय हर कॉलम को पक्का करें
         for col in expected_columns:
             if col not in df.columns:
                 df[col] = None
@@ -175,8 +174,54 @@ if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     categories = current_config.get("categories", ["General"])
-    # सिर्फ वो केटेगरी दिखाएं जो सेटिंग्स में मौजूद हैं और जिनके उत्पाद हैं
+    valid_categories = []
+    
+    # केटेगरी चेक करने का आसान तरीका (बिना किसी स्पेस एरर के)
     if "Category" in products_df.columns:
+        for c in products_df['Category'].unique():
+            if pd.notna(c) and c in categories:
+                valid_categories.append(c)
+                
+    if len(valid_categories) == 0:
+        valid_categories = categories 
+        
+    tabs = st.tabs(valid_categories)
+    
+    for i, cat in enumerate(valid_categories):
+        with tabs[i]:
+            if "Category" in products_df.columns:
+                cat_products = products_df[products_df['Category'] == cat]
+            else:
+                cat_products = pd.DataFrame()
+                
+            if cat_products.empty:
+                 st.write("इस केटेगरी में अभी कोई उत्पाद नहीं है।")
+            else:
+                cols = st.columns(3)
+                for idx, row in cat_products.reset_index().iterrows():
+                    with cols[idx % 3]:
+                        with st.container(border=True):
+                            # फोटो दिखाना
+                            image_path = row.get("Image_Path", "")
+                            if pd.notna(image_path) and os.path.exists(str(image_path)):
+                                try:
+                                    st.image(str(image_path), use_container_width=True)
+                                except:
+                                    st.warning("⚠️ फोटो में खराबी")
+                            else:
+                                st.warning("⚠️ फोटो उपलब्ध नहीं")
+                                
+                            st.write(f"**{row.get('Name', 'Unknown')}**")
+                            
+                            # रेट और मात्रा
+                            try:
+                                w_qty = int(float(row.get('Wholesale_Qty', 1)))
+                                w_price = int(float(row.get('Wholesale_Price', row.get('Price', 0))))
+                                retail_price = row.get('Price', 0)
+                            except:
+                                w_qty = 1
+                                w_price = row.get('Price',
+
 
 
 
