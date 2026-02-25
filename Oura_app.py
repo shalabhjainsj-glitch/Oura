@@ -208,7 +208,32 @@ else:
                                 
                             qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{idx}_{row['ID']}")
                             
-                            if st.button("कार्ट में डालें", key=f"b
+                            if st.button("कार्ट में डालें", key=f"b_{idx}_{row['ID']}"):
+                                final_price = w_price if qty >= w_qty else row['Price']
+                                img_link = GITHUB_RAW_URL + urllib.parse.quote(img_path)
+                                
+                                st.session_state.cart[f"{idx}_{row['ID']}"] = {
+                                    "name": row['Name'], 
+                                    "price": final_price, 
+                                    "qty": qty,
+                                    "img_link": img_link
+                                }
+                                st.success("कार्ट में जुड़ गया! 🛒")
+
+st.markdown("---")
+st.header("🛒 आपकी बास्केट (कच्चा बिल)")
+if st.session_state.cart:
+    total = 0
+    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
+    
+    count = 1
+    for k, item in st.session_state.cart.items():
+        subtotal = item['price'] * item['qty']
+        total += subtotal
+        st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
+        
+        msg += f"{count}. {item
+
 
 
 
