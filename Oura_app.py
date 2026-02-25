@@ -232,7 +232,24 @@ if st.session_state.cart:
         total += subtotal
         st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
         
-        msg += f"{count}. {item
+        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+        msg += f"   🖼️ {item['img_link']}\n"
+        count += 1
+    
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n"
+    msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
+    
+    st.subheader(f"कुल बिल: ₹{total}")
+    st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
+    
+    if st.button("WhatsApp पर ऑर्डर भेजें"):
+        encoded_msg = urllib.parse.quote(msg)
+        st.write(f"👉 [यहाँ क्लिक करके WhatsApp भेजें](https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg})")
+    
+    if st.button("बास्केट खाली करें"):
+        st.session_state.cart = {}
+        st.rerun()
+
 
 
 
