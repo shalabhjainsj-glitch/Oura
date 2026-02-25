@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import urllib.parse
 import json
+import shutil
 
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
@@ -92,7 +93,7 @@ else:
 
     st.sidebar.subheader("➕ नया उत्पाद जोड़ें")
     with st.sidebar.form("add_product", clear_on_submit=True):
-        new_id = st.text_input("ID (यूनिक रखें)")
+        new_id = st.text_input("ID (यूनिक रखें, जैसे: P001)")
         new_name = st.text_input("नाम")
         new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
         new_w_qty = st.number_input("होलसेल के लिए कम से कम पीस (जैसे 100)", min_value=1, value=10)
@@ -127,6 +128,21 @@ else:
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
+    # नया क्लीनअप फीचर (पूरा डेटाबेस साफ करने के लिए)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🧨 पूरा डेटाबेस साफ करें")
+    st.sidebar.caption("अगर ऐप अटक जाए या पुराना कचरा न जाए, तो इसे दबाएं।")
+    if st.sidebar.button("सब कुछ डिलीट करें (Reset)"):
+        # डेटा फाइल खाली करें
+        df_empty = pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
+        df_empty.to_csv(DATA_FILE, index=False)
+        # पुरानी इमेजेज उड़ा दें
+        if os.path.exists("images"):
+            shutil.rmtree("images")
+        os.makedirs("images")
+        st.sidebar.success("सब कुछ साफ हो गया! ऐप एकदम नया है।")
+        st.rerun()
+
 # 3. कस्टमर व्यू
 if os.path.isfile(BANNER_FILE):
     try:
@@ -144,41 +160,32 @@ if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     app_categories = current_config.get("categories", ["General"])
-    all_saved_cats = products_df['Category'].dropna().unique()
-    missing_cats = [c for c in all_saved_cats if c not in app_categories]
+    # स्मार्ट फिल्टर: सिर्फ वही केटेगरी दिखाएं जो सेटिंग्स में हैं
+    tabs = st.tabs(app_categories)
     
-    display_tabs = app_categories.copy()
-    if missing_cats:
-        display_tabs.append("अन्य (पुराने उत्पाद)")
-
-    tabs = st.tabs(display_tabs)
-    
-    for i, tab_name in enumerate(display_tabs):
+    for i, tab_name in enumerate(app_categories):
         with tabs[i]:
-            if tab_name == "अन्य (पुराने उत्पाद)":
-                cat_products = products_df[products_df['Category'].isin(missing_cats)]
+            cat_products = products_df[products_df['Category'] == tab_name]
+            
+            # ऑटो-हाइड: उन प्रोडक्ट्स को लिस्ट से बाहर कर दें जिनकी फोटो फाइल नहीं मिल रही
+            valid_products = []
+            for _, r in cat_products.iterrows():
+                if os.path.isfile(str(r.get("Image_Path", ""))):
+                    valid_products.append(r)
+            
+            if not valid_products:
+                st.write("इस केटेगरी में अभी कोई नया उत्पाद नहीं है।")
             else:
-                cat_products = products_df[products_df['Category'] == tab_name]
-                
-            if cat_products.empty:
-                st.write("इस केटेगरी में अभी कोई उत्पाद नहीं है।")
-            else:
+                valid_df = pd.DataFrame(valid_products)
                 cols = st.columns(3)
-                for idx, row in cat_products.reset_index().iterrows():
+                for idx, row in valid_df.reset_index().iterrows():
                     with cols[idx % 3]:
                         with st.container(border=True):
                             img_path = str(row.get("Image_Path", ""))
-                            if os.path.isfile(img_path):
-                                try:
-                                    st.image(img_path, use_container_width=True)
-                                except Exception:
-                                    st.error("⚠️ फोटो में खराबी")
-                            else:
-                                st.warning("⚠️ फोटो उपलब्ध नहीं")
+                            st.image(img_path, use_container_width=True)
                                 
                             st.write(f"**{row['Name']}**")
                             
-                            # बुलेटप्रूफ कोड: अगर डेटा में कोई भी खराबी है तो ऐप क्रैश नहीं होगा
                             try:
                                 w_qty = int(float(row.get('Wholesale_Qty', 1)))
                             except:
@@ -237,6 +244,7 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
 
 
 
