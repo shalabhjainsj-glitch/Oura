@@ -115,7 +115,6 @@ else:
     st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
     df_del = load_products()
     if not df_del.empty:
-        # यहाँ प्रोडक्ट के साथ उसकी केटेगरी भी दिखेगी
         product_list = df_del['ID'].astype(str) + " - " + df_del['Name'] + " [" + df_del['Category'].astype(str) + "]"
         item_to_delete = st.sidebar.selectbox("हटाने के लिए उत्पाद चुनें:", product_list)
         
@@ -168,7 +167,6 @@ else:
                 for idx, row in cat_products.reset_index().iterrows():
                     with cols[idx % 3]:
                         with st.container(border=True):
-                            # सेफ्टी शील्ड: अगर फोटो फाइल में कोई दिक्कत है, तो ऐप क्रैश नहीं होगा
                             img_path = str(row.get("Image_Path", ""))
                             if os.path.isfile(img_path):
                                 try:
@@ -180,9 +178,16 @@ else:
                                 
                             st.write(f"**{row['Name']}**")
                             
-                            # पुरानी फाइल के खाली डेटा (NaN) को संभालने का तरीका
-                            w_qty = 1 if pd.isna(row.get('Wholesale_Qty')) else int(row.get('Wholesale_Qty', 1))
-                            w_price = row['Price'] if pd.isna(row.get('Wholesale_Price')) else int(row.get('Wholesale_Price', row['Price']))
+                            # बुलेटप्रूफ कोड: अगर डेटा में कोई भी खराबी है तो ऐप क्रैश नहीं होगा
+                            try:
+                                w_qty = int(float(row.get('Wholesale_Qty', 1)))
+                            except:
+                                w_qty = 1
+                                
+                            try:
+                                w_price = int(float(row.get('Wholesale_Price', row['Price'])))
+                            except:
+                                w_price = row['Price']
                             
                             if w_qty > 1:
                                 st.markdown(f"**रिटेल:** ₹{row['Price']} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
@@ -232,6 +237,7 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
 
 
 
