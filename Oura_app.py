@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import urllib.parse
 import json
+import shutil
 
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
@@ -14,8 +15,11 @@ GITHUB_RAW_URL = "https://raw.githubusercontent.com/shalabhjainsj-glitch/Oura/ma
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
     return {
         "admin_whatsapp": "919891587437", 
         "upi_id": "", 
@@ -47,7 +51,10 @@ def init_db():
 init_db()
 
 def load_products():
-    return pd.read_csv(DATA_FILE)
+    try:
+        return pd.read_csv(DATA_FILE)
+    except:
+        return pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
 
 # 2. एडमिन पैनल
 st.sidebar.title("🔒 एडमिन पैनल")
@@ -93,12 +100,18 @@ else:
         new_w_qty = st.number_input("होलसेल के लिए कम से कम पीस (जैसे 100)", min_value=1, value=10)
         new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
         new_cat = st.selectbox("केटेगरी", current_config.get("categories", ["General"]))
-        img = st.file_uploader("फोटो", type=["jpg", "png", "jpeg"])
+        
+        # यहाँ वापस फोटो अपलोड का ऑप्शन आ गया है
+        img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
         
         if st.form_submit_button("सेव करें") and new_id and new_name and img:
-            path = os.path.join("images", img.name.replace(" ", "_"))
+            # फोटो को सुरक्षित तरीके से सेव करना
+            safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+            path = os.path.join("images", safe_filename)
+            
             with open(path, "wb") as f:
                 f.write(img.getbuffer())
+                
             df = load_products()
             new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, new_cat, path]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
@@ -111,24 +124,36 @@ else:
     st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
     df_del = load_products()
     if not df_del.empty:
-        # आईडी और नाम की एक लिस्ट बनाना
         product_list = df_del['ID'].astype(str) + " - " + df_del['Name']
         item_to_delete = st.sidebar.selectbox("हटाने के लिए उत्पाद चुनें:", product_list)
         
         if st.sidebar.button("❌ पक्का डिलीट करें"):
-            # चुनी हुई ID को अलग करना
             del_id = item_to_delete.split(" - ")[0]
-            # उस ID वाले प्रोडक्ट को हटाकर बाकी को सेव करना
             df_updated = df_del[df_del['ID'].astype(str) != del_id]
             df_updated.to_csv(DATA_FILE, index=False)
             st.sidebar.success(f"उत्पाद हटा दिया गया!")
             st.rerun()
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
+        
+    # डेटाबेस रीसेट बटन (इमरजेंसी के लिए)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🧨 पूरा डेटाबेस साफ करें")
+    if st.sidebar.button("सब कुछ डिलीट करें (Reset)"):
+        df_empty = pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
+        df_empty.to_csv(DATA_FILE, index=False)
+        if os.path.exists("images"):
+            shutil.rmtree("images")
+        os.makedirs("images")
+        st.sidebar.success("सब कुछ साफ हो गया!")
+        st.rerun()
 
 # 3. कस्टमर व्यू
 if os.path.exists(BANNER_FILE):
-    st.image(BANNER_FILE, use_container_width=True)
+    try:
+        st.image(BANNER_FILE, use_container_width=True)
+    except:
+        pass
 
 st.title("🛍️ Oura")
 if 'cart' not in st.session_state:
@@ -140,53 +165,81 @@ if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     categories = current_config.get("categories", ["General"])
-    tabs = st.tabs(categories)
-    for i, cat in enumerate(categories):
+    # सिर्फ वो केटेगरी दिखाएं जो सेटिंग्स में मौजूद हैं
+    valid_categories = [c for c in products_df['Category'].unique() if c in categories]
+    
+    if not valid_categories:
+        valid_categories = categories # अगर कोई पुराना प्रोडक्ट नहीं है तो डिफ़ॉल्ट दिखाएं
+        
+    tabs = st.tabs(valid_categories)
+    
+    for i, cat in enumerate(valid_categories):
         with tabs[i]:
             cat_products = products_df[products_df['Category'] == cat]
-            cols = st.columns(3)
-            for idx, row in cat_products.reset_index().iterrows():
-                with cols[idx % 3]:
-                    with st.container(border=True):
-                        if os.path.exists(row["Image_Path"]):
-                            st.image(row["Image_Path"], use_container_width=True)
-                        st.write(f"**{row['Name']}**")
-                        
-                        w_qty = int(row.get('Wholesale_Qty', 1))
-                        w_price = int(row.get('Wholesale_Price', row['Price']))
-                        
-                        if w_qty > 1:
-                            st.markdown(f"**रिटेल:** ₹{row['Price']} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"**रेट:** ₹{row['Price']}")
+            if cat_products.empty:
+                 st.write("इस केटेगरी में अभी कोई उत्पाद नहीं है।")
+            else:
+                cols = st.columns(3)
+                for idx, row in cat_products.reset_index().iterrows():
+                    with cols[idx % 3]:
+                        with st.container(border=True):
+                            # फोटो दिखाने का सुरक्षित तरीका
+                            if pd.notna(row["Image_Path"]) and os.path.exists(row["Image_Path"]):
+                                try:
+                                    st.image(row["Image_Path"], use_container_width=True)
+                                except:
+                                    st.warning("⚠️ फोटो में खराबी")
+                            else:
+                                st.warning("⚠️ फोटो उपलब्ध नहीं")
+                                
+                            st.write(f"**{row['Name']}**")
                             
-                        qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{cat}_{idx}")
-                        
-                        if st.button("कार्ट में डालें", key=f"b_{cat}_{idx}"):
-                            final_price = w_price if qty >= w_qty else row['Price']
-                            img_link = GITHUB_RAW_URL + urllib.parse.quote(row['Image_Path'])
+                            # रेट और मात्रा
+                            try:
+                                w_qty = int(float(row.get('Wholesale_Qty', 1)))
+                                w_price = int(float(row.get('Wholesale_Price', row['Price'])))
+                            except:
+                                w_qty = 1
+                                w_price = row['Price']
                             
-                            st.session_state.cart[f"{cat}_{idx}"] = {
-                                "name": row['Name'], 
-                                "price": final_price, 
-                                "qty": qty,
-                                "img_link": img_link
-                            }
-                            st.success("कार्ट में जुड़ गया! 🛒")
+                            if w_qty > 1:
+                                st.markdown(f"**रिटेल:** ₹{row['Price']} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"**रेट:** ₹{row['Price']}")
+                                
+                            qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{cat}_{idx}")
+                            
+                            if st.button("कार्ट में डालें", key=f"b_{cat}_{idx}"):
+                                final_price = w_price if qty >= w_qty else row['Price']
+                                img_link = GITHUB_RAW_URL + urllib.parse.quote(str(row['Image_Path']))
+                                
+                                st.session_state.cart[f"{cat}_{idx}"] = {
+                                    "name": row['Name'], 
+                                    "price": final_price, 
+                                    "qty": qty,
+                                    "img_link": img_link
+                                }
+                                st.success("कार्ट में जुड़ गया! 🛒")
 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
 if st.session_state.cart:
     total = 0
-    msg = "🧾 *KACCHA BILL (Oura)* 🧾\n------------------------\n"
+    # छोटे बिल का फॉर्मेट
+    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
     
+    count = 1
     for k, item in st.session_state.cart.items():
         subtotal = item['price'] * item['qty']
         total += subtotal
-        st.write(f"✔️ **{item['name']}** - {item['qty']} पीस x ₹{item['price']} = **₹{subtotal}**")
-        msg += f"▪️ {item['name']}\n   {item['qty']} पीस x ₹{item['price']} = ₹{subtotal}\n   🖼️ फोटो: {item['img_link']}\n\n"
+        st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
+        
+        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+        msg += f"   🖼️ {item['img_link']}\n"
+        count += 1
     
-    msg += f"------------------------\n*कुल बिल:* ₹{total}\n\n⚠️ *नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)*"
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n"
+    msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
     
     st.subheader(f"कुल बिल: ₹{total}")
     st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
@@ -198,6 +251,7 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
 
 
 
