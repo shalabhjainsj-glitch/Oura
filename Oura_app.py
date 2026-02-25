@@ -37,24 +37,36 @@ current_config = load_config()
 if not os.path.exists("images"):
     os.makedirs("images")
 
+expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"]
+
 def init_db():
     if not os.path.exists(DATA_FILE):
-        df = pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
+        df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DATA_FILE, index=False)
     else:
-        df = pd.read_csv(DATA_FILE)
-        if "Wholesale_Price" not in df.columns:
-            df["Wholesale_Price"] = df["Price"]
-            df["Wholesale_Qty"] = 1
+        try:
+            df = pd.read_csv(DATA_FILE)
+            # अगर कोई पुराना कॉलम नहीं है, तो उसे जोड़ें
+            for col in expected_columns:
+                if col not in df.columns:
+                    df[col] = None
+            df.to_csv(DATA_FILE, index=False)
+        except:
+            df = pd.DataFrame(columns=expected_columns)
             df.to_csv(DATA_FILE, index=False)
 
 init_db()
 
 def load_products():
     try:
-        return pd.read_csv(DATA_FILE)
+        df = pd.read_csv(DATA_FILE)
+        # बुलेटप्रूफ चेक: डेटा लोड करते समय हर कॉलम को पक्का करें
+        for col in expected_columns:
+            if col not in df.columns:
+                df[col] = None
+        return df
     except:
-        return pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
+        return pd.DataFrame(columns=expected_columns)
 
 # 2. एडमिन पैनल
 st.sidebar.title("🔒 एडमिन पैनल")
@@ -101,11 +113,9 @@ else:
         new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
         new_cat = st.selectbox("केटेगरी", current_config.get("categories", ["General"]))
         
-        # यहाँ वापस फोटो अपलोड का ऑप्शन आ गया है
         img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
         
         if st.form_submit_button("सेव करें") and new_id and new_name and img:
-            # फोटो को सुरक्षित तरीके से सेव करना
             safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
             path = os.path.join("images", safe_filename)
             
@@ -113,7 +123,7 @@ else:
                 f.write(img.getbuffer())
                 
             df = load_products()
-            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, new_cat, path]], columns=df.columns)
+            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, new_cat, path]], columns=expected_columns)
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
             st.sidebar.success("✅ प्रोडक्ट जुड़ गया!")
@@ -123,8 +133,8 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
     df_del = load_products()
-    if not df_del.empty:
-        product_list = df_del['ID'].astype(str) + " - " + df_del['Name']
+    if not df_del.empty and "ID" in df_del.columns and "Name" in df_del.columns:
+        product_list = df_del['ID'].astype(str) + " - " + df_del['Name'].astype(str)
         item_to_delete = st.sidebar.selectbox("हटाने के लिए उत्पाद चुनें:", product_list)
         
         if st.sidebar.button("❌ पक्का डिलीट करें"):
@@ -136,11 +146,11 @@ else:
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
         
-    # डेटाबेस रीसेट बटन (इमरजेंसी के लिए)
+    # डेटाबेस रीसेट बटन
     st.sidebar.markdown("---")
     st.sidebar.subheader("🧨 पूरा डेटाबेस साफ करें")
     if st.sidebar.button("सब कुछ डिलीट करें (Reset)"):
-        df_empty = pd.DataFrame(columns=["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"])
+        df_empty = pd.DataFrame(columns=expected_columns)
         df_empty.to_csv(DATA_FILE, index=False)
         if os.path.exists("images"):
             shutil.rmtree("images")
@@ -161,96 +171,13 @@ if 'cart' not in st.session_state:
 
 products_df = load_products()
 
+# पक्का करें कि डेटा खाली नहीं है
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     categories = current_config.get("categories", ["General"])
-    # सिर्फ वो केटेगरी दिखाएं जो सेटिंग्स में मौजूद हैं
-    valid_categories = [c for c in products_df['Category'].unique() if c in categories]
-    
-    if not valid_categories:
-        valid_categories = categories # अगर कोई पुराना प्रोडक्ट नहीं है तो डिफ़ॉल्ट दिखाएं
-        
-    tabs = st.tabs(valid_categories)
-    
-    for i, cat in enumerate(valid_categories):
-        with tabs[i]:
-            cat_products = products_df[products_df['Category'] == cat]
-            if cat_products.empty:
-                 st.write("इस केटेगरी में अभी कोई उत्पाद नहीं है।")
-            else:
-                cols = st.columns(3)
-                for idx, row in cat_products.reset_index().iterrows():
-                    with cols[idx % 3]:
-                        with st.container(border=True):
-                            # फोटो दिखाने का सुरक्षित तरीका
-                            if pd.notna(row["Image_Path"]) and os.path.exists(row["Image_Path"]):
-                                try:
-                                    st.image(row["Image_Path"], use_container_width=True)
-                                except:
-                                    st.warning("⚠️ फोटो में खराबी")
-                            else:
-                                st.warning("⚠️ फोटो उपलब्ध नहीं")
-                                
-                            st.write(f"**{row['Name']}**")
-                            
-                            # रेट और मात्रा
-                            try:
-                                w_qty = int(float(row.get('Wholesale_Qty', 1)))
-                                w_price = int(float(row.get('Wholesale_Price', row['Price'])))
-                            except:
-                                w_qty = 1
-                                w_price = row['Price']
-                            
-                            if w_qty > 1:
-                                st.markdown(f"**रिटेल:** ₹{row['Price']} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"**रेट:** ₹{row['Price']}")
-                                
-                            qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{cat}_{idx}")
-                            
-                            if st.button("कार्ट में डालें", key=f"b_{cat}_{idx}"):
-                                final_price = w_price if qty >= w_qty else row['Price']
-                                img_link = GITHUB_RAW_URL + urllib.parse.quote(str(row['Image_Path']))
-                                
-                                st.session_state.cart[f"{cat}_{idx}"] = {
-                                    "name": row['Name'], 
-                                    "price": final_price, 
-                                    "qty": qty,
-                                    "img_link": img_link
-                                }
-                                st.success("कार्ट में जुड़ गया! 🛒")
-
-st.markdown("---")
-st.header("🛒 आपकी बास्केट (कच्चा बिल)")
-if st.session_state.cart:
-    total = 0
-    # छोटे बिल का फॉर्मेट
-    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
-    
-    count = 1
-    for k, item in st.session_state.cart.items():
-        subtotal = item['price'] * item['qty']
-        total += subtotal
-        st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
-        
-        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
-        msg += f"   🖼️ {item['img_link']}\n"
-        count += 1
-    
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n"
-    msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
-    
-    st.subheader(f"कुल बिल: ₹{total}")
-    st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
-    
-    if st.button("WhatsApp पर ऑर्डर भेजें"):
-        encoded_msg = urllib.parse.quote(msg)
-        st.write(f"👉 [यहाँ क्लिक करके WhatsApp भेजें](https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg})")
-    
-    if st.button("बास्केट खाली करें"):
-        st.session_state.cart = {}
-        st.rerun()
+    # सिर्फ वो केटेगरी दिखाएं जो सेटिंग्स में मौजूद हैं और जिनके उत्पाद हैं
+    if "Category" in products_df.columns:
 
 
 
