@@ -22,7 +22,7 @@ def load_config():
             pass
     return {
         "admin_whatsapp": "919891587437", 
-        "upi_id": "", 
+        "upi_id": "9891587437@upi", 
         "payment_options": "UPI, Bank Transfer"
     }
 
@@ -91,7 +91,9 @@ else:
     
     with st.sidebar.expander("⚙️ ऐप सेटिंग्स"):
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
+        new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", "9891587437@upi"))
         new_banner = st.file_uploader("बैनर बदलें", type=["jpg", "png", "jpeg"])
+        
         if new_banner is not None:
             with open(BANNER_FILE, "wb") as f:
                 f.write(new_banner.getbuffer())
@@ -99,26 +101,26 @@ else:
             
         if st.button("सेटिंग्स सेव करें"):
             current_config["admin_whatsapp"] = new_wa
+            current_config["upi_id"] = new_upi
             save_config(current_config)
             st.success("सेटिंग्स सेव!")
             st.rerun()
 
-    # --- नया सामान जोड़ने का सेक्शन (ऑटोमैटिक केटेगरी के साथ) ---
+    # --- नया सामान जोड़ने का सेक्शन ---
     st.sidebar.subheader("➕ नया उत्पाद जोड़ें")
     with st.sidebar.form("add_product", clear_on_submit=True):
-        new_id = st.text_input("ID (यूनिक रखें)")
+        new_id = st.text_input("ID (यूनिक रखें, जैसे P001)")
         new_name = st.text_input("नाम")
         new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
         new_w_qty = st.number_input("होलसेल के लिए कम से कम पीस (जैसे 100)", min_value=1, value=10)
         new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
         
-        # ऑटोमैटिक केटेगरी सिस्टम
         existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
         cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
         selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
         
         if selected_cat == "नयी केटेगरी बनाएं...":
-            final_cat = st.text_input("नई केटेगरी का नाम लिखें (जैसे: Shoes, Toys)")
+            final_cat = st.text_input("नई केटेगरी का नाम लिखें (जैसे: Shirt, Mobile)")
         else:
             final_cat = selected_cat
             
@@ -141,7 +143,7 @@ else:
             st.sidebar.success(f"✅ उत्पाद '{final_cat}' केटेगरी में जुड़ गया!")
             st.rerun()
 
-    # --- सामान डिलीट करने का सेक्शन ---
+    # --- सुरक्षित डिलीट सेक्शन (सिर्फ एक-एक करके) ---
     st.sidebar.markdown("---")
     st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
     df_del = load_products()
@@ -153,7 +155,7 @@ else:
             del_id = item_to_delete.split(" - ")[0]
             df_updated = df_del[df_del['ID'].astype(str) != del_id]
             df_updated.to_csv(DATA_FILE, index=False)
-            st.sidebar.success(f"उत्पाद हटा दिया गया!")
+            st.sidebar.success(f"सिर्फ 1 उत्पाद हटा दिया गया!")
             st.rerun()
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
@@ -167,13 +169,11 @@ if os.path.exists(BANNER_FILE):
 
 st.title("🛍️ Oura")
 
-# --- नया सर्च बार ---
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
 
-# सामान दिखाने का फंक्शन (ताकि कोड छोटा रहे)
 def show_product_card(row, idx, prefix):
     with st.container(border=True):
         image_path = row.get("Image_Path", "")
@@ -219,14 +219,11 @@ def show_product_card(row, idx, prefix):
             }
             st.success("कार्ट में जुड़ गया! 🛒")
 
-# मेन डिस्प्ले लॉजिक
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
-    # अगर कस्टमर ने कुछ सर्च किया है
     if search_query:
         st.subheader(f"'{search_query}' के सर्च रिजल्ट:")
-        # नाम से सर्च करना (Case-insensitive)
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
         
         if filtered_df.empty:
@@ -237,7 +234,6 @@ else:
                 with cols[idx % 3]:
                     show_product_card(row, idx, "search")
     
-    # अगर सर्च खाली है, तो पुराने तरीके से टैब (केटेगरी) दिखाएं
     else:
         valid_categories = products_df['Category'].dropna().unique().tolist()
         if len(valid_categories) == 0:
@@ -279,6 +275,12 @@ if st.session_state.cart:
     st.subheader(f"कुल बिल: ₹{total}")
     st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
     
+    # UPI ID दिखाने का सेक्शन
+    upi = current_config.get("upi_id", "")
+    if upi:
+        st.success(f"💳 **पेमेंट के लिए UPI ID:** `{upi}`")
+        msg += f"\n\n💳 *UPI ID:* {upi}"
+    
     if st.button("WhatsApp पर ऑर्डर भेजें"):
         encoded_msg = urllib.parse.quote(msg)
         wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
@@ -287,6 +289,7 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
 
 
 
