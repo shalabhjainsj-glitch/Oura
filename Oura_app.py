@@ -67,7 +67,7 @@ def load_config():
                 return json.load(f)
         except:
             pass
-    return {"admin_whatsapp": "919891587437", "upi_id": "9891587437@upi"}
+    return {"admin_whatsapp": "919891587437", "upi_id": "9891587437@upi", "has_banner": False}
 
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -119,7 +119,7 @@ if 'admin_logged_in' not in st.session_state:
 if not st.session_state.admin_logged_in:
     password = st.sidebar.text_input("पासवर्ड डालें", type="password")
     if st.sidebar.button("लॉगिन"):
-        # 🛡️ सुरक्षा चक्र: अब पासवर्ड कोड में नहीं, बल्कि सुरक्षित तिजोरी (Secrets) से लिया जाएगा
+        # 🛡️ सुरक्षा चक्र: पासवर्ड तिजोरी (Secrets) से लिया जाएगा
         try:
             correct_password = st.secrets["ADMIN_PASSWORD"]
         except:
@@ -136,6 +136,38 @@ else:
         st.session_state.admin_logged_in = False
         st.rerun()
     
+    # --- 🖼️ नया फीचर: बैनर सेटिंग्स ---
+    with st.sidebar.expander("🖼️ बैनर (Banner) सेटिंग्स"):
+        st.write("दुकान के सबसे ऊपर दिखने वाला फोटो लगाएं/बदलें")
+        new_banner = st.file_uploader("नया बैनर चुनें (चौड़ी फोटो बेहतर रहेगी)", type=["jpg", "png", "jpeg"], key="banner_upload")
+        
+        if st.button("बैनर सेव करें") and new_banner:
+            with st.spinner("बैनर सेव हो रहा है..."):
+                banner_bytes = new_banner.getvalue()
+                
+                # लोकल सेव
+                try:
+                    with open(BANNER_FILE, "wb") as f:
+                        f.write(banner_bytes)
+                except:
+                    pass
+                
+                # GitHub पर सेव
+                if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
+                    current_config["has_banner"] = True
+                    save_config(current_config)
+                    st.success("✅ शानदार! बैनर लग गया है।")
+                    st.rerun()
+                else:
+                    st.error("बैनर सेव करने में समस्या आई।")
+                    
+        if current_config.get("has_banner", False):
+            if st.button("❌ बैनर हटाएं"):
+                current_config["has_banner"] = False
+                save_config(current_config)
+                st.success("बैनर हटा दिया गया है!")
+                st.rerun()
+
     with st.sidebar.expander("⚙️ ऐप सेटिंग्स"):
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
         new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
@@ -225,7 +257,19 @@ else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
 # 3. कस्टमर व्यू
-st.title("🛍️ Oura")
+# 🖼️ यहाँ बैनर दिखेगा
+if current_config.get("has_banner", False):
+    if os.path.exists(BANNER_FILE):
+        st.image(BANNER_FILE, use_container_width=True)
+    else:
+        banner_img_link = f"{GITHUB_RAW_URL}{BANNER_FILE}?t={int(time.time())}"
+        try:
+            st.image(banner_img_link, use_container_width=True)
+        except:
+            st.title("🛍️ Oura Wholesale")
+else:
+    st.title("🛍️ Oura Wholesale")
+
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
 if 'cart' not in st.session_state:
@@ -338,7 +382,6 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
-
 
 
 
