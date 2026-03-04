@@ -10,6 +10,16 @@ import time
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
 
+# 🛡️ सुरक्षा चक्र: Streamlit का मेन्यू और हेडर छुपाने का कोड
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            header {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 BANNER_FILE = "banner.png" 
 CONFIG_FILE = "config.json"
 DATA_FILE = "oura_products.csv"
@@ -22,7 +32,7 @@ def save_to_github(file_path, content, commit_message):
     try:
         token = st.secrets["GITHUB_TOKEN"]
     except Exception as e:
-        st.error(f"⚠️ GitHub Token नहीं मिला या गलत है! कृपया ऐप की सेटिंग्स चेक करें। Error: {e}")
+        st.error(f"⚠️ GitHub Token नहीं मिला या गलत है! कृपया ऐप की सेटिंग्स चेक करें।")
         return False
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
@@ -48,7 +58,6 @@ def save_to_github(file_path, content, commit_message):
     if put_response.status_code in [200, 201]:
         return True
     else:
-        st.error(f"GitHub पर सेव करने में एरर: {put_response.json().get('message')}")
         return False
 
 def load_config():
@@ -110,7 +119,14 @@ if 'admin_logged_in' not in st.session_state:
 if not st.session_state.admin_logged_in:
     password = st.sidebar.text_input("पासवर्ड डालें", type="password")
     if st.sidebar.button("लॉगिन"):
-        if password == "shalabh021208":
+        # 🛡️ सुरक्षा चक्र: अब पासवर्ड कोड में नहीं, बल्कि सुरक्षित तिजोरी (Secrets) से लिया जाएगा
+        try:
+            correct_password = st.secrets["ADMIN_PASSWORD"]
+        except:
+            st.sidebar.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला! कृपया Secrets अपडेट करें।")
+            correct_password = None
+            
+        if correct_password and password == correct_password:
             st.session_state.admin_logged_in = True
             st.rerun()
         else:
@@ -157,24 +173,20 @@ else:
                 
                 img_bytes = img.getvalue()
                 
-                # 0. लोकल सेव (ताकि फोटो तुरंत स्क्रीन पर दिख जाए)
                 try:
                     with open(path, "wb") as f:
                         f.write(img_bytes)
                 except:
                     pass
 
-                # 1. फोटो को GitHub पर हमेशा के लिए सेव करना
                 image_saved = save_to_github(path, img_bytes, f"Add image {safe_filename}")
                 
                 if image_saved:
-                    # 2. डेटाबेस (CSV) को अपडेट करना
                     df = load_products()
                     new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
                     df = pd.concat([df, new_row], ignore_index=True)
                     df.to_csv(DATA_FILE, index=False)
                     
-                    # 3. CSV को GitHub पर हमेशा के लिए सेव करना
                     with open(DATA_FILE, "r", encoding="utf-8") as f:
                         csv_content = f.read()
                     csv_saved = save_to_github(DATA_FILE, csv_content, f"Add product {new_name}")
@@ -183,7 +195,7 @@ else:
                         st.sidebar.success(f"✅ उत्पाद '{new_name}' हमेशा के लिए सेव हो गया!")
                         st.rerun()
                     else:
-                        st.sidebar.error("डेटाबेस (CSV) को सेव करने में समस्या आई।")
+                        st.sidebar.error("डेटाबेस को सेव करने में समस्या आई।")
                 else:
                     st.sidebar.error("इमेज को GitHub पर सेव करने में समस्या आई।")
 
@@ -224,16 +236,14 @@ def show_product_card(row, idx, prefix):
         image_path = str(row.get("Image_Path", "")).replace("\\", "/")
         img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(image_path, safe='/')}"
         
-        # स्मार्ट इमेज लोडर: पहले लोकल चेक करेगा, फिर इंटरनेट से मंगाएगा
         if os.path.exists(image_path):
             st.image(image_path, use_container_width=True)
         else:
             try:
-                # इंटरनेट से लाते समय पुराने कैश से बचने के लिए रैंडम टाइम जोड़ें
                 cache_bust_link = f"{img_link}?t={int(time.time())}"
                 st.image(cache_bust_link, use_container_width=True)
             except:
-                st.info("⏳ फोटो लोड हो रही है... कृपया कुछ सेकंड बाद रिफ्रेश करें।")
+                st.info("⏳ फोटो लोड हो रही है...")
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
