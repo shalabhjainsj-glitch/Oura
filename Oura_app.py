@@ -5,6 +5,7 @@ import urllib.parse
 import json
 import requests
 import base64
+import time
 
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
@@ -16,12 +17,12 @@ GITHUB_REPO = "shalabhjainsj-glitch/Oura"
 GITHUB_BRANCH = "main"
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
 
-# 🌟 नया जादुई फंक्शन: जो डेटा को हमेशा के लिए GitHub में सेव करेगा!
+# 🌟 जादुई फंक्शन: जो डेटा को हमेशा के लिए GitHub में सेव करेगा
 def save_to_github(file_path, content, commit_message):
     try:
         token = st.secrets["GITHUB_TOKEN"]
-    except:
-        st.error("⚠️ GitHub Token नहीं मिला! कृपया ऐप की सेटिंग्स (Secrets) चेक करें।")
+    except Exception as e:
+        st.error(f"⚠️ GitHub Token नहीं मिला या गलत है! कृपया ऐप की सेटिंग्स चेक करें। Error: {e}")
         return False
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
@@ -30,7 +31,6 @@ def save_to_github(file_path, content, commit_message):
         "Accept": "application/vnd.github.v3+json"
     }
     
-    # चेक करें कि फाइल पहले से है या नहीं (अपडेट करने के लिए)
     response = requests.get(url, headers=headers)
     sha = response.json().get("sha") if response.status_code == 200 else None
         
@@ -44,7 +44,12 @@ def save_to_github(file_path, content, commit_message):
         data["sha"] = sha
         
     put_response = requests.put(url, headers=headers, json=data)
-    return put_response.status_code in [200, 201]
+    
+    if put_response.status_code in [200, 201]:
+        return True
+    else:
+        st.error(f"GitHub पर सेव करने में एरर: {put_response.json().get('message')}")
+        return False
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -58,8 +63,7 @@ def load_config():
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
-    # सेटिंग्स को भी GitHub पर पक्का सेव करें
-    save_to_github(CONFIG_FILE, json.dumps(config, indent=4), "Update settings")
+    save_to_github(CONFIG_FILE, json.dumps(config, indent=4), "Update settings.json")
 
 current_config = load_config()
 
@@ -147,27 +151,41 @@ else:
         img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
         
         if st.form_submit_button("सेव करें") and new_id and new_name and img and final_cat:
-            st.info("डेटा सेव हो रहा है, कृपया 2-3 सेकंड प्रतीक्षा करें...")
-            safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-            path = f"images/{safe_filename}"
-            
-            # 1. फोटो को GitHub पर हमेशा के लिए सेव करना
-            img_bytes = img.getvalue()
-            save_to_github(path, img_bytes, f"Add image {safe_filename}")
-            
-            # 2. डेटाबेस (CSV) को अपडेट करना
-            df = load_products()
-            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
-            df = pd.concat([df, new_row], ignore_index=True)
-            df.to_csv(DATA_FILE, index=False)
-            
-            # 3. CSV को GitHub पर हमेशा के लिए सेव करना
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                csv_content = f.read()
-            save_to_github(DATA_FILE, csv_content, f"Add product {new_name}")
-            
-            st.sidebar.success(f"✅ उत्पाद '{new_name}' हमेशा के लिए सेव हो गया!")
-            st.rerun()
+            with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
+                safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                path = f"images/{safe_filename}"
+                
+                img_bytes = img.getvalue()
+                
+                # 0. लोकल सेव (ताकि फोटो तुरंत स्क्रीन पर दिख जाए)
+                try:
+                    with open(path, "wb") as f:
+                        f.write(img_bytes)
+                except:
+                    pass
+
+                # 1. फोटो को GitHub पर हमेशा के लिए सेव करना
+                image_saved = save_to_github(path, img_bytes, f"Add image {safe_filename}")
+                
+                if image_saved:
+                    # 2. डेटाबेस (CSV) को अपडेट करना
+                    df = load_products()
+                    new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
+                    df = pd.concat([df, new_row], ignore_index=True)
+                    df.to_csv(DATA_FILE, index=False)
+                    
+                    # 3. CSV को GitHub पर हमेशा के लिए सेव करना
+                    with open(DATA_FILE, "r", encoding="utf-8") as f:
+                        csv_content = f.read()
+                    csv_saved = save_to_github(DATA_FILE, csv_content, f"Add product {new_name}")
+                    
+                    if csv_saved:
+                        st.sidebar.success(f"✅ उत्पाद '{new_name}' हमेशा के लिए सेव हो गया!")
+                        st.rerun()
+                    else:
+                        st.sidebar.error("डेटाबेस (CSV) को सेव करने में समस्या आई।")
+                else:
+                    st.sidebar.error("इमेज को GitHub पर सेव करने में समस्या आई।")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
@@ -181,13 +199,16 @@ else:
             df_updated = df_del[df_del['ID'].astype(str) != del_id]
             df_updated.to_csv(DATA_FILE, index=False)
             
-            # GitHub पर अपडेटेड फाइल सेव करें
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                csv_content = f.read()
-            save_to_github(DATA_FILE, csv_content, f"Delete product {del_id}")
-            
-            st.sidebar.success(f"उत्पाद हमेशा के लिए हटा दिया गया!")
-            st.rerun()
+            with st.spinner("डेटाबेस को अपडेट किया जा रहा है..."):
+                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                    csv_content = f.read()
+                csv_saved = save_to_github(DATA_FILE, csv_content, f"Delete product {del_id}")
+                
+                if csv_saved:
+                    st.sidebar.success(f"उत्पाद हमेशा के लिए हटा दिया गया!")
+                    st.rerun()
+                else:
+                    st.sidebar.error("डेटाबेस को अपडेट करने में समस्या आई।")
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
@@ -200,11 +221,19 @@ if 'cart' not in st.session_state:
 
 def show_product_card(row, idx, prefix):
     with st.container(border=True):
-        image_path = row.get("Image_Path", "")
-        # अब इमेज सीधे GitHub से लोड होगी, इसलिए कभी गायब नहीं होगी!
-        img_link = GITHUB_RAW_URL + urllib.parse.quote(str(image_path))
+        image_path = str(row.get("Image_Path", "")).replace("\\", "/")
+        img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(image_path, safe='/')}"
         
-        st.image(img_link, use_container_width=True)
+        # स्मार्ट इमेज लोडर: पहले लोकल चेक करेगा, फिर इंटरनेट से मंगाएगा
+        if os.path.exists(image_path):
+            st.image(image_path, use_container_width=True)
+        else:
+            try:
+                # इंटरनेट से लाते समय पुराने कैश से बचने के लिए रैंडम टाइम जोड़ें
+                cache_bust_link = f"{img_link}?t={int(time.time())}"
+                st.image(cache_bust_link, use_container_width=True)
+            except:
+                st.info("⏳ फोटो लोड हो रही है... कृपया कुछ सेकंड बाद रिफ्रेश करें।")
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
