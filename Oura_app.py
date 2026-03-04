@@ -3,7 +3,8 @@ import pandas as pd
 import os
 import urllib.parse
 import json
-import shutil
+import requests
+import base64
 
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
@@ -11,7 +12,39 @@ st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="w
 BANNER_FILE = "banner.png" 
 CONFIG_FILE = "config.json"
 DATA_FILE = "oura_products.csv"
-GITHUB_RAW_URL = "https://raw.githubusercontent.com/shalabhjainsj-glitch/Oura/main/"
+GITHUB_REPO = "shalabhjainsj-glitch/Oura"
+GITHUB_BRANCH = "main"
+GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
+
+# 🌟 नया जादुई फंक्शन: जो डेटा को हमेशा के लिए GitHub में सेव करेगा!
+def save_to_github(file_path, content, commit_message):
+    try:
+        token = st.secrets["GITHUB_TOKEN"]
+    except:
+        st.error("⚠️ GitHub Token नहीं मिला! कृपया ऐप की सेटिंग्स (Secrets) चेक करें।")
+        return False
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    # चेक करें कि फाइल पहले से है या नहीं (अपडेट करने के लिए)
+    response = requests.get(url, headers=headers)
+    sha = response.json().get("sha") if response.status_code == 200 else None
+        
+    if isinstance(content, str):
+        encoded_content = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+    else:
+        encoded_content = base64.b64encode(content).decode('utf-8')
+        
+    data = {"message": commit_message, "content": encoded_content, "branch": GITHUB_BRANCH}
+    if sha:
+        data["sha"] = sha
+        
+    put_response = requests.put(url, headers=headers, json=data)
+    return put_response.status_code in [200, 201]
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -20,26 +53,20 @@ def load_config():
                 return json.load(f)
         except:
             pass
-    return {
-        "admin_whatsapp": "919891587437", 
-        "upi_id": "9891587437@upi", 
-        "payment_options": "UPI, Bank Transfer"
-    }
+    return {"admin_whatsapp": "919891587437", "upi_id": "9891587437@upi"}
 
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
+    # सेटिंग्स को भी GitHub पर पक्का सेव करें
+    save_to_github(CONFIG_FILE, json.dumps(config, indent=4), "Update settings")
 
 current_config = load_config()
 
-# डेटाबेस सेटअप
 if not os.path.exists("images"):
     os.makedirs("images")
 
-expected_columns = [
-    "ID", "Name", "Price", "Wholesale_Price", 
-    "Wholesale_Qty", "Category", "Image_Path"
-]
+expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"]
 
 def init_db():
     if not os.path.exists(DATA_FILE):
@@ -91,28 +118,21 @@ else:
     
     with st.sidebar.expander("⚙️ ऐप सेटिंग्स"):
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
-        new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", "9891587437@upi"))
-        new_banner = st.file_uploader("बैनर बदलें", type=["jpg", "png", "jpeg"])
+        new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
         
-        if new_banner is not None:
-            with open(BANNER_FILE, "wb") as f:
-                f.write(new_banner.getbuffer())
-            st.success("बैनर अपडेट हो गया!")
-            
         if st.button("सेटिंग्स सेव करें"):
             current_config["admin_whatsapp"] = new_wa
             current_config["upi_id"] = new_upi
             save_config(current_config)
-            st.success("सेटिंग्स सेव!")
+            st.success("सेटिंग्स हमेशा के लिए सेव हो गईं!")
             st.rerun()
 
-    # --- नया सामान जोड़ने का सेक्शन ---
     st.sidebar.subheader("➕ नया उत्पाद जोड़ें")
     with st.sidebar.form("add_product", clear_on_submit=True):
-        new_id = st.text_input("ID (यूनिक रखें, जैसे P001)")
+        new_id = st.text_input("ID (यूनिक रखें)")
         new_name = st.text_input("नाम")
         new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
-        new_w_qty = st.number_input("होलसेल के लिए कम से कम पीस (जैसे 100)", min_value=1, value=10)
+        new_w_qty = st.number_input("होलसेल के लिए कम से कम पीस", min_value=1, value=10)
         new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
         
         existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
@@ -120,30 +140,35 @@ else:
         selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
         
         if selected_cat == "नयी केटेगरी बनाएं...":
-            final_cat = st.text_input("नई केटेगरी का नाम लिखें (जैसे: Shirt, Mobile)")
+            final_cat = st.text_input("नई केटेगरी का नाम लिखें")
         else:
             final_cat = selected_cat
             
         img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
         
         if st.form_submit_button("सेव करें") and new_id and new_name and img and final_cat:
+            st.info("डेटा सेव हो रहा है, कृपया 2-3 सेकंड प्रतीक्षा करें...")
             safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-            path = os.path.join("images", safe_filename)
+            path = f"images/{safe_filename}"
             
-            with open(path, "wb") as f:
-                f.write(img.getbuffer())
-                
+            # 1. फोटो को GitHub पर हमेशा के लिए सेव करना
+            img_bytes = img.getvalue()
+            save_to_github(path, img_bytes, f"Add image {safe_filename}")
+            
+            # 2. डेटाबेस (CSV) को अपडेट करना
             df = load_products()
-            new_row = pd.DataFrame(
-                [[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], 
-                columns=expected_columns
-            )
+            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
-            st.sidebar.success(f"✅ उत्पाद '{final_cat}' केटेगरी में जुड़ गया!")
+            
+            # 3. CSV को GitHub पर हमेशा के लिए सेव करना
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                csv_content = f.read()
+            save_to_github(DATA_FILE, csv_content, f"Add product {new_name}")
+            
+            st.sidebar.success(f"✅ उत्पाद '{new_name}' हमेशा के लिए सेव हो गया!")
             st.rerun()
 
-    # --- सुरक्षित डिलीट सेक्शन (सिर्फ एक-एक करके) ---
     st.sidebar.markdown("---")
     st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
     df_del = load_products()
@@ -155,20 +180,19 @@ else:
             del_id = item_to_delete.split(" - ")[0]
             df_updated = df_del[df_del['ID'].astype(str) != del_id]
             df_updated.to_csv(DATA_FILE, index=False)
-            st.sidebar.success(f"सिर्फ 1 उत्पाद हटा दिया गया!")
+            
+            # GitHub पर अपडेटेड फाइल सेव करें
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                csv_content = f.read()
+            save_to_github(DATA_FILE, csv_content, f"Delete product {del_id}")
+            
+            st.sidebar.success(f"उत्पाद हमेशा के लिए हटा दिया गया!")
             st.rerun()
     else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
 # 3. कस्टमर व्यू
-if os.path.exists(BANNER_FILE):
-    try:
-        st.image(BANNER_FILE, use_container_width=True)
-    except:
-        pass
-
 st.title("🛍️ Oura")
-
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
 if 'cart' not in st.session_state:
@@ -177,13 +201,10 @@ if 'cart' not in st.session_state:
 def show_product_card(row, idx, prefix):
     with st.container(border=True):
         image_path = row.get("Image_Path", "")
-        if pd.notna(image_path) and os.path.exists(str(image_path)):
-            try:
-                st.image(str(image_path), use_container_width=True)
-            except:
-                st.warning("⚠️ फोटो में खराबी")
-        else:
-            st.warning("⚠️ फोटो उपलब्ध नहीं")
+        # अब इमेज सीधे GitHub से लोड होगी, इसलिए कभी गायब नहीं होगी!
+        img_link = GITHUB_RAW_URL + urllib.parse.quote(str(image_path))
+        
+        st.image(img_link, use_container_width=True)
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
@@ -197,11 +218,7 @@ def show_product_card(row, idx, prefix):
             w_price = retail_price
         
         if w_qty > 1:
-            st.markdown(
-                f"**रिटेल:** ₹{retail_price} <br> "
-                f"**होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", 
-                unsafe_allow_html=True
-            )
+            st.markdown(f"**रिटेल:** ₹{retail_price} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
         else:
             st.markdown(f"**रेट:** ₹{retail_price}")
             
@@ -209,8 +226,6 @@ def show_product_card(row, idx, prefix):
         
         if st.button("कार्ट में डालें", key=f"b_{prefix}_{idx}"):
             final_price = w_price if qty >= w_qty else retail_price
-            img_link = GITHUB_RAW_URL + urllib.parse.quote(str(image_path))
-            
             st.session_state.cart[f"{prefix}_{idx}"] = {
                 "name": row.get('Name', 'Item'), 
                 "price": final_price, 
@@ -227,13 +242,12 @@ else:
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
         
         if filtered_df.empty:
-            st.warning("इस नाम से कोई उत्पाद नहीं मिला। कुछ और लिखकर सर्च करें।")
+            st.warning("इस नाम से कोई उत्पाद नहीं मिला।")
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
                 with cols[idx % 3]:
                     show_product_card(row, idx, "search")
-    
     else:
         valid_categories = products_df['Category'].dropna().unique().tolist()
         if len(valid_categories) == 0:
@@ -264,18 +278,14 @@ if st.session_state.cart:
         subtotal = item['price'] * item['qty']
         total += subtotal
         st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
-        
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
-        msg += f"   🖼️ {item['img_link']}\n"
         count += 1
     
     msg += f"\n💰 *कुल बिल:* ₹{total}\n"
     msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
     
     st.subheader(f"कुल बिल: ₹{total}")
-    st.info("⚠️ नोट: पैकिंग व ट्रांसपोर्ट चार्ज Extra (अलग से लगेंगे)")
     
-    # UPI ID दिखाने का सेक्शन
     upi = current_config.get("upi_id", "")
     if upi:
         st.success(f"💳 **पेमेंट के लिए UPI ID:** `{upi}`")
@@ -289,6 +299,7 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
 
 
 
