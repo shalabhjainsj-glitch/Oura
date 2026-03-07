@@ -27,11 +27,12 @@ GITHUB_REPO = "shalabhjainsj-glitch/Oura"
 GITHUB_BRANCH = "main"
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
 
+# 🌟 जादुई फंक्शन: जो डेटा को हमेशा के लिए GitHub में सेव करेगा
 def save_to_github(file_path, content, commit_message):
     try:
         token = st.secrets["GITHUB_TOKEN"]
     except Exception as e:
-        st.error(f"⚠️ GitHub Token नहीं मिला या गलत है! कृपया ऐप की सेटिंग्स चेक करें।")
+        st.error("⚠️ GitHub Token नहीं मिला या गलत है! कृपया ऐप की सेटिंग्स चेक करें।")
         return False
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
@@ -54,10 +55,7 @@ def save_to_github(file_path, content, commit_message):
         
     put_response = requests.put(url, headers=headers, json=data)
     
-    if put_response.status_code in [200, 201]:
-        return True
-    else:
-        return False
+    return put_response.status_code in [200, 201]
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -109,150 +107,15 @@ def load_products():
 
 products_df = load_products()
 
-# 2. एडमिन पैनल
-st.sidebar.title("🔒 एडमिन पैनल")
-
+# --- सेशन स्टेट इनिशियलाइज़ेशन ---
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
+if 'show_login' not in st.session_state:
+    st.session_state.show_login = False
+if 'cart' not in st.session_state:
+    st.session_state.cart = {}
 
-if not st.session_state.admin_logged_in:
-    password = st.sidebar.text_input("पासवर्ड डालें", type="password")
-    if st.sidebar.button("लॉगिन"):
-        try:
-            correct_password = st.secrets["ADMIN_PASSWORD"]
-        except:
-            st.sidebar.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला! कृपया Secrets अपडेट करें।")
-            correct_password = None
-            
-        if correct_password and password == correct_password:
-            st.session_state.admin_logged_in = True
-            st.rerun()
-        else:
-            st.sidebar.error("❌ गलत पासवर्ड!")
-else:
-    if st.sidebar.button("🚪 लॉगआउट"):
-        st.session_state.admin_logged_in = False
-        st.rerun()
-    
-    # --- 🖼️ नया फीचर: बैनर सेटिंग्स ---
-    with st.sidebar.expander("🖼️ बैनर (Banner) सेटिंग्स"):
-        st.write("दुकान के सबसे ऊपर दिखने वाला फोटो लगाएं/बदलें")
-        new_banner = st.file_uploader("नया बैनर चुनें (चौड़ी फोटो बेहतर रहेगी)", type=["jpg", "png", "jpeg"], key="banner_upload")
-        
-        if st.button("बैनर सेव करें") and new_banner:
-            with st.spinner("बैनर सेव हो रहा है..."):
-                banner_bytes = new_banner.getvalue()
-                
-                try:
-                    with open(BANNER_FILE, "wb") as f:
-                        f.write(banner_bytes)
-                except:
-                    pass
-                
-                if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
-                    current_config["has_banner"] = True
-                    save_config(current_config)
-                    st.success("✅ शानदार! बैनर लग गया है।")
-                    st.rerun()
-                else:
-                    st.error("बैनर सेव करने में समस्या आई।")
-                    
-        if current_config.get("has_banner", False):
-            if st.button("❌ बैनर हटाएं"):
-                current_config["has_banner"] = False
-                save_config(current_config)
-                st.success("बैनर हटा दिया गया है!")
-                st.rerun()
-
-    with st.sidebar.expander("⚙️ ऐप सेटिंग्स"):
-        new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
-        new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
-        
-        if st.button("सेटिंग्स सेव करें"):
-            current_config["admin_whatsapp"] = new_wa
-            current_config["upi_id"] = new_upi
-            save_config(current_config)
-            st.success("सेटिंग्स हमेशा के लिए सेव हो गईं!")
-            st.rerun()
-
-    st.sidebar.subheader("➕ नया उत्पाद जोड़ें")
-    with st.sidebar.form("add_product", clear_on_submit=True):
-        new_id = st.text_input("ID (यूनिक रखें)")
-        new_name = st.text_input("नाम")
-        new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
-        new_w_qty = st.number_input("होलसेल के लिए कम से कम पीस", min_value=1, value=10)
-        new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
-        
-        existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-        cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
-        selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
-        
-        if selected_cat == "नयी केटेगरी बनाएं...":
-            final_cat = st.text_input("नई केटेगरी का नाम लिखें")
-        else:
-            final_cat = selected_cat
-            
-        img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
-        
-        if st.form_submit_button("सेव करें") and new_id and new_name and img and final_cat:
-            with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
-                safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                path = f"images/{safe_filename}"
-                
-                img_bytes = img.getvalue()
-                
-                try:
-                    with open(path, "wb") as f:
-                        f.write(img_bytes)
-                except:
-                    pass
-
-                image_saved = save_to_github(path, img_bytes, f"Add image {safe_filename}")
-                
-                if image_saved:
-                    df = load_products()
-                    new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
-                    df = pd.concat([df, new_row], ignore_index=True)
-                    df.to_csv(DATA_FILE, index=False)
-                    
-                    with open(DATA_FILE, "r", encoding="utf-8") as f:
-                        csv_content = f.read()
-                    csv_saved = save_to_github(DATA_FILE, csv_content, f"Add product {new_name}")
-                    
-                    if csv_saved:
-                        st.sidebar.success(f"✅ उत्पाद '{new_name}' हमेशा के लिए सेव हो गया!")
-                        st.rerun()
-                    else:
-                        st.sidebar.error("डेटाबेस को सेव करने में समस्या आई।")
-                else:
-                    st.sidebar.error("इमेज को GitHub पर सेव करने में समस्या आई।")
-
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🗑️ उत्पाद हटाएं (Delete)")
-    df_del = load_products()
-    if not df_del.empty and "ID" in df_del.columns and "Name" in df_del.columns:
-        product_list = df_del['ID'].astype(str) + " - " + df_del['Name'].astype(str)
-        item_to_delete = st.sidebar.selectbox("हटाने के लिए उत्पाद चुनें:", product_list)
-        
-        if st.sidebar.button("❌ पक्का डिलीट करें"):
-            del_id = item_to_delete.split(" - ")[0]
-            df_updated = df_del[df_del['ID'].astype(str) != del_id]
-            df_updated.to_csv(DATA_FILE, index=False)
-            
-            with st.spinner("डेटाबेस को अपडेट किया जा रहा है..."):
-                with open(DATA_FILE, "r", encoding="utf-8") as f:
-                    csv_content = f.read()
-                csv_saved = save_to_github(DATA_FILE, csv_content, f"Delete product {del_id}")
-                
-                if csv_saved:
-                    st.sidebar.success(f"उत्पाद हमेशा के लिए हटा दिया गया!")
-                    st.rerun()
-                else:
-                    st.sidebar.error("डेटाबेस को अपडेट करने में समस्या आई।")
-    else:
-        st.sidebar.write("अभी कोई उत्पाद नहीं है।")
-
-# 3. कस्टमर व्यू
+# --- 🖼️ बैनर (सबके लिए) ---
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
         st.image(BANNER_FILE, use_container_width=True)
@@ -265,10 +128,165 @@ if current_config.get("has_banner", False):
 else:
     st.title("🛍️ Oura Wholesale")
 
-search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
+# --- 🔒 सुरक्षित लॉगिन सिस्टम (मुख्य पेज पर) ---
+col1, col2 = st.columns([8, 2])
+with col2:
+    if not st.session_state.admin_logged_in:
+        if st.button("🔒 एडमिन लॉगिन"):
+            st.session_state.show_login = not st.session_state.show_login
+    else:
+        if st.button("🚪 लॉगआउट"):
+            st.session_state.admin_logged_in = False
+            st.session_state.show_login = False
+            st.rerun()
 
-if 'cart' not in st.session_state:
-    st.session_state.cart = {}
+if st.session_state.show_login and not st.session_state.admin_logged_in:
+    with st.container(border=True):
+        st.subheader("एडमिन एक्सेस")
+        password = st.text_input("पासवर्ड डालें", type="password")
+        if st.button("लॉगिन करें"):
+            try:
+                correct_password = st.secrets["ADMIN_PASSWORD"]
+            except:
+                st.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला! कृपया Secrets अपडेट करें।")
+                correct_password = None
+                
+            if correct_password and password == correct_password:
+                st.session_state.admin_logged_in = True
+                st.session_state.show_login = False
+                st.rerun()
+            else:
+                st.error("❌ गलत पासवर्ड!")
+    st.markdown("---")
+
+# --- 🛠️ एडमिन पैनल (सिर्फ लॉगिन होने पर दिखेगा) ---
+if st.session_state.admin_logged_in:
+    st.success("✅ आप एडमिन के रूप में लॉग इन हैं।")
+    
+    tab1, tab2, tab3 = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर सेटिंग्स", "⚙️ ऐप सेटिंग्स"])
+    
+    with tab1:
+        st.subheader("नया उत्पाद जोड़ें")
+        with st.form("add_product", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                new_id = st.text_input("ID (यूनिक रखें)")
+                new_name = st.text_input("नाम")
+                new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
+            with col_b:
+                new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
+                new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
+            
+            existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
+            selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
+            
+            if selected_cat == "नयी केटेगरी बनाएं...":
+                final_cat = st.text_input("नई केटेगरी का नाम लिखें")
+            else:
+                final_cat = selected_cat
+                
+            img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
+            
+            if st.form_submit_button("उत्पाद सेव करें") and new_id and new_name and img and final_cat:
+                with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
+                    safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                    path = f"images/{safe_filename}"
+                    img_bytes = img.getvalue()
+                    
+                    try:
+                        with open(path, "wb") as f:
+                            f.write(img_bytes)
+                    except:
+                        pass
+
+                    if save_to_github(path, img_bytes, f"Add image {safe_filename}"):
+                        df = load_products()
+                        new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
+                        df = pd.concat([df, new_row], ignore_index=True)
+                        df.to_csv(DATA_FILE, index=False)
+                        
+                        with open(DATA_FILE, "r", encoding="utf-8") as f:
+                            csv_content = f.read()
+                        if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
+                            st.success(f"✅ उत्पाद '{new_name}' हमेशा के लिए सेव हो गया!")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("डेटाबेस को सेव करने में समस्या आई।")
+                    else:
+                        st.error("इमेज को GitHub पर सेव करने में समस्या आई।")
+        
+        st.markdown("---")
+        st.subheader("🗑️ उत्पाद हटाएं (Delete)")
+        df_del = load_products()
+        if not df_del.empty and "ID" in df_del.columns and "Name" in df_del.columns:
+            product_list = df_del['ID'].astype(str) + " - " + df_del['Name'].astype(str)
+            item_to_delete = st.selectbox("हटाने के लिए उत्पाद चुनें:", product_list)
+            
+            if st.button("❌ पक्का डिलीट करें"):
+                del_id = item_to_delete.split(" - ")[0]
+                df_updated = df_del[df_del['ID'].astype(str) != del_id]
+                df_updated.to_csv(DATA_FILE, index=False)
+                
+                with st.spinner("डेटाबेस को अपडेट किया जा रहा है..."):
+                    with open(DATA_FILE, "r", encoding="utf-8") as f:
+                        csv_content = f.read()
+                    if save_to_github(DATA_FILE, csv_content, f"Delete product {del_id}"):
+                        st.success("उत्पाद हमेशा के लिए हटा दिया गया!")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("डेटाबेस को अपडेट करने में समस्या आई।")
+
+    with tab2:
+        st.subheader("🖼️ बैनर (Banner) सेटिंग्स")
+        st.write("दुकान के सबसे ऊपर दिखने वाला फोटो लगाएं/बदलें")
+        new_banner = st.file_uploader("नया बैनर चुनें (चौड़ी फोटो बेहतर रहेगी)", type=["jpg", "png", "jpeg"], key="banner_upload")
+        
+        if st.button("बैनर सेव करें") and new_banner:
+            with st.spinner("बैनर सेव हो रहा है..."):
+                banner_bytes = new_banner.getvalue()
+                try:
+                    with open(BANNER_FILE, "wb") as f:
+                        f.write(banner_bytes)
+                except:
+                    pass
+                
+                if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
+                    current_config["has_banner"] = True
+                    save_config(current_config)
+                    st.success("✅ शानदार! बैनर लग गया है।")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("बैनर सेव करने में समस्या आई।")
+                    
+        if current_config.get("has_banner", False):
+            if st.button("❌ बैनर हटाएं"):
+                current_config["has_banner"] = False
+                save_config(current_config)
+                st.success("बैनर हटा दिया गया है!")
+                time.sleep(2)
+                st.rerun()
+
+    with tab3:
+        st.subheader("⚙️ ऐप सेटिंग्स")
+        new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
+        new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
+        
+        if st.button("सेटिंग्स सेव करें"):
+            current_config["admin_whatsapp"] = new_wa
+            current_config["upi_id"] = new_upi
+            save_config(current_config)
+            st.success("सेटिंग्स हमेशा के लिए सेव हो गईं!")
+            time.sleep(2)
+            st.rerun()
+    
+    st.markdown("---")
+
+# --- 🛍️ कस्टमर व्यू (प्रोडक्ट लिस्ट) ---
+search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
 def show_product_card(row, idx, prefix):
     with st.container(border=True):
@@ -377,7 +395,6 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
-
 
 
 
