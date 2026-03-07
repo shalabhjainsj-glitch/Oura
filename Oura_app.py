@@ -27,7 +27,6 @@ GITHUB_REPO = "shalabhjainsj-glitch/Oura"
 GITHUB_BRANCH = "main"
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
 
-# 🌟 जादुई फंक्शन: जो डेटा को हमेशा के लिए GitHub में सेव करेगा
 def save_to_github(file_path, content, commit_message):
     try:
         token = st.secrets["GITHUB_TOKEN"]
@@ -119,7 +118,6 @@ if 'admin_logged_in' not in st.session_state:
 if not st.session_state.admin_logged_in:
     password = st.sidebar.text_input("पासवर्ड डालें", type="password")
     if st.sidebar.button("लॉगिन"):
-        # 🛡️ सुरक्षा चक्र: पासवर्ड तिजोरी (Secrets) से लिया जाएगा
         try:
             correct_password = st.secrets["ADMIN_PASSWORD"]
         except:
@@ -145,14 +143,12 @@ else:
             with st.spinner("बैनर सेव हो रहा है..."):
                 banner_bytes = new_banner.getvalue()
                 
-                # लोकल सेव
                 try:
                     with open(BANNER_FILE, "wb") as f:
                         f.write(banner_bytes)
                 except:
                     pass
                 
-                # GitHub पर सेव
                 if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
                     current_config["has_banner"] = True
                     save_config(current_config)
@@ -257,7 +253,6 @@ else:
         st.sidebar.write("अभी कोई उत्पाद नहीं है।")
 
 # 3. कस्टमर व्यू
-# 🖼️ यहाँ बैनर दिखेगा
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
         st.image(BANNER_FILE, use_container_width=True)
