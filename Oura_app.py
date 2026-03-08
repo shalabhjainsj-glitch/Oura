@@ -10,12 +10,14 @@ import time
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
 
-# 🛡️ सुरक्षा चक्र: Streamlit का मेन्यू और हेडर छुपाने का कोड
+# 🛡️ सुरक्षा चक्र: Streamlit का मेन्यू, हेडर और 'लाल लाइन' छुपाने का कोड
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             header {visibility: hidden;}
             footer {visibility: hidden;}
+            /* 🔴 नीचे वाली लाइन Streamlit की लाल पट्टी को गायब कर देगी */
+            div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
