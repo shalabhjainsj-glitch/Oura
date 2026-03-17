@@ -160,16 +160,13 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
                 st.error("❌ गलत पासवर्ड!")
     st.markdown("---")
 
-# --- 🛠️ एडमिन पैनल (सिर्फ लॉगिन होने पर दिखेगा) ---
+# --- 🛠️ एडमिन पैनल (सिर्फ नया जोड़ने और सेटिंग्स के लिए) ---
 if st.session_state.admin_logged_in:
-    st.success("✅ आप एडमिन के रूप में लॉग इन हैं।")
+    st.success("✅ आप एडमिन के रूप में लॉग इन हैं। किसी भी पुराने उत्पाद को बदलने या हटाने के लिए सीधे नीचे उस उत्पाद पर जाएं।")
     
-    # 🌟 नया डिज़ाइन: अब आपके पास 5 टैब होंगे
-    tab_add, tab_edit, tab_del, tab_banner, tab_settings = st.tabs(["➕ नया", "✏️ एडिट", "🗑️ डिलीट", "🖼️ बैनर", "⚙️ सेटिंग्स"])
+    tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद जोड़ें", "🖼️ बैनर सेटिंग्स", "⚙️ ऐप सेटिंग्स"])
     
-    # --- 1. नया उत्पाद ---
     with tab_add:
-        st.subheader("नया उत्पाद जोड़ें")
         with st.form("add_product", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
@@ -192,7 +189,7 @@ if st.session_state.admin_logged_in:
             img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
             
             if st.form_submit_button("उत्पाद सेव करें") and new_id and new_name and img and final_cat:
-                with st.spinner("डेटा सेव हो रहा है..."):
+                with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
                     safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
                     path = f"images/{safe_filename}"
                     img_bytes = img.getvalue()
@@ -213,116 +210,14 @@ if st.session_state.admin_logged_in:
                             csv_content = f.read()
                         if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
                             st.success(f"✅ उत्पाद '{new_name}' सेव हो गया!")
-                            time.sleep(2)
+                            time.sleep(1)
                             st.rerun()
                         else:
-                            st.error("डेटाबेस सेव करने में समस्या आई।")
+                            st.error("डेटाबेस को सेव करने में समस्या आई।")
                     else:
                         st.error("इमेज को GitHub पर सेव करने में समस्या आई।")
 
-    # --- 2. 🌟 नया फीचर: उत्पाद एडिट करें (Update) ---
-    with tab_edit:
-        st.subheader("✏️ उत्पाद में बदलाव करें (Edit)")
-        df_edit = load_products()
-        if not df_edit.empty and "ID" in df_edit.columns and "Name" in df_edit.columns:
-            product_list = df_edit['ID'].astype(str) + " - " + df_edit['Name'].astype(str)
-            item_to_edit = st.selectbox("बदलने के लिए उत्पाद चुनें:", product_list, key="edit_select")
-            
-            if item_to_edit:
-                edit_id = item_to_edit.split(" - ")[0]
-                current_row = df_edit[df_edit['ID'].astype(str) == edit_id].iloc[0]
-                
-                # पुरानी वैल्यूज़ को सुरक्षित तरीके से निकालना
-                try: p_price = int(float(current_row.get("Price", 1)))
-                except: p_price = 1
-                try: p_w_price = int(float(current_row.get("Wholesale_Price", 1)))
-                except: p_w_price = 1
-                try: p_w_qty = int(float(current_row.get("Wholesale_Qty", 10)))
-                except: p_w_qty = 10
-                
-                with st.form("edit_product_form"):
-                    st.write("नई जानकारी भरें (जो नहीं बदलना, उसे वैसे ही रहने दें)")
-                    col_c, col_d = st.columns(2)
-                    with col_c:
-                        e_name = st.text_input("नाम", value=str(current_row.get("Name", "")))
-                        e_price = st.number_input("रिटेल रेट", min_value=1, value=p_price)
-                    with col_d:
-                        e_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=p_w_qty)
-                        e_w_price = st.number_input("होलसेल रेट", min_value=1, value=p_w_price)
-                    
-                    existing_cats_edit = df_edit['Category'].dropna().unique().tolist()
-                    current_cat = str(current_row.get("Category", ""))
-                    if current_cat not in existing_cats_edit:
-                        existing_cats_edit.insert(0, current_cat)
-                        
-                    e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat) if current_cat in existing_cats_edit else 0)
-                    
-                    st.info("🖼️ अगर फोटो बदलनी है तभी नई फोटो अपलोड करें, वरना इसे खाली छोड़ दें।")
-                    e_img = st.file_uploader("नई फोटो अपलोड करें (Optional)", type=["jpg", "png", "jpeg"], key="edit_img")
-                    
-                    if st.form_submit_button("✅ उत्पाद अपडेट करें"):
-                        with st.spinner("अपडेट हो रहा है..."):
-                            final_path = current_row.get("Image_Path", "")
-                            image_updated = True
-                            
-                            # अगर नई फोटो डाली गई है
-                            if e_img:
-                                safe_filename = e_img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                final_path = f"images/{safe_filename}"
-                                img_bytes = e_img.getvalue()
-                                try:
-                                    with open(final_path, "wb") as f:
-                                        f.write(img_bytes)
-                                except:
-                                    pass
-                                image_updated = save_to_github(final_path, img_bytes, f"Update image for {e_name}")
-                            
-                            if image_updated:
-                                # डेटाबेस में नई जानकारी डालना
-                                df_edit.loc[df_edit['ID'].astype(str) == edit_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path]
-                                df_edit.to_csv(DATA_FILE, index=False)
-                                
-                                with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                    csv_content = f.read()
-                                if save_to_github(DATA_FILE, csv_content, f"Update product {edit_id}"):
-                                    st.success("✅ उत्पाद सफलतापूर्वक अपडेट हो गया!")
-                                    time.sleep(2)
-                                    st.rerun()
-                                else:
-                                    st.error("डेटाबेस अपडेट करने में समस्या आई।")
-                            else:
-                                st.error("नई फोटो सेव करने में समस्या आई।")
-        else:
-            st.write("अभी कोई उत्पाद नहीं है।")
-
-    # --- 3. उत्पाद हटाएं ---
-    with tab_del:
-        st.subheader("🗑️ उत्पाद हटाएं (Delete)")
-        df_del = load_products()
-        if not df_del.empty and "ID" in df_del.columns and "Name" in df_del.columns:
-            product_list = df_del['ID'].astype(str) + " - " + df_del['Name'].astype(str)
-            item_to_delete = st.selectbox("हटाने के लिए उत्पाद चुनें:", product_list, key="del_select")
-            
-            if st.button("❌ पक्का डिलीट करें"):
-                del_id = item_to_delete.split(" - ")[0]
-                df_updated = df_del[df_del['ID'].astype(str) != del_id]
-                df_updated.to_csv(DATA_FILE, index=False)
-                
-                with st.spinner("डेटाबेस को अपडेट किया जा रहा है..."):
-                    with open(DATA_FILE, "r", encoding="utf-8") as f:
-                        csv_content = f.read()
-                    if save_to_github(DATA_FILE, csv_content, f"Delete product {del_id}"):
-                        st.success("उत्पाद हमेशा के लिए हटा दिया गया!")
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        st.error("डेटाबेस को अपडेट करने में समस्या आई।")
-        else:
-            st.write("अभी कोई उत्पाद नहीं है।")
-
-    # --- 4. बैनर सेटिंग्स ---
     with tab_banner:
-        st.subheader("🖼️ बैनर (Banner) सेटिंग्स")
         st.write("दुकान के सबसे ऊपर दिखने वाला फोटो लगाएं/बदलें")
         new_banner = st.file_uploader("नया बैनर चुनें (चौड़ी फोटो बेहतर रहेगी)", type=["jpg", "png", "jpeg"], key="banner_upload")
         
@@ -339,7 +234,7 @@ if st.session_state.admin_logged_in:
                     current_config["has_banner"] = True
                     save_config(current_config)
                     st.success("✅ शानदार! बैनर लग गया है।")
-                    time.sleep(2)
+                    time.sleep(1)
                     st.rerun()
                 else:
                     st.error("बैनर सेव करने में समस्या आई।")
@@ -349,12 +244,10 @@ if st.session_state.admin_logged_in:
                 current_config["has_banner"] = False
                 save_config(current_config)
                 st.success("बैनर हटा दिया गया है!")
-                time.sleep(2)
+                time.sleep(1)
                 st.rerun()
 
-    # --- 5. ऐप सेटिंग्स ---
     with tab_settings:
-        st.subheader("⚙️ ऐप सेटिंग्स")
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
         new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
         
@@ -363,7 +256,7 @@ if st.session_state.admin_logged_in:
             current_config["upi_id"] = new_upi
             save_config(current_config)
             st.success("सेटिंग्स हमेशा के लिए सेव हो गईं!")
-            time.sleep(2)
+            time.sleep(1)
             st.rerun()
     
     st.markdown("---")
@@ -412,6 +305,71 @@ def show_product_card(row, idx, prefix):
                 "img_link": img_link
             }
             st.success("कार्ट में जुड़ गया! 🛒")
+            
+        # 🌟 नया फीचर: एडमिन के लिए हर प्रोडक्ट के नीचे ही एडिट/डिलीट का ऑप्शन
+        if st.session_state.admin_logged_in:
+            st.markdown("---")
+            with st.expander("⚙️ एडिट / डिलीट करें"):
+                with st.form(f"edit_form_{prefix}_{idx}"):
+                    e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
+                    col_x, col_y = st.columns(2)
+                    with col_x:
+                        e_price = st.number_input("रिटेल", value=retail_price)
+                        e_w_qty = st.number_input("होलसेल मात्रा", value=w_qty)
+                    with col_y:
+                        e_w_price = st.number_input("होलसेल", value=w_price)
+                        
+                    existing_cats_edit = products_df['Category'].dropna().unique().tolist()
+                    current_cat = str(row.get("Category", ""))
+                    if current_cat not in existing_cats_edit:
+                        existing_cats_edit.insert(0, current_cat)
+                    e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat))
+                    
+                    e_img = st.file_uploader("नई फोटो (अगर बदलनी हो)", type=["jpg", "png", "jpeg"])
+                    
+                    update_btn = st.form_submit_button("✅ अपडेट करें")
+                    
+                if update_btn:
+                    with st.spinner("अपडेट हो रहा है..."):
+                        df_edit = load_products()
+                        final_path = row.get("Image_Path", "")
+                        image_updated = True
+                        
+                        if e_img:
+                            safe_filename = e_img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                            final_path = f"images/{safe_filename}"
+                            img_bytes = e_img.getvalue()
+                            try:
+                                with open(final_path, "wb") as f:
+                                    f.write(img_bytes)
+                            except: pass
+                            image_updated = save_to_github(final_path, img_bytes, f"Update image for {e_name}")
+                            
+                        if image_updated:
+                            df_edit.loc[df_edit['ID'].astype(str) == str(row['ID']), ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path]
+                            df_edit.to_csv(DATA_FILE, index=False)
+                            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                                csv_content = f.read()
+                            if save_to_github(DATA_FILE, csv_content, f"Update product {row['ID']}"):
+                                st.success("✅ अपडेट हो गया!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("एरर: डेटाबेस अपडेट नहीं हुआ।")
+                        else:
+                            st.error("एरर: फोटो सेव नहीं हुई।")
+
+                if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix}_{idx}"):
+                    with st.spinner("डिलीट हो रहा है..."):
+                        df_del = load_products()
+                        df_updated = df_del[df_del['ID'].astype(str) != str(row['ID'])]
+                        df_updated.to_csv(DATA_FILE, index=False)
+                        with open(DATA_FILE, "r", encoding="utf-8") as f:
+                            csv_content = f.read()
+                        if save_to_github(DATA_FILE, csv_content, f"Delete product {row['ID']}"):
+                            st.success("डिलीट हो गया!")
+                            time.sleep(1)
+                            st.rerun()
 
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
@@ -478,20 +436,3 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
