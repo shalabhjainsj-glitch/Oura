@@ -17,6 +17,23 @@ hide_streamlit_style = """
             header {visibility: hidden;}
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
+            /* स्मार्ट गैलरी के लिए CSS */
+            .thumb-container {
+                display: flex;
+                flex-direction: row;
+                justify-content: flex-start;
+                gap: 5px;
+                margin-top: 5px;
+                overflow-x: auto;
+            }
+            .thumb-img {
+                width: 60px;
+                height: 60px;
+                object-fit: cover;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                cursor: pointer;
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -77,6 +94,7 @@ current_config = load_config()
 if not os.path.exists("images"):
     os.makedirs("images")
 
+# 'Image_Path' अब '|' से अलग की गई कई फोटो के पाथ सेव करेगा (e.g., path1|path2|path3)
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"]
 
 def init_db():
@@ -115,6 +133,8 @@ if 'show_login' not in st.session_state:
     st.session_state.show_login = False
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
+if 'current_image_index' not in st.session_state:
+    st.session_state.current_image_index = {} # {product_prefix_idx : index}
 
 # --- 🖼️ बैनर (सबके लिए) ---
 if current_config.get("has_banner", False):
@@ -160,13 +180,14 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
                 st.error("❌ गलत पासवर्ड!")
     st.markdown("---")
 
-# --- 🛠️ एडमिन पैनल (सिर्फ नया जोड़ने और सेटिंग्स के लिए) ---
+# --- 🛠️ एडमिन पैनल ---
 if st.session_state.admin_logged_in:
-    st.success("✅ आप एडमिन के रूप में लॉग इन हैं। किसी भी पुराने उत्पाद को बदलने या हटाने के लिए सीधे नीचे उस उत्पाद पर जाएं।")
+    st.success("✅ आप एडमिन हैं। किसी उत्पाद को बदलने/हटाने के लिए सीधे नीचे उस उत्पाद पर जाएं।")
     
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद जोड़ें", "🖼️ बैनर सेटिंग्स", "⚙️ ऐप सेटिंग्स"])
     
     with tab_add:
+        # 🌟 अपडेट: अब आप एक साथ 3 फोटो अपलोड कर सकते हैं
         with st.form("add_product", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
@@ -186,36 +207,57 @@ if st.session_state.admin_logged_in:
             else:
                 final_cat = selected_cat
                 
-            img = st.file_uploader("फोटो अपलोड करें", type=["jpg", "png", "jpeg"])
+            # 📸 अपडेट: मल्टीपल फाइल अपलोड
+            uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3 फोटो)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
             
-            if st.form_submit_button("उत्पाद सेव करें") and new_id and new_name and img and final_cat:
-                with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
-                    safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                    path = f"images/{safe_filename}"
-                    img_bytes = img.getvalue()
-                    
-                    try:
-                        with open(path, "wb") as f:
-                            f.write(img_bytes)
-                    except:
-                        pass
-
-                    if save_to_github(path, img_bytes, f"Add image {safe_filename}"):
-                        df = load_products()
-                        new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, path]], columns=expected_columns)
-                        df = pd.concat([df, new_row], ignore_index=True)
-                        df.to_csv(DATA_FILE, index=False)
+            submit_btn = st.form_submit_button("उत्पाद सेव करें")
+            
+            if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
+                if len(uploaded_imgs) > 3:
+                    st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+                else:
+                    with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
+                        image_paths = []
+                        all_images_saved = True
                         
-                        with open(DATA_FILE, "r", encoding="utf-8") as f:
-                            csv_content = f.read()
-                        if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                            st.success(f"✅ उत्पाद '{new_name}' सेव हो गया!")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("डेटाबेस को सेव करने में समस्या आई।")
-                    else:
-                        st.error("इमेज को GitHub पर सेव करने में समस्या आई।")
+                        # हर इमेज को लूप में सेव करें
+                        for idx, img in enumerate(uploaded_imgs):
+                            safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                            # यूनिक नाम देने के लिए ID और इंडेक्स जोड़ें
+                            timestamp = int(time.time())
+                            final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
+                            path = f"images/{final_filename}"
+                            img_bytes = img.getvalue()
+                            
+                            try:
+                                with open(path, "wb") as f:
+                                    f.write(img_bytes)
+                            except: pass
+
+                            if save_to_github(path, img_bytes, f"Add image {final_filename}"):
+                                image_paths.append(path)
+                            else:
+                                all_images_saved = False
+                                st.error(f"फोटो '{img.name}' GitHub पर सेव करने में समस्या आई।")
+                                break # अगर एक भी इमेज फेल हो तो रुक जाएं
+
+                        if all_images_saved:
+                            # पाथ्स को '|' से जोड़कर एक स्ट्रिंग बनाएं
+                            final_path_str = "|".join(image_paths)
+                            
+                            df = load_products()
+                            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str]], columns=expected_columns)
+                            df = pd.concat([df, new_row], ignore_index=True)
+                            df.to_csv(DATA_FILE, index=False)
+                            
+                            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                                csv_content = f.read()
+                            if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
+                                st.success(f"✅ उत्पाद '{new_name}' 3 फोटो के साथ सेव हो गया!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("डेटाबेस को सेव करने में समस्या आई।")
 
     with tab_banner:
         st.write("दुकान के सबसे ऊपर दिखने वाला फोटो लगाएं/बदलें")
@@ -227,8 +269,7 @@ if st.session_state.admin_logged_in:
                 try:
                     with open(BANNER_FILE, "wb") as f:
                         f.write(banner_bytes)
-                except:
-                    pass
+                except: pass
                 
                 if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
                     current_config["has_banner"] = True
@@ -261,22 +302,81 @@ if st.session_state.admin_logged_in:
     
     st.markdown("---")
 
-# --- 🛍️ कस्टमर व्यू (प्रोडक्ट लिस्ट) ---
+# --- 🛍️ कस्टमर व्यू ---
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
+# 🖼️ अपडेट: मल्टीपल इमेज दिखाने वाला स्मार्ट फंक्शन
+def show_product_images(path_str, prefix_idx):
+    if not path_str:
+        st.info("📷 फोटो उपलब्ध नहीं है")
+        return []
+
+    # '|' से पाथ्स को अलग करें
+    paths = [p.strip() for p in path_str.split('|') if p.strip()]
+    
+    if not paths:
+        st.info("📷 फोटो उपलब्ध नहीं है")
+        return []
+
+    # इमेज गैलरी का लॉजिक
+    unique_key = prefix_idx
+    if unique_key not in st.session_state.current_image_index:
+        st.session_state.current_image_index[unique_key] = 0
+    
+    current_idx = st.session_state.current_image_index[unique_key]
+    if current_idx >= len(paths): # सुरक्षा के लिए, अगर डिलीट हुई हो
+        current_idx = 0
+        st.session_state.current_image_index[unique_key] = 0
+
+    main_image_path = paths[current_idx]
+    
+    # मुख्य इमेज दिखाएं
+    image_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(main_image_path.replace('\\', '/'), safe='/')}"
+    if os.path.exists(main_image_path):
+        st.image(main_image_path, use_container_width=True)
+    else:
+        # cache bust के लिए समय जोड़ें
+        cache_bust_link = f"{image_link}?t={int(time.time())}"
+        try:
+            st.image(cache_bust_link, use_container_width=True)
+        except:
+            st.info("⏳ फोटो लोड हो रही है...")
+
+    # अगर 1 से ज्यादा फोटो हैं, तो नीचे थंबनेल दिखाएं
+    if len(paths) > 1:
+        cols = st.columns(len(paths))
+        for i, p in enumerate(paths):
+            thumb_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(p.replace('\\', '/'), safe='/')}"
+            
+            with cols[i]:
+                # थंबनेल को बटन की तरह बनाने के लिए expander का हैक या st.image + click detector (Streamlit में इमेज पर क्लिक डायरेक्ट नहीं होता)
+                # सबसे आसान तरीका: st.button को इमेज के नीचे रखना या st.image के नीचे छोटे रेडियो बटन
+                
+                # हैक: st.image दिखाएं, और क्लिक ट्रैक करने के लिए Invisible button या रेडियो
+                if os.path.exists(p):
+                    st.image(p, width=60, use_container_width=False)
+                else:
+                    st.image(f"{thumb_link}?t={int(time.time())}", width=60, use_container_width=False)
+                
+                # क्लिक डिटेक्टर (छोटा बटन)
+                if st.button(f"🔎 {i+1}", key=f"thumb_{unique_key}_{i}"):
+                    st.session_state.current_image_index[unique_key] = i
+                    st.rerun()
+
+    return paths # पाथ्स की लिस्ट वापस करें ताकि WhatsApp में यूज़ हो सके
+
 def show_product_card(row, idx, prefix):
+    prefix_idx = f"{prefix}_{idx}"
+    
     with st.container(border=True):
-        image_path = str(row.get("Image_Path", "")).replace("\\", "/")
-        img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(image_path, safe='/')}"
+        # 📸 अपडेट: अब मल्टीपल फोटो दिखेंगी
+        image_path_str = str(row.get("Image_Path", ""))
+        all_local_paths = show_product_images(image_path_str, prefix_idx)
         
-        if os.path.exists(image_path):
-            st.image(image_path, use_container_width=True)
-        else:
-            try:
-                cache_bust_link = f"{img_link}?t={int(time.time())}"
-                st.image(cache_bust_link, use_container_width=True)
-            except:
-                st.info("⏳ फोटो लोड हो रही है...")
+        # WhatsApp के लिए पहली इमेज का लिंक
+        img_link_for_wa = ""
+        if all_local_paths:
+            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(all_local_paths[0].replace('\\', '/'), safe='/')}"
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
@@ -294,23 +394,23 @@ def show_product_card(row, idx, prefix):
         else:
             st.markdown(f"**रेट:** ₹{retail_price}")
             
-        qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix}_{idx}")
+        qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
         
-        if st.button("कार्ट में डालें", key=f"b_{prefix}_{idx}"):
+        if st.button("कार्ट में डालें", key=f"b_{prefix_idx}"):
             final_price = w_price if qty >= w_qty else retail_price
-            st.session_state.cart[f"{prefix}_{idx}"] = {
+            st.session_state.cart[prefix_idx] = {
                 "name": row.get('Name', 'Item'), 
                 "price": final_price, 
                 "qty": qty,
-                "img_link": img_link
+                "img_link": img_link_for_wa # पहली फोटो का लिंक भेजें
             }
             st.success("कार्ट में जुड़ गया! 🛒")
             
-        # 🌟 नया फीचर: एडमिन के लिए हर प्रोडक्ट के नीचे ही एडिट/डिलीट का ऑप्शन
+        # 🌟 एडमिन के लिए एडिट/डिलीट का ऑप्शन
         if st.session_state.admin_logged_in:
             st.markdown("---")
             with st.expander("⚙️ एडिट / डिलीट करें"):
-                with st.form(f"edit_form_{prefix}_{idx}"):
+                with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
                     with col_x:
@@ -325,49 +425,81 @@ def show_product_card(row, idx, prefix):
                         existing_cats_edit.insert(0, current_cat)
                     e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat))
                     
-                    e_img = st.file_uploader("नई फोटो (अगर बदलनी हो)", type=["jpg", "png", "jpeg"])
+                    # 📸 अपडेट: एडिट में भी मल्टीपल फोटो (Optional)
+                    st.info("🖼️ अगर पुरानी फोटो बदलनी हैं तभी नई फोटो अपलोड करें (अधिकतम 3)। यह पुरानी सारी फोटो को बदल देगा।")
+                    e_uploaded_imgs = st.file_uploader("नई फोटो अपलोड करें (Optional, अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"edit_imgs_{prefix_idx}")
                     
-                    update_btn = st.form_submit_button("✅ अपडेट करें")
+                    update_btn = st.form_submit_button("✅ उत्पाद अपडेट करें")
                     
                 if update_btn:
-                    with st.spinner("अपडेट हो रहा है..."):
-                        df_edit = load_products()
-                        final_path = row.get("Image_Path", "")
-                        image_updated = True
-                        
-                        if e_img:
-                            safe_filename = e_img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                            final_path = f"images/{safe_filename}"
-                            img_bytes = e_img.getvalue()
-                            try:
-                                with open(final_path, "wb") as f:
-                                    f.write(img_bytes)
-                            except: pass
-                            image_updated = save_to_github(final_path, img_bytes, f"Update image for {e_name}")
+                    if e_uploaded_imgs and len(e_uploaded_imgs) > 3:
+                        st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+                    else:
+                        with st.spinner("अपडेट हो रहा है..."):
+                            df_edit = load_products()
+                            p_id = str(row['ID'])
                             
-                        if image_updated:
-                            df_edit.loc[df_edit['ID'].astype(str) == str(row['ID']), ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path]
-                            df_edit.to_csv(DATA_FILE, index=False)
-                            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                csv_content = f.read()
-                            if save_to_github(DATA_FILE, csv_content, f"Update product {row['ID']}"):
-                                st.success("✅ अपडेट हो गया!")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error("एरर: डेटाबेस अपडेट नहीं हुआ।")
-                        else:
-                            st.error("एरर: फोटो सेव नहीं हुई।")
+                            # डिफ़ॉल्ट पाथ पुराना ही रखें
+                            final_path_str = row.get("Image_Path", "")
+                            images_updated = True
+                            
+                            # अगर नई फोटो डाली गई हैं
+                            if e_uploaded_imgs:
+                                st.info("पुरानी फोटो हटाई जा रही हैं और नई अपलोड हो रही हैं...")
+                                new_image_paths = []
+                                timestamp = int(time.time())
+                                
+                                for idx, img in enumerate(e_uploaded_imgs):
+                                    safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                                    final_filename = f"{p_id}_{idx}_{timestamp}_{safe_filename}"
+                                    path = f"images/{final_filename}"
+                                    img_bytes = img.getvalue()
+                                    try:
+                                        with open(path, "wb") as f:
+                                            f.write(img_bytes)
+                                    except: pass
+                                    
+                                    if save_to_github(path, img_bytes, f"Update image for {e_name} - {final_filename}"):
+                                        new_image_paths.append(path)
+                                    else:
+                                        images_updated = False
+                                        st.error(f"फोटो '{img.name}' सेव नहीं हुई।")
+                                        break
+                                
+                                if images_updated:
+                                    final_path_str = "|".join(new_image_paths)
 
-                if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix}_{idx}"):
+                            if images_updated:
+                                # डेटाबेस में नई जानकारी डालना
+                                df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str]
+                                df_edit.to_csv(DATA_FILE, index=False)
+                                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                                    csv_content = f.read()
+                                if save_to_github(DATA_FILE, csv_content, f"Update product {p_id}"):
+                                    st.success("✅ उत्पाद सफलतापूर्वक अपडेट हो गया!")
+                                    
+                                    # इंडेक्स रिसेट करें ताकि ग्राहक पहली फोटो से शुरू करे
+                                    if prefix_idx in st.session_state.current_image_index:
+                                        st.session_state.current_image_index[prefix_idx] = 0
+                                        
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("एरर: डेटाबेस अपडेट नहीं हुआ।")
+
+                if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
                         df_del = load_products()
-                        df_updated = df_del[df_del['ID'].astype(str) != str(row['ID'])]
+                        p_id = str(row['ID'])
+                        df_updated = df_del[df_del['ID'].astype(str) != p_id]
                         df_updated.to_csv(DATA_FILE, index=False)
                         with open(DATA_FILE, "r", encoding="utf-8") as f:
                             csv_content = f.read()
-                        if save_to_github(DATA_FILE, csv_content, f"Delete product {row['ID']}"):
-                            st.success("डिलीट हो गया!")
+                        if save_to_github(DATA_FILE, csv_content, f"Delete product {p_id}"):
+                            st.success("उत्पाद हमेशा के लिए डिलीट हो गया!")
+                            # सेशन स्टेट साफ़ करें
+                            if prefix_idx in st.session_state.current_image_index:
+                                del st.session_state.current_image_index[prefix_idx]
                             time.sleep(1)
                             st.rerun()
 
