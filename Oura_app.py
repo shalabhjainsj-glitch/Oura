@@ -115,7 +115,7 @@ def init_db():
 
 init_db()
 
-@st.cache_data(ttl=5) # 🚀 कैशिंग का इस्तेमाल ताकि डेटाबेस बार-बार लोड न हो
+@st.cache_data(ttl=5) # डेटाबेस को बार-बार लोड होने से रोकेगा
 def load_products():
     try:
         df = pd.read_csv(DATA_FILE)
@@ -139,7 +139,6 @@ if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
         st.image(BANNER_FILE, use_container_width=True)
     else:
-        # बैनर के लिए कैश-बस्टिंग ज़रूरी है क्योंकि उसका नाम नहीं बदलता
         banner_img_link = f"{GITHUB_RAW_URL}{BANNER_FILE}?t={int(time.time())}"
         try:
             st.image(banner_img_link, use_container_width=True)
@@ -240,7 +239,8 @@ if st.session_state.admin_logged_in:
                             with open(DATA_FILE, "r", encoding="utf-8") as f:
                                 csv_content = f.read()
                             if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                                load_products.clear() # कैश साफ करें
+                                load_products.clear()
+                                get_image_src.clear() # फोटो कैश भी साफ़ करें
                                 st.success("✅ सेव हो गया!")
                                 time.sleep(1)
                                 st.rerun()
@@ -280,15 +280,16 @@ if st.session_state.admin_logged_in:
 
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
-# 🚀 फास्ट इमेज लोडिंग (Cache Busting हटा दिया गया है)
+# 🚀 सबसे बड़ा बदलाव: इस फंक्शन में 'सुपर मेमोरी' (Cache) लगा दी गई है
+@st.cache_data(max_entries=100) 
 def get_image_src(path):
+    # अब यह कोड बार-बार लोड नहीं लेगा, एक बार पढ़कर याद रख लेगा!
     if os.path.exists(path):
         with open(path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
         return f"data:image/jpeg;base64,{b64}"
     else:
-        # अब बिना ?t=time के लिंक जाएगा, ताकि ब्राउज़र इसे कैश कर सके!
         img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(path.replace('\\', '/'), safe='/')}"
         return img_link
 
@@ -401,7 +402,8 @@ def show_product_card(row, idx, prefix):
                                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                                     csv_content = f.read()
                                 if save_to_github(DATA_FILE, csv_content, f"Update product"):
-                                    load_products.clear() # कैश साफ़ करें
+                                    load_products.clear()
+                                    get_image_src.clear() # फोटो कैश साफ़ करें
                                     st.success("✅ अपडेट हो गया!")
                                     time.sleep(1)
                                     st.rerun()
@@ -416,6 +418,7 @@ def show_product_card(row, idx, prefix):
                             csv_content = f.read()
                         if save_to_github(DATA_FILE, csv_content, f"Delete product"):
                             load_products.clear()
+                            get_image_src.clear()
                             st.success("डिलीट हो गया!")
                             time.sleep(1)
                             st.rerun()
