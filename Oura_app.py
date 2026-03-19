@@ -10,29 +10,36 @@ import time
 # 1. ऐप का सेटअप
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
 
-# 🛡️ सुरक्षा चक्र: Streamlit का मेन्यू, हेडर और 'लाल लाइन' छुपाने का कोड
+# 🛡️ सुरक्षा चक्र और स्मार्ट स्वाइप गैलरी (CSS)
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             header {visibility: hidden;}
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
-            /* स्मार्ट गैलरी के लिए CSS */
-            .thumb-container {
+            
+            /* 📸 स्मार्ट स्वाइप गैलरी का जादू (Instagram/Amazon जैसा) */
+            .swipe-gallery {
                 display: flex;
-                flex-direction: row;
-                justify-content: flex-start;
-                gap: 5px;
-                margin-top: 5px;
                 overflow-x: auto;
+                scroll-snap-type: x mandatory;
+                gap: 10px;
+                padding-bottom: 5px;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none; /* Firefox में स्क्रोलबार छुपाएं */
             }
-            .thumb-img {
-                width: 60px;
-                height: 60px;
-                object-fit: cover;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                cursor: pointer;
+            .swipe-gallery::-webkit-scrollbar {
+                display: none; /* Chrome/Safari में स्क्रोलबार छुपाएं */
+            }
+            .swipe-img {
+                scroll-snap-align: center;
+                flex: 0 0 100%;
+                max-width: 100%;
+                height: 300px; /* फोटो की ऊँचाई फिक्स रखें ताकि डिज़ाइन न बिगड़े */
+                object-fit: contain; /* फोटो को बिना काटे पूरा दिखाएं */
+                background-color: #f8f9fa;
+                border-radius: 8px;
+                border: 1px solid #eee;
             }
             </style>
             """
@@ -94,7 +101,6 @@ current_config = load_config()
 if not os.path.exists("images"):
     os.makedirs("images")
 
-# 'Image_Path' अब '|' से अलग की गई कई फोटो के पाथ सेव करेगा (e.g., path1|path2|path3)
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"]
 
 def init_db():
@@ -133,8 +139,6 @@ if 'show_login' not in st.session_state:
     st.session_state.show_login = False
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
-if 'current_image_index' not in st.session_state:
-    st.session_state.current_image_index = {} # {product_prefix_idx : index}
 
 # --- 🖼️ बैनर (सबके लिए) ---
 if current_config.get("has_banner", False):
@@ -187,7 +191,6 @@ if st.session_state.admin_logged_in:
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद जोड़ें", "🖼️ बैनर सेटिंग्स", "⚙️ ऐप सेटिंग्स"])
     
     with tab_add:
-        # 🌟 अपडेट: अब आप एक साथ 3 फोटो अपलोड कर सकते हैं
         with st.form("add_product", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
@@ -207,7 +210,6 @@ if st.session_state.admin_logged_in:
             else:
                 final_cat = selected_cat
                 
-            # 📸 अपडेट: मल्टीपल फाइल अपलोड
             uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3 फोटो)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
             
             submit_btn = st.form_submit_button("उत्पाद सेव करें")
@@ -220,10 +222,8 @@ if st.session_state.admin_logged_in:
                         image_paths = []
                         all_images_saved = True
                         
-                        # हर इमेज को लूप में सेव करें
                         for idx, img in enumerate(uploaded_imgs):
                             safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                            # यूनिक नाम देने के लिए ID और इंडेक्स जोड़ें
                             timestamp = int(time.time())
                             final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
                             path = f"images/{final_filename}"
@@ -239,12 +239,10 @@ if st.session_state.admin_logged_in:
                             else:
                                 all_images_saved = False
                                 st.error(f"फोटो '{img.name}' GitHub पर सेव करने में समस्या आई।")
-                                break # अगर एक भी इमेज फेल हो तो रुक जाएं
+                                break
 
                         if all_images_saved:
-                            # पाथ्स को '|' से जोड़कर एक स्ट्रिंग बनाएं
                             final_path_str = "|".join(image_paths)
-                            
                             df = load_products()
                             new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str]], columns=expected_columns)
                             df = pd.concat([df, new_row], ignore_index=True)
@@ -253,7 +251,7 @@ if st.session_state.admin_logged_in:
                             with open(DATA_FILE, "r", encoding="utf-8") as f:
                                 csv_content = f.read()
                             if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                                st.success(f"✅ उत्पाद '{new_name}' 3 फोटो के साथ सेव हो गया!")
+                                st.success(f"✅ उत्पाद '{new_name}' सेव हो गया!")
                                 time.sleep(1)
                                 st.rerun()
                             else:
@@ -305,78 +303,55 @@ if st.session_state.admin_logged_in:
 # --- 🛍️ कस्टमर व्यू ---
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
-# 🖼️ अपडेट: मल्टीपल इमेज दिखाने वाला स्मार्ट फंक्शन
-def show_product_images(path_str, prefix_idx):
+# 📸 फोटो को HTML Base64 या लिंक में बदलने का फंक्शन
+def get_image_src(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            data = f.read()
+        b64 = base64.b64encode(data).decode()
+        return f"data:image/jpeg;base64,{b64}"
+    else:
+        img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(path.replace('\\', '/'), safe='/')}"
+        return f"{img_link}?t={int(time.time())}"
+
+# 🖼️ स्मार्ट स्वाइप गैलरी फंक्शन
+def show_swipe_gallery(path_str):
     if not path_str:
         st.info("📷 फोटो उपलब्ध नहीं है")
         return []
 
-    # '|' से पाथ्स को अलग करें
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
-    
     if not paths:
         st.info("📷 फोटो उपलब्ध नहीं है")
         return []
 
-    # इमेज गैलरी का लॉजिक
-    unique_key = prefix_idx
-    if unique_key not in st.session_state.current_image_index:
-        st.session_state.current_image_index[unique_key] = 0
+    # HTML के ज़रिए गैलरी बनाना (Swipable)
+    html_code = '<div class="swipe-gallery">'
+    for p in paths:
+        src = get_image_src(p)
+        html_code += f'<img src="{src}" class="swipe-img" alt="Product Image">'
+    html_code += '</div>'
     
-    current_idx = st.session_state.current_image_index[unique_key]
-    if current_idx >= len(paths): # सुरक्षा के लिए, अगर डिलीट हुई हो
-        current_idx = 0
-        st.session_state.current_image_index[unique_key] = 0
-
-    main_image_path = paths[current_idx]
-    
-    # मुख्य इमेज दिखाएं
-    image_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(main_image_path.replace('\\', '/'), safe='/')}"
-    if os.path.exists(main_image_path):
-        st.image(main_image_path, use_container_width=True)
-    else:
-        # cache bust के लिए समय जोड़ें
-        cache_bust_link = f"{image_link}?t={int(time.time())}"
-        try:
-            st.image(cache_bust_link, use_container_width=True)
-        except:
-            st.info("⏳ फोटो लोड हो रही है...")
-
-    # अगर 1 से ज्यादा फोटो हैं, तो नीचे थंबनेल दिखाएं
+    # अगर 1 से ज्यादा फोटो हैं तो एक छोटा सा हिंट (Hint) दिखाएं
     if len(paths) > 1:
-        cols = st.columns(len(paths))
-        for i, p in enumerate(paths):
-            thumb_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(p.replace('\\', '/'), safe='/')}"
-            
-            with cols[i]:
-                # थंबनेल को बटन की तरह बनाने के लिए expander का हैक या st.image + click detector (Streamlit में इमेज पर क्लिक डायरेक्ट नहीं होता)
-                # सबसे आसान तरीका: st.button को इमेज के नीचे रखना या st.image के नीचे छोटे रेडियो बटन
-                
-                # हैक: st.image दिखाएं, और क्लिक ट्रैक करने के लिए Invisible button या रेडियो
-                if os.path.exists(p):
-                    st.image(p, width=60, use_container_width=False)
-                else:
-                    st.image(f"{thumb_link}?t={int(time.time())}", width=60, use_container_width=False)
-                
-                # क्लिक डिटेक्टर (छोटा बटन)
-                if st.button(f"🔎 {i+1}", key=f"thumb_{unique_key}_{i}"):
-                    st.session_state.current_image_index[unique_key] = i
-                    st.rerun()
-
-    return paths # पाथ्स की लिस्ट वापस करें ताकि WhatsApp में यूज़ हो सके
+        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">फोटो बदलने के लिए स्वाइप करें (1/{len(paths)}) 👉</div>'
+        
+    st.markdown(html_code, unsafe_allow_html=True)
+    return paths
 
 def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     
     with st.container(border=True):
-        # 📸 अपडेट: अब मल्टीपल फोटो दिखेंगी
         image_path_str = str(row.get("Image_Path", ""))
-        all_local_paths = show_product_images(image_path_str, prefix_idx)
+        
+        # 📸 स्वाइप वाली गैलरी दिखाएं
+        all_paths = show_swipe_gallery(image_path_str)
         
         # WhatsApp के लिए पहली इमेज का लिंक
         img_link_for_wa = ""
-        if all_local_paths:
-            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(all_local_paths[0].replace('\\', '/'), safe='/')}"
+        if all_paths:
+            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(all_paths[0].replace('\\', '/'), safe='/')}"
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
@@ -425,7 +400,6 @@ def show_product_card(row, idx, prefix):
                         existing_cats_edit.insert(0, current_cat)
                     e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat))
                     
-                    # 📸 अपडेट: एडिट में भी मल्टीपल फोटो (Optional)
                     st.info("🖼️ अगर पुरानी फोटो बदलनी हैं तभी नई फोटो अपलोड करें (अधिकतम 3)। यह पुरानी सारी फोटो को बदल देगा।")
                     e_uploaded_imgs = st.file_uploader("नई फोटो अपलोड करें (Optional, अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"edit_imgs_{prefix_idx}")
                     
@@ -439,13 +413,10 @@ def show_product_card(row, idx, prefix):
                             df_edit = load_products()
                             p_id = str(row['ID'])
                             
-                            # डिफ़ॉल्ट पाथ पुराना ही रखें
                             final_path_str = row.get("Image_Path", "")
                             images_updated = True
                             
-                            # अगर नई फोटो डाली गई हैं
                             if e_uploaded_imgs:
-                                st.info("पुरानी फोटो हटाई जा रही हैं और नई अपलोड हो रही हैं...")
                                 new_image_paths = []
                                 timestamp = int(time.time())
                                 
@@ -470,18 +441,12 @@ def show_product_card(row, idx, prefix):
                                     final_path_str = "|".join(new_image_paths)
 
                             if images_updated:
-                                # डेटाबेस में नई जानकारी डालना
                                 df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str]
                                 df_edit.to_csv(DATA_FILE, index=False)
                                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                                     csv_content = f.read()
                                 if save_to_github(DATA_FILE, csv_content, f"Update product {p_id}"):
                                     st.success("✅ उत्पाद सफलतापूर्वक अपडेट हो गया!")
-                                    
-                                    # इंडेक्स रिसेट करें ताकि ग्राहक पहली फोटो से शुरू करे
-                                    if prefix_idx in st.session_state.current_image_index:
-                                        st.session_state.current_image_index[prefix_idx] = 0
-                                        
                                     time.sleep(1)
                                     st.rerun()
                                 else:
@@ -497,9 +462,6 @@ def show_product_card(row, idx, prefix):
                             csv_content = f.read()
                         if save_to_github(DATA_FILE, csv_content, f"Delete product {p_id}"):
                             st.success("उत्पाद हमेशा के लिए डिलीट हो गया!")
-                            # सेशन स्टेट साफ़ करें
-                            if prefix_idx in st.session_state.current_image_index:
-                                del st.session_state.current_image_index[prefix_idx]
                             time.sleep(1)
                             st.rerun()
 
