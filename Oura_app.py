@@ -7,10 +7,9 @@ import requests
 import base64
 import time
 
-# 1. ऐप का सेटअप
+# 1. ऐप का सेटअप (फास्ट लोडिंग के लिए)
 st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
 
-# 🛡️ सुरक्षा चक्र और स्मार्ट स्वाइप गैलरी (CSS)
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -18,7 +17,6 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* 📸 स्मार्ट स्वाइप गैलरी का जादू (Instagram/Amazon जैसा) */
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -26,17 +24,17 @@ hide_streamlit_style = """
                 gap: 10px;
                 padding-bottom: 5px;
                 -webkit-overflow-scrolling: touch;
-                scrollbar-width: none; /* Firefox में स्क्रोलबार छुपाएं */
+                scrollbar-width: none;
             }
             .swipe-gallery::-webkit-scrollbar {
-                display: none; /* Chrome/Safari में स्क्रोलबार छुपाएं */
+                display: none;
             }
             .swipe-img {
                 scroll-snap-align: center;
                 flex: 0 0 100%;
                 max-width: 100%;
-                height: 300px; /* फोटो की ऊँचाई फिक्स रखें ताकि डिज़ाइन न बिगड़े */
-                object-fit: contain; /* फोटो को बिना काटे पूरा दिखाएं */
+                height: 300px;
+                object-fit: contain;
                 background-color: #f8f9fa;
                 border-radius: 8px;
                 border: 1px solid #eee;
@@ -52,7 +50,6 @@ GITHUB_REPO = "shalabhjainsj-glitch/Oura"
 GITHUB_BRANCH = "main"
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
 
-# 🌟 जादुई फंक्शन: जो डेटा को हमेशा के लिए GitHub में सेव करेगा
 def save_to_github(file_path, content, commit_message):
     try:
         token = st.secrets["GITHUB_TOKEN"]
@@ -79,7 +76,6 @@ def save_to_github(file_path, content, commit_message):
         data["sha"] = sha
         
     put_response = requests.put(url, headers=headers, json=data)
-    
     return put_response.status_code in [200, 201]
 
 def load_config():
@@ -87,8 +83,7 @@ def load_config():
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
-            pass
+        except: pass
     return {"admin_whatsapp": "919891587437", "upi_id": "9891587437@upi", "has_banner": False}
 
 def save_config(config):
@@ -120,6 +115,7 @@ def init_db():
 
 init_db()
 
+@st.cache_data(ttl=5) # 🚀 कैशिंग का इस्तेमाल ताकि डेटाबेस बार-बार लोड न हो
 def load_products():
     try:
         df = pd.read_csv(DATA_FILE)
@@ -132,7 +128,6 @@ def load_products():
 
 products_df = load_products()
 
-# --- सेशन स्टेट इनिशियलाइज़ेशन ---
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'show_login' not in st.session_state:
@@ -140,11 +135,11 @@ if 'show_login' not in st.session_state:
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
 
-# --- 🖼️ बैनर (सबके लिए) ---
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
         st.image(BANNER_FILE, use_container_width=True)
     else:
+        # बैनर के लिए कैश-बस्टिंग ज़रूरी है क्योंकि उसका नाम नहीं बदलता
         banner_img_link = f"{GITHUB_RAW_URL}{BANNER_FILE}?t={int(time.time())}"
         try:
             st.image(banner_img_link, use_container_width=True)
@@ -153,7 +148,6 @@ if current_config.get("has_banner", False):
 else:
     st.title("🛍️ Oura Wholesale")
 
-# --- 🔒 सुरक्षित लॉगिन सिस्टम (मुख्य पेज पर) ---
 col1, col2 = st.columns([8, 2])
 with col2:
     if not st.session_state.admin_logged_in:
@@ -184,7 +178,6 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
                 st.error("❌ गलत पासवर्ड!")
     st.markdown("---")
 
-# --- 🛠️ एडमिन पैनल ---
 if st.session_state.admin_logged_in:
     st.success("✅ आप एडमिन हैं। किसी उत्पाद को बदलने/हटाने के लिए सीधे नीचे उस उत्पाद पर जाएं।")
     
@@ -211,14 +204,13 @@ if st.session_state.admin_logged_in:
                 final_cat = selected_cat
                 
             uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3 फोटो)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
-            
             submit_btn = st.form_submit_button("उत्पाद सेव करें")
             
             if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
                 if len(uploaded_imgs) > 3:
                     st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
                 else:
-                    with st.spinner("डेटा सेव हो रहा है, कृपया प्रतीक्षा करें..."):
+                    with st.spinner("डेटा सेव हो रहा है..."):
                         image_paths = []
                         all_images_saved = True
                         
@@ -228,17 +220,14 @@ if st.session_state.admin_logged_in:
                             final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
                             path = f"images/{final_filename}"
                             img_bytes = img.getvalue()
-                            
                             try:
-                                with open(path, "wb") as f:
-                                    f.write(img_bytes)
+                                with open(path, "wb") as f: f.write(img_bytes)
                             except: pass
 
                             if save_to_github(path, img_bytes, f"Add image {final_filename}"):
                                 image_paths.append(path)
                             else:
                                 all_images_saved = False
-                                st.error(f"फोटो '{img.name}' GitHub पर सेव करने में समस्या आई।")
                                 break
 
                         if all_images_saved:
@@ -251,59 +240,47 @@ if st.session_state.admin_logged_in:
                             with open(DATA_FILE, "r", encoding="utf-8") as f:
                                 csv_content = f.read()
                             if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                                st.success(f"✅ उत्पाद '{new_name}' सेव हो गया!")
+                                load_products.clear() # कैश साफ करें
+                                st.success("✅ सेव हो गया!")
                                 time.sleep(1)
                                 st.rerun()
-                            else:
-                                st.error("डेटाबेस को सेव करने में समस्या आई।")
 
     with tab_banner:
-        st.write("दुकान के सबसे ऊपर दिखने वाला फोटो लगाएं/बदलें")
-        new_banner = st.file_uploader("नया बैनर चुनें (चौड़ी फोटो बेहतर रहेगी)", type=["jpg", "png", "jpeg"], key="banner_upload")
-        
+        new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
         if st.button("बैनर सेव करें") and new_banner:
             with st.spinner("बैनर सेव हो रहा है..."):
                 banner_bytes = new_banner.getvalue()
                 try:
-                    with open(BANNER_FILE, "wb") as f:
-                        f.write(banner_bytes)
+                    with open(BANNER_FILE, "wb") as f: f.write(banner_bytes)
                 except: pass
-                
                 if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
                     current_config["has_banner"] = True
                     save_config(current_config)
-                    st.success("✅ शानदार! बैनर लग गया है।")
+                    st.success("✅ बैनर लग गया!")
                     time.sleep(1)
                     st.rerun()
-                else:
-                    st.error("बैनर सेव करने में समस्या आई।")
                     
         if current_config.get("has_banner", False):
             if st.button("❌ बैनर हटाएं"):
                 current_config["has_banner"] = False
                 save_config(current_config)
-                st.success("बैनर हटा दिया गया है!")
-                time.sleep(1)
                 st.rerun()
 
     with tab_settings:
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
         new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
-        
         if st.button("सेटिंग्स सेव करें"):
             current_config["admin_whatsapp"] = new_wa
             current_config["upi_id"] = new_upi
             save_config(current_config)
-            st.success("सेटिंग्स हमेशा के लिए सेव हो गईं!")
+            st.success("सेव हो गईं!")
             time.sleep(1)
             st.rerun()
-    
     st.markdown("---")
 
-# --- 🛍️ कस्टमर व्यू ---
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
-# 📸 फोटो को HTML Base64 या लिंक में बदलने का फंक्शन
+# 🚀 फास्ट इमेज लोडिंग (Cache Busting हटा दिया गया है)
 def get_image_src(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
@@ -311,58 +288,47 @@ def get_image_src(path):
         b64 = base64.b64encode(data).decode()
         return f"data:image/jpeg;base64,{b64}"
     else:
+        # अब बिना ?t=time के लिंक जाएगा, ताकि ब्राउज़र इसे कैश कर सके!
         img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(path.replace('\\', '/'), safe='/')}"
-        return f"{img_link}?t={int(time.time())}"
+        return img_link
 
-# 🖼️ स्मार्ट स्वाइप गैलरी फंक्शन
 def show_swipe_gallery(path_str):
     if not path_str:
         st.info("📷 फोटो उपलब्ध नहीं है")
         return []
-
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
-    if not paths:
-        st.info("📷 फोटो उपलब्ध नहीं है")
-        return []
+    if not paths: return []
 
-    # HTML के ज़रिए गैलरी बनाना (Swipable)
     html_code = '<div class="swipe-gallery">'
     for p in paths:
         src = get_image_src(p)
-        html_code += f'<img src="{src}" class="swipe-img" alt="Product Image">'
+        html_code += f'<img src="{src}" class="swipe-img" loading="lazy" alt="Product Image">'
     html_code += '</div>'
     
-    # अगर 1 से ज्यादा फोटो हैं तो एक छोटा सा हिंट (Hint) दिखाएं
     if len(paths) > 1:
-        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">फोटो बदलने के लिए स्वाइप करें (1/{len(paths)}) 👉</div>'
+        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">स्वाइप करें 👉</div>'
         
     st.markdown(html_code, unsafe_allow_html=True)
     return paths
 
 def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
-    
     with st.container(border=True):
         image_path_str = str(row.get("Image_Path", ""))
-        
-        # 📸 स्वाइप वाली गैलरी दिखाएं
         all_paths = show_swipe_gallery(image_path_str)
         
-        # WhatsApp के लिए पहली इमेज का लिंक
         img_link_for_wa = ""
         if all_paths:
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(all_paths[0].replace('\\', '/'), safe='/')}"
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
-        try:
-            w_qty = int(float(row.get('Wholesale_Qty', 1)))
-            retail_price = row.get('Price', 0)
-            w_price = int(float(row.get('Wholesale_Price', retail_price)))
-        except:
-            w_qty = 1
-            retail_price = row.get('Price', 0)
-            w_price = retail_price
+        try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
+        except: w_qty = 1
+        try: retail_price = row.get('Price', 0)
+        except: retail_price = 0
+        try: w_price = int(float(row.get('Wholesale_Price', retail_price)))
+        except: w_price = retail_price
         
         if w_qty > 1:
             st.markdown(f"**रिटेल:** ₹{retail_price} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
@@ -377,14 +343,13 @@ def show_product_card(row, idx, prefix):
                 "name": row.get('Name', 'Item'), 
                 "price": final_price, 
                 "qty": qty,
-                "img_link": img_link_for_wa # पहली फोटो का लिंक भेजें
+                "img_link": img_link_for_wa
             }
             st.success("कार्ट में जुड़ गया! 🛒")
             
-        # 🌟 एडमिन के लिए एडिट/डिलीट का ऑप्शन
         if st.session_state.admin_logged_in:
             st.markdown("---")
-            with st.expander("⚙️ एडिट / डिलीट करें"):
+            with st.expander("⚙️ एडिट / डिलीट"):
                 with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
@@ -400,57 +365,46 @@ def show_product_card(row, idx, prefix):
                         existing_cats_edit.insert(0, current_cat)
                     e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat))
                     
-                    st.info("🖼️ अगर पुरानी फोटो बदलनी हैं तभी नई फोटो अपलोड करें (अधिकतम 3)। यह पुरानी सारी फोटो को बदल देगा।")
-                    e_uploaded_imgs = st.file_uploader("नई फोटो अपलोड करें (Optional, अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"edit_imgs_{prefix_idx}")
-                    
-                    update_btn = st.form_submit_button("✅ उत्पाद अपडेट करें")
+                    e_uploaded_imgs = st.file_uploader("नई फोटो (Optional, max 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"edit_imgs_{prefix_idx}")
+                    update_btn = st.form_submit_button("✅ अपडेट करें")
                     
                 if update_btn:
                     if e_uploaded_imgs and len(e_uploaded_imgs) > 3:
-                        st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+                        st.error("⚠️ अधिकतम 3 फोटो ही चुनें।")
                     else:
                         with st.spinner("अपडेट हो रहा है..."):
                             df_edit = load_products()
                             p_id = str(row['ID'])
-                            
                             final_path_str = row.get("Image_Path", "")
                             images_updated = True
                             
                             if e_uploaded_imgs:
                                 new_image_paths = []
                                 timestamp = int(time.time())
-                                
-                                for idx, img in enumerate(e_uploaded_imgs):
+                                for idx_img, img in enumerate(e_uploaded_imgs):
                                     safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                    final_filename = f"{p_id}_{idx}_{timestamp}_{safe_filename}"
+                                    final_filename = f"{p_id}_{idx_img}_{timestamp}_{safe_filename}"
                                     path = f"images/{final_filename}"
-                                    img_bytes = img.getvalue()
                                     try:
-                                        with open(path, "wb") as f:
-                                            f.write(img_bytes)
+                                        with open(path, "wb") as f: f.write(img.getvalue())
                                     except: pass
-                                    
-                                    if save_to_github(path, img_bytes, f"Update image for {e_name} - {final_filename}"):
+                                    if save_to_github(path, img.getvalue(), f"Update image"):
                                         new_image_paths.append(path)
                                     else:
                                         images_updated = False
-                                        st.error(f"फोटो '{img.name}' सेव नहीं हुई।")
                                         break
-                                
-                                if images_updated:
-                                    final_path_str = "|".join(new_image_paths)
+                                if images_updated: final_path_str = "|".join(new_image_paths)
 
                             if images_updated:
                                 df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str]
                                 df_edit.to_csv(DATA_FILE, index=False)
                                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                                     csv_content = f.read()
-                                if save_to_github(DATA_FILE, csv_content, f"Update product {p_id}"):
-                                    st.success("✅ उत्पाद सफलतापूर्वक अपडेट हो गया!")
+                                if save_to_github(DATA_FILE, csv_content, f"Update product"):
+                                    load_products.clear() # कैश साफ़ करें
+                                    st.success("✅ अपडेट हो गया!")
                                     time.sleep(1)
                                     st.rerun()
-                                else:
-                                    st.error("एरर: डेटाबेस अपडेट नहीं हुआ।")
 
                 if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
@@ -460,8 +414,9 @@ def show_product_card(row, idx, prefix):
                         df_updated.to_csv(DATA_FILE, index=False)
                         with open(DATA_FILE, "r", encoding="utf-8") as f:
                             csv_content = f.read()
-                        if save_to_github(DATA_FILE, csv_content, f"Delete product {p_id}"):
-                            st.success("उत्पाद हमेशा के लिए डिलीट हो गया!")
+                        if save_to_github(DATA_FILE, csv_content, f"Delete product"):
+                            load_products.clear()
+                            st.success("डिलीट हो गया!")
                             time.sleep(1)
                             st.rerun()
 
@@ -471,39 +426,29 @@ else:
     if search_query:
         st.subheader(f"'{search_query}' के सर्च रिजल्ट:")
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        
-        if filtered_df.empty:
-            st.warning("इस नाम से कोई उत्पाद नहीं मिला।")
+        if filtered_df.empty: st.warning("इस नाम से कोई उत्पाद नहीं मिला।")
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
-                with cols[idx % 3]:
-                    show_product_card(row, idx, "search")
+                with cols[idx % 3]: show_product_card(row, idx, "search")
     else:
         valid_categories = products_df['Category'].dropna().unique().tolist()
-        if len(valid_categories) == 0:
-            valid_categories = ["General"]
-            
+        if len(valid_categories) == 0: valid_categories = ["General"]
         tabs = st.tabs(valid_categories)
-        
         for i, cat in enumerate(valid_categories):
             with tabs[i]:
                 cat_products = products_df[products_df['Category'] == cat]
-                
-                if cat_products.empty:
-                     st.write("इस केटेगरी में अभी कोई उत्पाद नहीं है।")
+                if cat_products.empty: st.write("अभी कोई उत्पाद नहीं है।")
                 else:
                     cols = st.columns(3)
                     for idx, row in cat_products.reset_index().iterrows():
-                        with cols[idx % 3]:
-                            show_product_card(row, idx, f"tab_{i}")
+                        with cols[idx % 3]: show_product_card(row, idx, f"tab_{i}")
 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
 if st.session_state.cart:
     total = 0
     msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
-    
     count = 1
     for k, item in st.session_state.cart.items():
         subtotal = item['price'] * item['qty']
@@ -512,11 +457,8 @@ if st.session_state.cart:
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
         count += 1
     
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n"
-    msg += "⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
-    
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
     st.subheader(f"कुल बिल: ₹{total}")
-    
     upi = current_config.get("upi_id", "")
     if upi:
         st.success(f"💳 **पेमेंट के लिए UPI ID:** `{upi}`")
