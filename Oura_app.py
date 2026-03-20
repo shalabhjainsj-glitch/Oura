@@ -41,7 +41,7 @@ hide_streamlit_style = """
                 border: 1px solid #eee;
             }
             
-            /* 🌟 4-कॉलम स्मार्ट बॉक्स डिज़ाइन (पूरा नाम अंदर) */
+            /* 🌟 4-कॉलम स्मार्ट बॉक्स डिज़ाइन */
             .category-grid {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
@@ -52,12 +52,12 @@ hide_streamlit_style = """
                 border-radius: 12px;
                 padding: 10px 5px;
                 text-align: center;
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 700;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                height: 75px; /* सभी बॉक्स की ऊंचाई एक बराबर */
+                height: 75px; 
                 text-decoration: none !important;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.06);
                 line-height: 1.3;
@@ -67,6 +67,31 @@ hide_streamlit_style = """
             }
             .category-box:active {
                 transform: scale(0.95);
+            }
+            
+            /* 🚀 हवा में तैरने वाला (Floating) बैक बटन */
+            .floating-back-btn {
+                position: fixed;
+                bottom: 25px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: #222222;
+                color: #ffffff !important;
+                padding: 12px 24px;
+                border-radius: 40px;
+                font-size: 15px;
+                font-weight: 700;
+                box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+                z-index: 999999;
+                text-decoration: none !important;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: background-color 0.2s;
+            }
+            .floating-back-btn:active {
+                background-color: #000000;
+                transform: translateX(-50%) scale(0.95);
             }
             </style>
             """
@@ -213,7 +238,7 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
     st.markdown("---")
 
 if st.session_state.admin_logged_in:
-    st.success("✅ आप एडमिन हैं। किसी उत्पाद को बदलने/हटाने के लिए अपनी कैटेगरी खोलें और उत्पाद पर जाएं।")
+    st.success("✅ आप एडमिन हैं।")
     
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर", "⚙️ सेटिंग्स"])
     
@@ -233,7 +258,7 @@ if st.session_state.admin_logged_in:
             selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
             
             if selected_cat == "नयी केटेगरी बनाएं...":
-                final_cat = st.text_input("नई केटेगरी का नाम लिखें")
+                final_cat = st.text_input("नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)")
             else:
                 final_cat = selected_cat
                 
@@ -301,6 +326,7 @@ if st.session_state.admin_logged_in:
                 st.rerun()
 
     with tab_settings:
+        st.subheader("📱 संपर्क सेटिंग्स")
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
         new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
         if st.button("सेटिंग्स सेव करें"):
@@ -468,7 +494,6 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        # 🌟 ठीक किया गया HTML कोड (बिना किसी फालतू स्पेस के)
         st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
@@ -487,20 +512,45 @@ else:
                 safe_cat = urllib.parse.quote(cat)
                 bg_color, text_color = colors[i % len(colors)]
                 
-                # बिना किसी फालतू लाइन या स्पेस के सीधा HTML लिखा गया है
                 html_grid += f'<a href="?cat={safe_cat}" target="_self" class="category-box" style="background-color: {bg_color}; color: {text_color};">{cat}</a>'
             
             html_grid += '</div>'
             st.markdown(html_grid, unsafe_allow_html=True)
             
     else:
-        if st.button("🔙 सभी कैटेगरीज देखें"):
-            st.session_state.selected_category = None
-            st.query_params.clear()
-            st.rerun()
-            
         st.subheader(f"📂 {st.session_state.selected_category}")
         
+        # 🌟 नया फीचर: हवा में तैरने वाला बैक बटन (Floating Button)
+        floating_btn_html = '''
+        <a href="?" target="_self" class="floating-back-btn">
+            🔙 सभी कैटेगरीज 
+        </a>
+        '''
+        st.markdown(floating_btn_html, unsafe_allow_html=True)
+        
+        if st.session_state.admin_logged_in:
+            with st.expander(f"✏️ इस कैटेगरी का नाम/आइकॉन बदलें"):
+                new_cat_name = st.text_input("नया नाम या इमोजी डालें:", value=st.session_state.selected_category)
+                if st.button("✅ सेव करें", key="rename_cat_btn"):
+                    if new_cat_name and new_cat_name != st.session_state.selected_category:
+                        with st.spinner("नाम बदला जा रहा है..."):
+                            df_update = load_products()
+                            old_cat = st.session_state.selected_category
+                            df_update.loc[df_update['Category'] == old_cat, 'Category'] = new_cat_name
+                            df_update.to_csv(DATA_FILE, index=False)
+                            
+                            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                                csv_content = f.read()
+                            if save_to_github(DATA_FILE, csv_content, f"Rename category to {new_cat_name}"):
+                                load_products.clear()
+                                st.session_state.selected_category = new_cat_name
+                                st.query_params["cat"] = new_cat_name
+                                st.success("✅ नाम बदल गया!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("डेटाबेस अपडेट करने में समस्या आई।")
+
         cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
         if cat_products.empty: 
             st.write("इस कैटेगरी में अभी कोई उत्पाद नहीं है।")
@@ -510,6 +560,8 @@ else:
                 with cols[idx % 3]: 
                     show_product_card(row, idx, "cat_view")
 
+# नीचे कार्ट का हिस्सा भी थोड़ा सा गैप के साथ आएगा ताकि फ्लोटिंग बटन उस पर न चढ़े
+st.markdown("<br><br>", unsafe_allow_html=True) 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
 if st.session_state.cart:
