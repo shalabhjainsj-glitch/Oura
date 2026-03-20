@@ -17,6 +17,7 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
+            /* 📸 स्मार्ट स्वाइप गैलरी (फोटो देखने के लिए) */
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -40,14 +41,48 @@ hide_streamlit_style = """
                 border: 1px solid #eee;
             }
             
-            /* कैटेगरी बटन को कार्ड जैसा बनाने के लिए */
-            div.stButton > button {
-                height: auto;
-                padding: 15px 10px;
-                border-radius: 12px;
+            /* 🌟 Blinkit/Swiggy स्टाइल 4-कॉलम कैटेगरी ग्रिड */
+            .category-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px 8px;
+                padding: 10px 0;
+            }
+            .category-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-decoration: none !important;
+                background: transparent;
+                padding: 0;
+                transition: transform 0.1s;
+                cursor: pointer;
+            }
+            .category-item:active {
+                transform: scale(0.92);
+            }
+            .category-icon {
+                width: 65px;
+                height: 65px;
+                border-radius: 18px; /* प्रीमियम गोल बॉक्स */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 28px;
                 font-weight: bold;
-                border: 1px solid #e0e0e0;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                margin-bottom: 8px;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+            }
+            .category-name {
+                font-size: 11px;
+                color: #222 !important;
+                text-align: center;
+                font-weight: 700;
+                line-height: 1.2;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
             }
             </style>
             """
@@ -138,15 +173,18 @@ def load_products():
 
 products_df = load_products()
 
-# --- सेशन स्टेट इनिशियलाइज़ेशन ---
+# --- सेशन स्टेट और URL से कैटेगरी पढ़ना ---
+if "cat" in st.query_params:
+    st.session_state.selected_category = st.query_params["cat"]
+elif 'selected_category' not in st.session_state:
+    st.session_state.selected_category = None
+
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'show_login' not in st.session_state:
     st.session_state.show_login = False
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
-if 'selected_category' not in st.session_state:
-    st.session_state.selected_category = None
 
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
@@ -193,7 +231,7 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
 if st.session_state.admin_logged_in:
     st.success("✅ आप एडमिन हैं। किसी उत्पाद को बदलने/हटाने के लिए अपनी कैटेगरी खोलें और उत्पाद पर जाएं।")
     
-    tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद जोड़ें", "🖼️ बैनर सेटिंग्स", "⚙️ ऐप सेटिंग्स"])
+    tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर", "⚙️ सेटिंग्स"])
     
     with tab_add:
         with st.form("add_product", clear_on_submit=True):
@@ -433,15 +471,11 @@ def show_product_card(row, idx, prefix):
                             time.sleep(1)
                             st.rerun()
 
-# --- 🌟 नया डिज़ाइन: लेज़ी लोडिंग कैटेगरीज (Swiggy/Blinkit Style) ---
-def go_back():
-    st.session_state.selected_category = None
 
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     if search_query:
-        # अगर कोई सर्च कर रहा है तो सीधे रिजल्ट दिखाएं
         st.subheader(f"'{search_query}' के सर्च रिजल्ट:")
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
         if filtered_df.empty: st.warning("इस नाम से कोई उत्पाद नहीं मिला।")
@@ -451,23 +485,45 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        # 🌟 मेन स्क्रीन: सिर्फ कैटेगरीज के कार्ड (बहुत तेज़ लोड होगा)
+        # 🌟 नया डिज़ाइन: 4-कॉलम स्मार्ट HTML ग्रिड (Swiggy/Blinkit Style)
         st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
+        
         if len(valid_categories) == 0:
             st.write("अभी कोई कैटेगरी नहीं है।")
         else:
-            # 3 कॉलम का ग्रिड बनाएं
-            cols = st.columns(3)
+            # शानदार पेस्टल रंगों की लिस्ट (बॉक्स को सुंदर बनाने के लिए)
+            colors = [
+                ("#e1f5fe", "#0288d1"), ("#fce4ec", "#c2185b"), 
+                ("#e8f5e9", "#388e3c"), ("#fff3e0", "#f57c00"), 
+                ("#f3e5f5", "#7b1fa2"), ("#e0f7fa", "#0097a7"), 
+                ("#fff8e1", "#ffa000"), ("#ffebee", "#d32f2f")
+            ]
+            
+            html_grid = '<div class="category-grid">'
             for i, cat in enumerate(valid_categories):
-                with cols[i % 3]:
-                    # बटन को कार्ड जैसा लुक दिया गया है CSS से
-                    if st.button(f"📁 {cat}", key=f"cat_btn_{i}", use_container_width=True):
-                        st.session_state.selected_category = cat
-                        st.rerun()
+                safe_cat = urllib.parse.quote(cat)
+                bg_color, text_color = colors[i % len(colors)]
+                first_letter = cat[0].upper() if len(cat) > 0 else "🛍️"
+                
+                html_grid += f'''
+                <a href="?cat={safe_cat}" target="_self" class="category-item">
+                    <div class="category-icon" style="background-color: {bg_color}; color: {text_color};">
+                        {first_letter}
+                    </div>
+                    <div class="category-name">{cat}</div>
+                </a>
+                '''
+            html_grid += '</div>'
+            st.markdown(html_grid, unsafe_allow_html=True)
+            
     else:
-        # 🌟 कैटेगरी के अंदर: सिर्फ चुनी हुई कैटेगरी के उत्पाद दिखेंगे
-        st.button("🔙 सभी कैटेगरीज देखें", on_click=go_back)
+        # कैटेगरी खुलने पर: वापस जाने का बटन
+        if st.button("🔙 सभी कैटेगरीज देखें"):
+            st.session_state.selected_category = None
+            st.query_params.clear()
+            st.rerun()
+            
         st.subheader(f"📂 {st.session_state.selected_category}")
         
         cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
