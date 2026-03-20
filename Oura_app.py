@@ -17,7 +17,7 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* 📸 स्मार्ट स्वाइप गैलरी (फोटो देखने के लिए) */
+            /* 📸 स्मार्ट स्वाइप गैलरी */
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -41,48 +41,32 @@ hide_streamlit_style = """
                 border: 1px solid #eee;
             }
             
-            /* 🌟 Blinkit/Swiggy स्टाइल 4-कॉलम कैटेगरी ग्रिड */
+            /* 🌟 4-कॉलम स्मार्ट बॉक्स डिज़ाइन (पूरा नाम अंदर) */
             .category-grid {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
-                gap: 15px 8px;
+                gap: 10px;
                 padding: 10px 0;
             }
-            .category-item {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                text-decoration: none !important;
-                background: transparent;
-                padding: 0;
-                transition: transform 0.1s;
-                cursor: pointer;
-            }
-            .category-item:active {
-                transform: scale(0.92);
-            }
-            .category-icon {
-                width: 65px;
-                height: 65px;
-                border-radius: 18px; /* प्रीमियम गोल बॉक्स */
+            .category-box {
+                border-radius: 12px;
+                padding: 10px 5px;
+                text-align: center;
+                font-size: 12px;
+                font-weight: 700;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 28px;
-                font-weight: bold;
-                margin-bottom: 8px;
-                box-shadow: 0 3px 6px rgba(0,0,0,0.08);
-            }
-            .category-name {
-                font-size: 11px;
-                color: #222 !important;
-                text-align: center;
-                font-weight: 700;
-                line-height: 1.2;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
+                height: 75px; /* सभी बॉक्स की ऊंचाई एक बराबर */
+                text-decoration: none !important;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+                line-height: 1.3;
                 overflow: hidden;
+                transition: transform 0.1s;
+                border: 1px solid rgba(0,0,0,0.05);
+            }
+            .category-box:active {
+                transform: scale(0.95);
             }
             </style>
             """
@@ -471,7 +455,6 @@ def show_product_card(row, idx, prefix):
                             time.sleep(1)
                             st.rerun()
 
-
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
@@ -485,14 +468,13 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        # 🌟 नया डिज़ाइन: 4-कॉलम स्मार्ट HTML ग्रिड (Swiggy/Blinkit Style)
+        # 🌟 ठीक किया गया HTML कोड (बिना किसी फालतू स्पेस के)
         st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0:
             st.write("अभी कोई कैटेगरी नहीं है।")
         else:
-            # शानदार पेस्टल रंगों की लिस्ट (बॉक्स को सुंदर बनाने के लिए)
             colors = [
                 ("#e1f5fe", "#0288d1"), ("#fce4ec", "#c2185b"), 
                 ("#e8f5e9", "#388e3c"), ("#fff3e0", "#f57c00"), 
@@ -504,21 +486,14 @@ else:
             for i, cat in enumerate(valid_categories):
                 safe_cat = urllib.parse.quote(cat)
                 bg_color, text_color = colors[i % len(colors)]
-                first_letter = cat[0].upper() if len(cat) > 0 else "🛍️"
                 
-                html_grid += f'''
-                <a href="?cat={safe_cat}" target="_self" class="category-item">
-                    <div class="category-icon" style="background-color: {bg_color}; color: {text_color};">
-                        {first_letter}
-                    </div>
-                    <div class="category-name">{cat}</div>
-                </a>
-                '''
+                # बिना किसी फालतू लाइन या स्पेस के सीधा HTML लिखा गया है
+                html_grid += f'<a href="?cat={safe_cat}" target="_self" class="category-box" style="background-color: {bg_color}; color: {text_color};">{cat}</a>'
+            
             html_grid += '</div>'
             st.markdown(html_grid, unsafe_allow_html=True)
             
     else:
-        # कैटेगरी खुलने पर: वापस जाने का बटन
         if st.button("🔙 सभी कैटेगरीज देखें"):
             st.session_state.selected_category = None
             st.query_params.clear()
