@@ -39,6 +39,16 @@ hide_streamlit_style = """
                 border-radius: 8px;
                 border: 1px solid #eee;
             }
+            
+            /* कैटेगरी बटन को कार्ड जैसा बनाने के लिए */
+            div.stButton > button {
+                height: auto;
+                padding: 15px 10px;
+                border-radius: 12px;
+                font-weight: bold;
+                border: 1px solid #e0e0e0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -115,7 +125,7 @@ def init_db():
 
 init_db()
 
-@st.cache_data(ttl=5) # डेटाबेस को बार-बार लोड होने से रोकेगा
+@st.cache_data(ttl=5)
 def load_products():
     try:
         df = pd.read_csv(DATA_FILE)
@@ -128,12 +138,15 @@ def load_products():
 
 products_df = load_products()
 
+# --- सेशन स्टेट इनिशियलाइज़ेशन ---
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'show_login' not in st.session_state:
     st.session_state.show_login = False
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
+if 'selected_category' not in st.session_state:
+    st.session_state.selected_category = None
 
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
@@ -166,7 +179,7 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
             try:
                 correct_password = st.secrets["ADMIN_PASSWORD"]
             except:
-                st.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला! कृपया Secrets अपडेट करें।")
+                st.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला!")
                 correct_password = None
                 
             if correct_password and password == correct_password:
@@ -178,7 +191,7 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
     st.markdown("---")
 
 if st.session_state.admin_logged_in:
-    st.success("✅ आप एडमिन हैं। किसी उत्पाद को बदलने/हटाने के लिए सीधे नीचे उस उत्पाद पर जाएं।")
+    st.success("✅ आप एडमिन हैं। किसी उत्पाद को बदलने/हटाने के लिए अपनी कैटेगरी खोलें और उत्पाद पर जाएं।")
     
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद जोड़ें", "🖼️ बैनर सेटिंग्स", "⚙️ ऐप सेटिंग्स"])
     
@@ -202,7 +215,7 @@ if st.session_state.admin_logged_in:
             else:
                 final_cat = selected_cat
                 
-            uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3 फोटो)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
+            uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
             submit_btn = st.form_submit_button("उत्पाद सेव करें")
             
             if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
@@ -240,7 +253,6 @@ if st.session_state.admin_logged_in:
                                 csv_content = f.read()
                             if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
                                 load_products.clear()
-                                get_image_src.clear() # फोटो कैश भी साफ़ करें
                                 st.success("✅ सेव हो गया!")
                                 time.sleep(1)
                                 st.rerun()
@@ -280,10 +292,8 @@ if st.session_state.admin_logged_in:
 
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
 
-# 🚀 सबसे बड़ा बदलाव: इस फंक्शन में 'सुपर मेमोरी' (Cache) लगा दी गई है
 @st.cache_data(max_entries=100) 
 def get_image_src(path):
-    # अब यह कोड बार-बार लोड नहीं लेगा, एक बार पढ़कर याद रख लेगा!
     if os.path.exists(path):
         with open(path, "rb") as f:
             data = f.read()
@@ -403,7 +413,7 @@ def show_product_card(row, idx, prefix):
                                     csv_content = f.read()
                                 if save_to_github(DATA_FILE, csv_content, f"Update product"):
                                     load_products.clear()
-                                    get_image_src.clear() # फोटो कैश साफ़ करें
+                                    get_image_src.clear() 
                                     st.success("✅ अपडेट हो गया!")
                                     time.sleep(1)
                                     st.rerun()
@@ -423,10 +433,15 @@ def show_product_card(row, idx, prefix):
                             time.sleep(1)
                             st.rerun()
 
+# --- 🌟 नया डिज़ाइन: लेज़ी लोडिंग कैटेगरीज (Swiggy/Blinkit Style) ---
+def go_back():
+    st.session_state.selected_category = None
+
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
 else:
     if search_query:
+        # अगर कोई सर्च कर रहा है तो सीधे रिजल्ट दिखाएं
         st.subheader(f"'{search_query}' के सर्च रिजल्ट:")
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
         if filtered_df.empty: st.warning("इस नाम से कोई उत्पाद नहीं मिला।")
@@ -434,18 +449,35 @@ else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "search")
-    else:
+    
+    elif st.session_state.selected_category is None:
+        # 🌟 मेन स्क्रीन: सिर्फ कैटेगरीज के कार्ड (बहुत तेज़ लोड होगा)
+        st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
-        if len(valid_categories) == 0: valid_categories = ["General"]
-        tabs = st.tabs(valid_categories)
-        for i, cat in enumerate(valid_categories):
-            with tabs[i]:
-                cat_products = products_df[products_df['Category'] == cat]
-                if cat_products.empty: st.write("अभी कोई उत्पाद नहीं है।")
-                else:
-                    cols = st.columns(3)
-                    for idx, row in cat_products.reset_index().iterrows():
-                        with cols[idx % 3]: show_product_card(row, idx, f"tab_{i}")
+        if len(valid_categories) == 0:
+            st.write("अभी कोई कैटेगरी नहीं है।")
+        else:
+            # 3 कॉलम का ग्रिड बनाएं
+            cols = st.columns(3)
+            for i, cat in enumerate(valid_categories):
+                with cols[i % 3]:
+                    # बटन को कार्ड जैसा लुक दिया गया है CSS से
+                    if st.button(f"📁 {cat}", key=f"cat_btn_{i}", use_container_width=True):
+                        st.session_state.selected_category = cat
+                        st.rerun()
+    else:
+        # 🌟 कैटेगरी के अंदर: सिर्फ चुनी हुई कैटेगरी के उत्पाद दिखेंगे
+        st.button("🔙 सभी कैटेगरीज देखें", on_click=go_back)
+        st.subheader(f"📂 {st.session_state.selected_category}")
+        
+        cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
+        if cat_products.empty: 
+            st.write("इस कैटेगरी में अभी कोई उत्पाद नहीं है।")
+        else:
+            cols = st.columns(3)
+            for idx, row in cat_products.reset_index().iterrows():
+                with cols[idx % 3]: 
+                    show_product_card(row, idx, "cat_view")
 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
