@@ -196,6 +196,8 @@ if 'cart' not in st.session_state:
     st.session_state.cart = {}
 if 'share_msg' not in st.session_state:
     st.session_state.share_msg = None
+if 'share_img_path' not in st.session_state:
+    st.session_state.share_img_path = None
 
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
@@ -245,10 +247,13 @@ if st.session_state.admin_logged_in:
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर", "⚙️ सेटिंग्स"])
     
     with tab_add:
-        # 🌟 नया ऑटो-शेयर (Auto-Share) फीचर 🌟
         if st.session_state.share_msg:
             st.success("✅ शानदार! आपका नया उत्पाद दुकान में जुड़ गया है।")
-            st.info("अब इसे तुरंत अपने ग्राहकों (ब्रॉडकास्ट लिस्ट/ग्रुप) को भेजें:")
+            
+            # 📸 फोटो कॉपी करने का जुगाड़
+            if st.session_state.share_img_path and os.path.exists(st.session_state.share_img_path):
+                st.image(st.session_state.share_img_path, width=200)
+                st.info("💡 **टिप:** इस फोटो को WhatsApp पर भेजने के लिए, फोटो पर उंगली दबाए रखें (Long Press) और **'Copy Image'** चुनें, फिर WhatsApp में Paste कर दें।")
             
             # WhatsApp शेयर बटन
             encoded_share = urllib.parse.quote(st.session_state.share_msg)
@@ -262,6 +267,7 @@ if st.session_state.admin_logged_in:
             
             if st.button("➕ एक और नया उत्पाद जोड़ें"):
                 st.session_state.share_msg = None
+                st.session_state.share_img_path = None
                 st.rerun()
                 
         else:
@@ -323,10 +329,13 @@ if st.session_state.admin_logged_in:
                                 if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
                                     load_products.clear()
                                     
-                                    # 📢 WhatsApp शेयर मैसेज तैयार करें
-                                    app_link = "https://ouraindia.streamlit.app"
-                                    msg = f"🔥 *नया स्टॉक आ गया है!* 🔥\n\n🛍️ *उत्पाद:* {new_name}\n📦 *होलसेल रेट:* ₹{new_w_price}\n\n👇 *लाइव फोटो देखने और ऑर्डर करने के लिए अभी क्लिक करें:*\n{app_link}"
+                                    # 🌟 स्मार्ट अपडेट: बिना रेट वाला मैसेज + डायरेक्ट कैटेगरी लिंक
+                                    safe_cat_link = urllib.parse.quote(final_cat)
+                                    app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
+                                    
+                                    msg = f"🔥 *नया स्टॉक आ गया है!* 🔥\n\n🛍️ *उत्पाद:* {new_name}\n\n👇 *होलसेल रेट जानने और लाइव फोटो देखने के लिए अभी लिंक पर क्लिक करें:*\n{app_link}"
                                     st.session_state.share_msg = msg
+                                    st.session_state.share_img_path = image_paths[0] if image_paths else None
                                     st.rerun()
 
     with tab_banner:
