@@ -182,7 +182,7 @@ def load_products():
 
 products_df = load_products()
 
-# --- सेशन स्टेट और URL से कैटेगरी पढ़ना ---
+# --- सेशन स्टेट ---
 if "cat" in st.query_params:
     st.session_state.selected_category = st.query_params["cat"]
 elif 'selected_category' not in st.session_state:
@@ -194,6 +194,8 @@ if 'show_login' not in st.session_state:
     st.session_state.show_login = False
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
+if 'share_msg' not in st.session_state:
+    st.session_state.share_msg = None
 
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
@@ -243,66 +245,89 @@ if st.session_state.admin_logged_in:
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर", "⚙️ सेटिंग्स"])
     
     with tab_add:
-        with st.form("add_product", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                new_id = st.text_input("ID (यूनिक रखें)")
-                new_name = st.text_input("नाम")
-                new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
-            with col_b:
-                new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
-                new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
+        # 🌟 नया ऑटो-शेयर (Auto-Share) फीचर 🌟
+        if st.session_state.share_msg:
+            st.success("✅ शानदार! आपका नया उत्पाद दुकान में जुड़ गया है।")
+            st.info("अब इसे तुरंत अपने ग्राहकों (ब्रॉडकास्ट लिस्ट/ग्रुप) को भेजें:")
             
-            existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-            cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
-            selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
+            # WhatsApp शेयर बटन
+            encoded_share = urllib.parse.quote(st.session_state.share_msg)
+            wa_share_link = f"https://wa.me/?text={encoded_share}"
             
-            if selected_cat == "नयी केटेगरी बनाएं...":
-                final_cat = st.text_input("नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)")
-            else:
-                final_cat = selected_cat
+            st.markdown(f'''
+            <a href="{wa_share_link}" target="_blank" style="display:inline-block; background-color:#25D366; color:white; padding:12px 25px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; margin-bottom:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                📢 WhatsApp पर शेयर करें
+            </a>
+            ''', unsafe_allow_html=True)
+            
+            if st.button("➕ एक और नया उत्पाद जोड़ें"):
+                st.session_state.share_msg = None
+                st.rerun()
                 
-            uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
-            submit_btn = st.form_submit_button("उत्पाद सेव करें")
-            
-            if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
-                if len(uploaded_imgs) > 3:
-                    st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+        else:
+            with st.form("add_product", clear_on_submit=True):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    new_id = st.text_input("ID (यूनिक रखें)")
+                    new_name = st.text_input("नाम")
+                    new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
+                with col_b:
+                    new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
+                    new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
+                
+                existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+                cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
+                selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
+                
+                if selected_cat == "नयी केटेगरी बनाएं...":
+                    final_cat = st.text_input("नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)")
                 else:
-                    with st.spinner("डेटा सेव हो रहा है..."):
-                        image_paths = []
-                        all_images_saved = True
-                        
-                        for idx, img in enumerate(uploaded_imgs):
-                            safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                            timestamp = int(time.time())
-                            final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
-                            path = f"images/{final_filename}"
-                            img_bytes = img.getvalue()
-                            try:
-                                with open(path, "wb") as f: f.write(img_bytes)
-                            except: pass
-
-                            if save_to_github(path, img_bytes, f"Add image {final_filename}"):
-                                image_paths.append(path)
-                            else:
-                                all_images_saved = False
-                                break
-
-                        if all_images_saved:
-                            final_path_str = "|".join(image_paths)
-                            df = load_products()
-                            new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str]], columns=expected_columns)
-                            df = pd.concat([df, new_row], ignore_index=True)
-                            df.to_csv(DATA_FILE, index=False)
+                    final_cat = selected_cat
+                    
+                uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
+                submit_btn = st.form_submit_button("उत्पाद सेव करें")
+                
+                if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
+                    if len(uploaded_imgs) > 3:
+                        st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+                    else:
+                        with st.spinner("डेटा सेव हो रहा है..."):
+                            image_paths = []
+                            all_images_saved = True
                             
-                            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                csv_content = f.read()
-                            if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                                load_products.clear()
-                                st.success("✅ सेव हो गया!")
-                                time.sleep(1)
-                                st.rerun()
+                            for idx, img in enumerate(uploaded_imgs):
+                                safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                                timestamp = int(time.time())
+                                final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
+                                path = f"images/{final_filename}"
+                                img_bytes = img.getvalue()
+                                try:
+                                    with open(path, "wb") as f: f.write(img_bytes)
+                                except: pass
+
+                                if save_to_github(path, img_bytes, f"Add image {final_filename}"):
+                                    image_paths.append(path)
+                                else:
+                                    all_images_saved = False
+                                    break
+
+                            if all_images_saved:
+                                final_path_str = "|".join(image_paths)
+                                df = load_products()
+                                new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str]], columns=expected_columns)
+                                df = pd.concat([df, new_row], ignore_index=True)
+                                df.to_csv(DATA_FILE, index=False)
+                                
+                                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                                    csv_content = f.read()
+                                if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
+                                    load_products.clear()
+                                    
+                                    # 📢 WhatsApp शेयर मैसेज तैयार करें
+                                    app_link = "https://ouraindia.streamlit.app"
+                                    msg = f"🔥 *नया स्टॉक आ गया है!* 🔥\n\n🛍️ *उत्पाद:* {new_name}\n📦 *होलसेल रेट:* ₹{new_w_price}\n\n👇 *लाइव फोटो देखने और ऑर्डर करने के लिए अभी क्लिक करें:*\n{app_link}"
+                                    st.session_state.share_msg = msg
+                                    st.rerun()
 
     with tab_banner:
         new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
@@ -520,7 +545,6 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        # 🌟 नया फीचर: हवा में तैरने वाला बैक बटन (Floating Button)
         floating_btn_html = '''
         <a href="?" target="_self" class="floating-back-btn">
             🔙 सभी कैटेगरीज 
@@ -560,7 +584,6 @@ else:
                 with cols[idx % 3]: 
                     show_product_card(row, idx, "cat_view")
 
-# नीचे कार्ट का हिस्सा भी थोड़ा सा गैप के साथ आएगा ताकि फ्लोटिंग बटन उस पर न चढ़े
 st.markdown("<br><br>", unsafe_allow_html=True) 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
