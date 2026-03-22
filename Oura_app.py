@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import os
 import urllib.parse
@@ -17,7 +18,7 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* 📸 स्मार्ट स्वाइप गैलरी */
+            /* 📸 स्मार्ट स्वाइप गैलरी + ज़ूम के लिए अपडेट */
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -30,10 +31,14 @@ hide_streamlit_style = """
             .swipe-gallery::-webkit-scrollbar {
                 display: none;
             }
-            .swipe-img {
+            .swipe-gallery a {
                 scroll-snap-align: center;
                 flex: 0 0 100%;
                 max-width: 100%;
+                text-decoration: none;
+            }
+            .swipe-img {
+                width: 100%;
                 height: 300px;
                 object-fit: contain;
                 background-color: #f8f9fa;
@@ -92,6 +97,37 @@ hide_streamlit_style = """
             .floating-back-btn:active {
                 background-color: #000000;
                 transform: translateX(-50%) scale(0.95);
+            }
+
+            /* 📞 चमकता हुआ (Glowing) व्हाट्सएप बटन (Draggable) */
+            @keyframes glowing {
+              0% { box-shadow: 0 0 5px #25D366; }
+              50% { box-shadow: 0 0 20px #25D366, 0 0 30px #25D366; transform: scale(1.05); }
+              100% { box-shadow: 0 0 5px #25D366; }
+            }
+            #oura-wa-btn {
+                position: fixed;
+                bottom: 120px;
+                right: 15px;
+                background-color: #25D366;
+                color: white !important;
+                padding: 12px 18px;
+                border-radius: 50px;
+                font-size: 16px;
+                font-weight: bold;
+                text-decoration: none !important;
+                z-index: 9999999;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                animation: glowing 2s infinite;
+                cursor: grab;
+                border: 2px solid white;
+                user-select: none;
+                touch-action: none; /* टच स्क्रोलिंग को रोकने के लिए */
+            }
+            #oura-wa-btn:active {
+                cursor: grabbing;
             }
             </style>
             """
@@ -250,12 +286,10 @@ if st.session_state.admin_logged_in:
         if st.session_state.share_msg:
             st.success("✅ शानदार! आपका नया उत्पाद दुकान में जुड़ गया है।")
             
-            # 📸 फोटो कॉपी करने का जुगाड़
             if st.session_state.share_img_path and os.path.exists(st.session_state.share_img_path):
                 st.image(st.session_state.share_img_path, width=200)
                 st.info("💡 **टिप:** इस फोटो को WhatsApp पर भेजने के लिए, फोटो पर उंगली दबाए रखें (Long Press) और **'Copy Image'** चुनें, फिर WhatsApp में Paste कर दें।")
             
-            # WhatsApp शेयर बटन
             encoded_share = urllib.parse.quote(st.session_state.share_msg)
             wa_share_link = f"https://wa.me/?text={encoded_share}"
             
@@ -264,6 +298,8 @@ if st.session_state.admin_logged_in:
                 📢 WhatsApp पर शेयर करें
             </a>
             ''', unsafe_allow_html=True)
+            
+            st.write("*(नोट: WhatsApp लिंक में सीधे फोटो नहीं भेजता, लेकिन इस लिंक पर क्लिक करते ही ग्राहक सीधा इसी प्रोडक्ट की फोटो देखेगा!)*")
             
             if st.button("➕ एक और नया उत्पाद जोड़ें"):
                 st.session_state.share_msg = None
@@ -329,7 +365,6 @@ if st.session_state.admin_logged_in:
                                 if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
                                     load_products.clear()
                                     
-                                    # 🌟 स्मार्ट अपडेट: बिना रेट वाला मैसेज + डायरेक्ट कैटेगरी लिंक
                                     safe_cat_link = urllib.parse.quote(final_cat)
                                     app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
                                     
@@ -361,7 +396,7 @@ if st.session_state.admin_logged_in:
 
     with tab_settings:
         st.subheader("📱 संपर्क सेटिंग्स")
-        new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", ""))
+        new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
         new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
         if st.button("सेटिंग्स सेव करें"):
             current_config["admin_whatsapp"] = new_wa
@@ -395,11 +430,15 @@ def show_swipe_gallery(path_str):
     html_code = '<div class="swipe-gallery">'
     for p in paths:
         src = get_image_src(p)
-        html_code += f'<img src="{src}" class="swipe-img" loading="lazy" alt="Product Image">'
+        # 🔍 ज़ूम अपडेट: फोटो को <a> टैग में डाला है। क्लिक करते ही फोटो पूरी स्क्रीन पर खुलेगी
+        full_url = f"{GITHUB_RAW_URL}{urllib.parse.quote(p.replace('\\', '/'), safe='/')}"
+        html_code += f'<a href="{full_url}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
     html_code += '</div>'
     
     if len(paths) > 1:
-        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">स्वाइप करें 👉</div>'
+        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">फोटो बड़ी करने के लिए उस पर क्लिक करें 🔍</div>'
+    else:
+        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">ज़ूम करने के लिए फोटो पर क्लिक करें 🔍</div>'
         
     st.markdown(html_code, unsafe_allow_html=True)
     return paths
@@ -593,7 +632,7 @@ else:
                 with cols[idx % 3]: 
                     show_product_card(row, idx, "cat_view")
 
-st.markdown("<br><br>", unsafe_allow_html=True) 
+st.markdown("<br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
 if st.session_state.cart:
@@ -622,3 +661,80 @@ if st.session_state.cart:
     if st.button("बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
+
+# ---------------------------------------------------------
+# 📞 खिसकने (Draggable) और चमकने वाला WhatsApp नंबर
+# ---------------------------------------------------------
+admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
+wa_chat_link = f"https://wa.me/{admin_wa_number}"
+
+# HTML में चमकता हुआ बटन
+floating_wa_html = f"""
+<a id="oura-wa-btn" href="{wa_chat_link}" target="_blank" title="WhatsApp Us">
+    📞 9891587437
+</a>
+"""
+st.markdown(floating_wa_html, unsafe_allow_html=True)
+
+# JS कोड: जो इस बटन को उंगली से ऊपर-नीचे खिसकाने (Drag) की ताकत देगा
+drag_js_code = """
+<script>
+const parentDoc = window.parent.document;
+const btn = parentDoc.getElementById('oura-wa-btn');
+
+if (btn && !btn.dataset.draggable) {
+    btn.dataset.draggable = "true";
+    let isDragging = false;
+    let startY, startTop;
+
+    const onStart = (e) => {
+        if(e.type === 'mousedown' || e.type === 'touchstart') {
+            isDragging = true;
+            startY = e.touches ? e.touches[0].clientY : e.clientY;
+            startTop = btn.offsetTop;
+            btn.style.animation = 'none'; // खिसकाते समय चमकना बंद
+            btn.style.transition = 'none';
+        }
+    };
+
+    const onMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault(); 
+        let currentY = e.touches ? e.touches[0].clientY : e.clientY;
+        let dy = currentY - startY;
+        let newTop = startTop + dy;
+        
+        // स्क्रीन से बाहर न जाए, इसकी लिमिट
+        if (newTop < 80) newTop = 80;
+        if (newTop > parentDoc.documentElement.clientHeight - 80) newTop = parentDoc.documentElement.clientHeight - 80;
+        
+        btn.style.top = newTop + 'px';
+        btn.style.bottom = 'auto'; // Bottom को हटाकर Top सेट करें
+    };
+
+    const onEnd = () => {
+        isDragging = false;
+        btn.style.animation = 'glowing 2s infinite'; // वापस चमकना शुरू
+    };
+
+    // मोबाइल टच के लिए
+    btn.addEventListener('touchstart', onStart, {passive: false});
+    parentDoc.addEventListener('touchmove', onMove, {passive: false});
+    parentDoc.addEventListener('touchend', onEnd);
+
+    // कंप्यूटर माउस के लिए
+    btn.addEventListener('mousedown', onStart);
+    parentDoc.addEventListener('mousemove', onMove);
+    parentDoc.addEventListener('mouseup', onEnd);
+    
+    // अगर बटन को खिसकाया गया है, तो WhatsApp न खुले
+    btn.addEventListener('click', (e) => {
+        if (Math.abs(btn.offsetTop - startTop) > 10) {
+            e.preventDefault(); 
+        }
+    });
+}
+</script>
+"""
+# Streamlit में JS चलाने का कोड
+components.html(drag_js_code, height=0, width=0)
