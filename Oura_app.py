@@ -99,7 +99,7 @@ hide_streamlit_style = """
                 transform: translateX(-50%) scale(0.95);
             }
 
-            /* 📞 चमकता हुआ (Glowing) व्हाट्सएप बटन (Draggable) */
+            /* 📞 चमकता हुआ व्हाट्सएप बटन (Draggable) */
             @keyframes glowing {
               0% { box-shadow: 0 0 5px #25D366; }
               50% { box-shadow: 0 0 20px #25D366, 0 0 30px #25D366; transform: scale(1.05); }
@@ -237,10 +237,11 @@ def load_products():
 
 products_df = load_products()
 
-# --- सेशन स्टेट ---
+# --- 🌟 100% सुरक्षित नेविगेशन (बैक बटन फिक्स) 🌟 ---
 if "cat" in st.query_params:
     st.session_state.selected_category = st.query_params["cat"]
-elif 'selected_category' not in st.session_state:
+else:
+    # अगर URL में कोई कैटेगरी नहीं है, तो ऐप पक्का मेन स्क्रीन पर जाएगा
     st.session_state.selected_category = None
 
 if 'admin_logged_in' not in st.session_state:
@@ -561,6 +562,8 @@ def show_product_card(row, idx, prefix):
                     with st.spinner("डिलीट हो रहा है..."):
                         df_del = load_products()
                         p_id = str(row['ID'])
+                        current_cat_before_delete = st.session_state.selected_category
+                        
                         df_updated = df_del[df_del['ID'].astype(str) != p_id]
                         df_updated.to_csv(DATA_FILE, index=False)
                         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -568,6 +571,10 @@ def show_product_card(row, idx, prefix):
                         if save_to_github(DATA_FILE, csv_content, f"Delete product"):
                             load_products.clear()
                             get_image_src.clear()
+                            
+                            st.session_state.selected_category = current_cat_before_delete
+                            if current_cat_before_delete:
+                                st.query_params["cat"] = current_cat_before_delete
                             st.success("डिलीट हो गया!")
                             time.sleep(1)
                             st.rerun()
@@ -609,7 +616,15 @@ else:
             st.markdown(html_grid, unsafe_allow_html=True)
             
     else:
-        st.subheader(f"📂 {st.session_state.selected_category}")
+        # 🌟 नया: सबसे ऊपर भी एक बड़ा "बैक बटन" लगा दिया है
+        col_back, col_title = st.columns([2, 8])
+        with col_back:
+            if st.button("🔙 बाहर आएं", use_container_width=True):
+                st.query_params.clear()
+                st.session_state.selected_category = None
+                st.rerun()
+        with col_title:
+            st.subheader(f"📂 {st.session_state.selected_category}")
         
         floating_btn_html = '''
         <a href="?" target="_self" class="floating-back-btn">
@@ -668,12 +683,9 @@ if st.session_state.cart:
     msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
     st.subheader(f"कुल बिल: ₹{total}")
     
-    # 🌟 नया 100% फ्री और असली UPI पेमेंट सिस्टम 🌟
     upi_id = current_config.get("upi_id", "")
     if upi_id:
         st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
-        
-        # 1. मोबाइल के लिए डायरेक्ट UPI बटन (PhonePe/GPay खोलने के लिए)
         upi_string = f"upi://pay?pa={upi_id}&pn=Oura_Wholesale&am={total}&cu=INR"
         st.markdown(f'''
         <a href="{upi_string}" class="upi-btn">
@@ -681,7 +693,6 @@ if st.session_state.cart:
         </a>
         ''', unsafe_allow_html=True)
         
-        # 2. कंप्यूटर/स्कैन करने के लिए डायनामिक QR कोड
         with st.expander("स्कैन करके पेमेंट करें (QR Code)"):
             qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(upi_string)}"
             st.image(qr_url, width=200)
@@ -689,7 +700,7 @@ if st.session_state.cart:
             st.write("*(नोट: ट्रांसपोर्ट या पैकिंग का खर्च ऊपर से जोड़ा जा सकता है)*")
             msg += f"\n\n💳 *UPI ID:* {upi_id}"
     
-    st.write("") # थोड़ा सा गैप
+    st.write("") 
     if st.button("WhatsApp पर ऑर्डर भेजें"):
         encoded_msg = urllib.parse.quote(msg)
         wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
