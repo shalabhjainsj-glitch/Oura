@@ -18,7 +18,7 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* 📸 स्मार्ट स्वाइप गैलरी + ज़ूम के लिए अपडेट */
+            /* 📸 स्मार्ट स्वाइप गैलरी */
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -124,10 +124,29 @@ hide_streamlit_style = """
                 cursor: grab;
                 border: 2px solid white;
                 user-select: none;
-                touch-action: none; /* टच स्क्रोलिंग को रोकने के लिए */
+                touch-action: none;
             }
             #oura-wa-btn:active {
                 cursor: grabbing;
+            }
+            
+            /* 💳 UPI पेमेंट बटन डिज़ाइन */
+            .upi-btn {
+                display: block;
+                text-align: center;
+                background: linear-gradient(135deg, #673AB7, #512DA8);
+                color: white !important;
+                padding: 15px;
+                border-radius: 12px;
+                text-decoration: none !important;
+                font-size: 16px;
+                font-weight: bold;
+                box-shadow: 0 4px 10px rgba(103, 58, 183, 0.4);
+                margin: 15px 0;
+                transition: transform 0.1s;
+            }
+            .upi-btn:active {
+                transform: scale(0.96);
             }
             </style>
             """
@@ -430,7 +449,6 @@ def show_swipe_gallery(path_str):
     html_code = '<div class="swipe-gallery">'
     for p in paths:
         src = get_image_src(p)
-        # 🔍 ज़ूम अपडेट: फोटो को <a> टैग में डाला है। क्लिक करते ही फोटो पूरी स्क्रीन पर खुलेगी
         full_url = f"{GITHUB_RAW_URL}{urllib.parse.quote(p.replace('\\', '/'), safe='/')}"
         html_code += f'<a href="{full_url}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
     html_code += '</div>'
@@ -635,6 +653,7 @@ else:
 st.markdown("<br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
 st.header("🛒 आपकी बास्केट (कच्चा बिल)")
+
 if st.session_state.cart:
     total = 0
     msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
@@ -648,11 +667,29 @@ if st.session_state.cart:
     
     msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
     st.subheader(f"कुल बिल: ₹{total}")
-    upi = current_config.get("upi_id", "")
-    if upi:
-        st.success(f"💳 **पेमेंट के लिए UPI ID:** `{upi}`")
-        msg += f"\n\n💳 *UPI ID:* {upi}"
     
+    # 🌟 नया 100% फ्री और असली UPI पेमेंट सिस्टम 🌟
+    upi_id = current_config.get("upi_id", "")
+    if upi_id:
+        st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
+        
+        # 1. मोबाइल के लिए डायरेक्ट UPI बटन (PhonePe/GPay खोलने के लिए)
+        upi_string = f"upi://pay?pa={upi_id}&pn=Oura_Wholesale&am={total}&cu=INR"
+        st.markdown(f'''
+        <a href="{upi_string}" class="upi-btn">
+            📲 PhonePe / GPay / Paytm से ₹{total} पे करें
+        </a>
+        ''', unsafe_allow_html=True)
+        
+        # 2. कंप्यूटर/स्कैन करने के लिए डायनामिक QR कोड
+        with st.expander("स्कैन करके पेमेंट करें (QR Code)"):
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(upi_string)}"
+            st.image(qr_url, width=200)
+            st.success(f"**UPI ID:** `{upi_id}`")
+            st.write("*(नोट: ट्रांसपोर्ट या पैकिंग का खर्च ऊपर से जोड़ा जा सकता है)*")
+            msg += f"\n\n💳 *UPI ID:* {upi_id}"
+    
+    st.write("") # थोड़ा सा गैप
     if st.button("WhatsApp पर ऑर्डर भेजें"):
         encoded_msg = urllib.parse.quote(msg)
         wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
@@ -668,15 +705,13 @@ if st.session_state.cart:
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 wa_chat_link = f"https://wa.me/{admin_wa_number}"
 
-# HTML में चमकता हुआ बटन
 floating_wa_html = f"""
 <a id="oura-wa-btn" href="{wa_chat_link}" target="_blank" title="WhatsApp Us">
-    📞 9891587437
+    📞 {admin_wa_number}
 </a>
 """
 st.markdown(floating_wa_html, unsafe_allow_html=True)
 
-# JS कोड: जो इस बटन को उंगली से ऊपर-नीचे खिसकाने (Drag) की ताकत देगा
 drag_js_code = """
 <script>
 const parentDoc = window.parent.document;
@@ -692,7 +727,7 @@ if (btn && !btn.dataset.draggable) {
             isDragging = true;
             startY = e.touches ? e.touches[0].clientY : e.clientY;
             startTop = btn.offsetTop;
-            btn.style.animation = 'none'; // खिसकाते समय चमकना बंद
+            btn.style.animation = 'none'; 
             btn.style.transition = 'none';
         }
     };
@@ -704,30 +739,26 @@ if (btn && !btn.dataset.draggable) {
         let dy = currentY - startY;
         let newTop = startTop + dy;
         
-        // स्क्रीन से बाहर न जाए, इसकी लिमिट
         if (newTop < 80) newTop = 80;
         if (newTop > parentDoc.documentElement.clientHeight - 80) newTop = parentDoc.documentElement.clientHeight - 80;
         
         btn.style.top = newTop + 'px';
-        btn.style.bottom = 'auto'; // Bottom को हटाकर Top सेट करें
+        btn.style.bottom = 'auto'; 
     };
 
     const onEnd = () => {
         isDragging = false;
-        btn.style.animation = 'glowing 2s infinite'; // वापस चमकना शुरू
+        btn.style.animation = 'glowing 2s infinite'; 
     };
 
-    // मोबाइल टच के लिए
     btn.addEventListener('touchstart', onStart, {passive: false});
     parentDoc.addEventListener('touchmove', onMove, {passive: false});
     parentDoc.addEventListener('touchend', onEnd);
 
-    // कंप्यूटर माउस के लिए
     btn.addEventListener('mousedown', onStart);
     parentDoc.addEventListener('mousemove', onMove);
     parentDoc.addEventListener('mouseup', onEnd);
     
-    // अगर बटन को खिसकाया गया है, तो WhatsApp न खुले
     btn.addEventListener('click', (e) => {
         if (Math.abs(btn.offsetTop - startTop) > 10) {
             e.preventDefault(); 
@@ -736,5 +767,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-# Streamlit में JS चलाने का कोड
 components.html(drag_js_code, height=0, width=0)
