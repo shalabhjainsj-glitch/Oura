@@ -328,10 +328,10 @@ if st.session_state.admin_logged_in:
                 with col_a:
                     new_id = st.text_input("ID (यूनिक रखें)")
                     new_name = st.text_input("नाम")
-                    new_price = st.number_input("रिटेल रेट (1 पीस का)", min_value=1)
+                    new_price = st.number_input("सिंगल पीस रेट (कोरियर चार्ज जोड़कर लिखें)", min_value=1)
                 with col_b:
                     new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
-                    new_w_price = st.number_input("होलसेल रेट (प्रति पीस)", min_value=1)
+                    new_w_price = st.number_input("होलसेल / बॉक्स रेट (प्रति पीस)", min_value=1)
                 
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
                 cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
@@ -495,9 +495,9 @@ def show_product_card(row, idx, prefix):
         except: w_price = retail_price
         
         if w_qty > 1:
-            st.markdown(f"**रिटेल:** ₹{retail_price} <br> **होलसेल:** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
+            st.markdown(f"🛵 **सिंगल पीस (फ्री डिलीवरी):** ₹{retail_price} <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
         else:
-            st.markdown(f"**रेट:** ₹{retail_price}")
+            st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(फ्री डिलीवरी)*")
             
         qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
         
@@ -518,10 +518,10 @@ def show_product_card(row, idx, prefix):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
                     with col_x:
-                        e_price = st.number_input("रिटेल", value=retail_price)
+                        e_price = st.number_input("सिंगल पीस (कोरियर सहित)", value=retail_price)
                         e_w_qty = st.number_input("होलसेल मात्रा", value=w_qty)
                     with col_y:
-                        e_w_price = st.number_input("होलसेल", value=w_price)
+                        e_w_price = st.number_input("होलसेल (बॉक्स रेट)", value=w_price)
                         
                     existing_cats_edit = products_df['Category'].dropna().unique().tolist()
                     current_cat = str(row.get("Category", ""))
@@ -692,10 +692,9 @@ if st.session_state.cart:
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
         count += 1
     
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *पैकिंग व ट्रांसपोर्ट Extra*\n"
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर ट्रांसपोर्ट/पैकिंग अलग से लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
     st.subheader(f"कुल बिल: ₹{total}")
     
-    # 🌟 मल्टी-UPI पेमेंट सेक्शन 🌟
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
     if current_config.get("paytm_upi"): available_upis["Paytm"] = {"id": current_config["paytm_upi"], "color": "#00baf2", "icon": "🔵"}
@@ -725,9 +724,19 @@ if st.session_state.cart:
                     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(f'upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR')}"
                     st.image(qr_url, width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
-            st.write("*(नोट: ट्रांसपोर्ट या पैकिंग का खर्च ऊपर से जोड़ा जा सकता है)*")
 
-    # 🌟 नया 100% पक्का डिलीवरी एड्रेस सिस्टम 🌟
+    # 🌟 अपडेटेड: रिफंड पॉलिसी (इम्पोर्टेड आइटम क्लॉज़ के साथ) 🌟
+    st.markdown("---")
+    st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
+    st.warning("""
+    ⚠️ **ध्यान दें:**
+    1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** की स्थिति में ही होगी।
+    2. ट्रांसपोर्ट या कूरियर में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी या रिफंड नहीं होगा।
+    3. **इम्पोर्टेड (Imported) आइटम की कोई गारंटी नहीं होगी।**
+    """)
+    
+    msg += "\n\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
+
     st.markdown("---")
     st.markdown("### 📍 डिलीवरी की जानकारी")
     st.info("ऑर्डर भेजने से पहले कृपया अपना पता और मोबाईल नंबर यहाँ भरें ताकि हम आपका माल भेज सकें।")
@@ -744,7 +753,6 @@ if st.session_state.cart:
     final_msg += f"📞 मोबाईल: {cust_mobile if cust_mobile else 'नहीं बताया'}\n"
     final_msg += f"🏠 पता: {cust_address if cust_address else 'नहीं बताया'}\n"
 
-    # WhatsApp बटन लॉजिक
     if st.button("✅ WhatsApp पर ऑर्डर भेजें"):
         if len(cust_mobile) < 10 or len(cust_address) < 5:
             st.error("⚠️ कृपया अपना सही मोबाईल नंबर और पूरा पता (पिन कोड के साथ) ज़रूर लिखें!")
