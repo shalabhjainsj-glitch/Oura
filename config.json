@@ -1,5 +1,9 @@
 {
     "admin_whatsapp": "919891587437",
-    "upi_id": "9891587437@upi",
-    "has_banner": true
+    "upi_id": "",
+    "has_banner": true,
+    "phonepe_upi": "9891587437@axl",
+    "paytm_upi": "",
+    "gpay_upi": "",
+    "bhim_upi": "9891587437@upi"
 }
