@@ -130,22 +130,11 @@ hide_streamlit_style = """
                 cursor: grabbing;
             }
             
-            /* 💳 UPI पेमेंट बटन डिज़ाइन */
-            .upi-btn {
-                display: block;
-                text-align: center;
-                background: linear-gradient(135deg, #673AB7, #512DA8);
-                color: white !important;
-                padding: 15px;
-                border-radius: 12px;
-                text-decoration: none !important;
-                font-size: 16px;
-                font-weight: bold;
-                box-shadow: 0 4px 10px rgba(103, 58, 183, 0.4);
-                margin: 15px 0;
+            /* 💳 मल्टी UPI बटन के लिए होवर इफ़ेक्ट */
+            .multi-upi-btn {
                 transition: transform 0.1s;
             }
-            .upi-btn:active {
+            .multi-upi-btn:active {
                 transform: scale(0.96);
             }
             </style>
@@ -193,7 +182,15 @@ def load_config():
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except: pass
-    return {"admin_whatsapp": "919891587437", "upi_id": "9891587437@upi", "has_banner": False}
+    return {
+        "admin_whatsapp": "919891587437", 
+        "phonepe_upi": "",
+        "paytm_upi": "",
+        "gpay_upi": "",
+        "bhim_upi": "",
+        "upi_id": "",
+        "has_banner": False
+    }
 
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -237,11 +234,10 @@ def load_products():
 
 products_df = load_products()
 
-# --- 🌟 100% सुरक्षित नेविगेशन (बैक बटन फिक्स) 🌟 ---
+# --- 🌟 सुरक्षित नेविगेशन 🌟 ---
 if "cat" in st.query_params:
     st.session_state.selected_category = st.query_params["cat"]
 else:
-    # अगर URL में कोई कैटेगरी नहीं है, तो ऐप पक्का मेन स्क्रीन पर जाएगा
     st.session_state.selected_category = None
 
 if 'admin_logged_in' not in st.session_state:
@@ -388,7 +384,8 @@ if st.session_state.admin_logged_in:
                                     safe_cat_link = urllib.parse.quote(final_cat)
                                     app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
                                     
-                                    msg = f"🔥 *नया स्टॉक आ गया है!* 🔥\n\n🛍️ *उत्पाद:* {new_name}\n\n👇 *होलसेल रेट जानने और लाइव फोटो देखने के लिए अभी लिंक पर क्लिक करें:*\n{app_link}"
+                                    msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए हमने एक नया डिज़ाइन लॉन्च किया है!\n\n🎁 *नया उत्पाद:* {new_name}\n\nयह डिज़ाइन मार्केट में आते ही बिक रहा है। इससे पहले कि स्टॉक खत्म हो जाए...\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
+                                    
                                     st.session_state.share_msg = msg
                                     st.session_state.share_img_path = image_paths[0] if image_paths else None
                                     st.rerun()
@@ -417,12 +414,28 @@ if st.session_state.admin_logged_in:
     with tab_settings:
         st.subheader("📱 संपर्क सेटिंग्स")
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
-        new_upi = st.text_input("UPI ID (पेमेंट के लिए)", value=current_config.get("upi_id", ""))
-        if st.button("सेटिंग्स सेव करें"):
+        
+        st.markdown("---")
+        st.subheader("💳 मल्टी UPI सेटिंग्स")
+        st.info("आप अलग-अलग ऐप्स के लिए अलग-अलग UPI ID डाल सकते हैं। जो बॉक्स आप खाली छोड़ेंगे, उसका बटन ग्राहक को नहीं दिखेगा।")
+        
+        col_u1, col_u2 = st.columns(2)
+        with col_u1:
+            new_phonepe = st.text_input("PhonePe UPI ID", value=current_config.get("phonepe_upi", current_config.get("upi_id", "")))
+            new_paytm = st.text_input("Paytm UPI ID", value=current_config.get("paytm_upi", ""))
+        with col_u2:
+            new_gpay = st.text_input("Google Pay (GPay) UPI ID", value=current_config.get("gpay_upi", ""))
+            new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
+            
+        if st.button("⚙️ सेटिंग्स सेव करें"):
             current_config["admin_whatsapp"] = new_wa
-            current_config["upi_id"] = new_upi
+            current_config["phonepe_upi"] = new_phonepe
+            current_config["paytm_upi"] = new_paytm
+            current_config["gpay_upi"] = new_gpay
+            current_config["bhim_upi"] = new_bhim
+            current_config["upi_id"] = "" 
             save_config(current_config)
-            st.success("सेव हो गईं!")
+            st.success("✅ नई UPI सेटिंग्स सेव हो गईं!")
             time.sleep(1)
             st.rerun()
     st.markdown("---")
@@ -616,7 +629,6 @@ else:
             st.markdown(html_grid, unsafe_allow_html=True)
             
     else:
-        # 🌟 नया: सबसे ऊपर भी एक बड़ा "बैक बटन" लगा दिया है
         col_back, col_title = st.columns([2, 8])
         with col_back:
             if st.button("🔙 बाहर आएं", use_container_width=True):
@@ -680,33 +692,75 @@ if st.session_state.cart:
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
         count += 1
     
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *पैकिंग व ट्रांसपोर्ट Extra*"
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *पैकिंग व ट्रांसपोर्ट Extra*\n"
     st.subheader(f"कुल बिल: ₹{total}")
     
-    upi_id = current_config.get("upi_id", "")
-    if upi_id:
+    # 🌟 मल्टी-UPI पेमेंट सेक्शन 🌟
+    available_upis = {}
+    if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
+    if current_config.get("paytm_upi"): available_upis["Paytm"] = {"id": current_config["paytm_upi"], "color": "#00baf2", "icon": "🔵"}
+    if current_config.get("gpay_upi"): available_upis["Google Pay"] = {"id": current_config["gpay_upi"], "color": "#1a73e8", "icon": "🔴"}
+    if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
+    
+    if not available_upis and current_config.get("upi_id"):
+        available_upis["UPI App"] = {"id": current_config["upi_id"], "color": "#673AB7", "icon": "📲"}
+
+    if available_upis:
         st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
-        upi_string = f"upi://pay?pa={upi_id}&pn=Oura_Wholesale&am={total}&cu=INR"
-        st.markdown(f'''
-        <a href="{upi_string}" class="upi-btn">
-            📲 PhonePe / GPay / Paytm से ₹{total} पे करें
-        </a>
-        ''', unsafe_allow_html=True)
+        st.write("अपने पसंदीदा ऐप से 1-क्लिक में पेमेंट करें:")
+        
+        for name, data in available_upis.items():
+            upi_str = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
+            st.markdown(f'''
+            <a href="{upi_str}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                {data['icon']} {name} से ₹{total} पे करें
+            </a>
+            ''', unsafe_allow_html=True)
+            msg += f"\n💳 *{name} UPI:* {data['id']}"
         
         with st.expander("स्कैन करके पेमेंट करें (QR Code)"):
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(upi_string)}"
-            st.image(qr_url, width=200)
-            st.success(f"**UPI ID:** `{upi_id}`")
+            qr_tabs = st.tabs(list(available_upis.keys()))
+            for idx, (name, data) in enumerate(available_upis.items()):
+                with qr_tabs[idx]:
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(f'upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR')}"
+                    st.image(qr_url, width=150)
+                    st.success(f"**{name} UPI ID:** `{data['id']}`")
             st.write("*(नोट: ट्रांसपोर्ट या पैकिंग का खर्च ऊपर से जोड़ा जा सकता है)*")
-            msg += f"\n\n💳 *UPI ID:* {upi_id}"
+
+    # 🌟 नया 100% पक्का डिलीवरी एड्रेस सिस्टम 🌟
+    st.markdown("---")
+    st.markdown("### 📍 डिलीवरी की जानकारी")
+    st.info("ऑर्डर भेजने से पहले कृपया अपना पता और मोबाईल नंबर यहाँ भरें ताकि हम आपका माल भेज सकें।")
+    
+    cust_name = st.text_input("आपका नाम (Your Name)")
+    cust_mobile = st.text_input("मोबाईल नंबर (WhatsApp Number)")
+    cust_address = st.text_area("पूरा पता (Full Address - पिन कोड सहित)")
     
     st.write("") 
-    if st.button("WhatsApp पर ऑर्डर भेजें"):
-        encoded_msg = urllib.parse.quote(msg)
-        wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
-        st.write(f"👉 [यहाँ क्लिक करके WhatsApp भेजें]({wa_link})")
     
-    if st.button("बास्केट खाली करें"):
+    final_msg = msg
+    final_msg += "\n\n📍 *डिलीवरी की जानकारी:*\n"
+    final_msg += f"👤 नाम: {cust_name if cust_name else 'नहीं बताया'}\n"
+    final_msg += f"📞 मोबाईल: {cust_mobile if cust_mobile else 'नहीं बताया'}\n"
+    final_msg += f"🏠 पता: {cust_address if cust_address else 'नहीं बताया'}\n"
+
+    # WhatsApp बटन लॉजिक
+    if st.button("✅ WhatsApp पर ऑर्डर भेजें"):
+        if len(cust_mobile) < 10 or len(cust_address) < 5:
+            st.error("⚠️ कृपया अपना सही मोबाईल नंबर और पूरा पता (पिन कोड के साथ) ज़रूर लिखें!")
+        else:
+            encoded_msg = urllib.parse.quote(final_msg)
+            wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
+            
+            st.markdown(f'''
+            <a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">
+                📲 यहाँ क्लिक करके WhatsApp पर भेजें
+            </a>
+            ''', unsafe_allow_html=True)
+            st.success("👆 ऊपर दिए गए हरे बटन पर क्लिक करें!")
+    
+    st.write("")
+    if st.button("🗑️ बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
 
