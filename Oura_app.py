@@ -725,12 +725,10 @@ if st.session_state.cart:
                     st.image(qr_url, width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
-    # 🌟 नया: 100% ग्राहक संतुष्टि और पैकिंग वीडियो का वादा 🌟
     st.markdown("---")
     st.markdown("### 🤝 100% ग्राहक संतुष्टि (Customer Trust)")
     st.success("✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी। आप बिल्कुल बेफिक्र होकर ऑर्डर करें!")
     
-    # यह वादा WhatsApp मैसेज में भी जुड़ेगा
     msg += "\n\n🤝 *भरोसा:* आपके माल की पैकिंग की लाइव वीडियो और फोटो डिस्पैच से पहले आपको WhatsApp पर भेजी जाएगी।\n"
 
     st.markdown("---")
@@ -744,35 +742,32 @@ if st.session_state.cart:
     
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
+    # 🌟 सुरक्षित और बिना रोक-टोक वाला चेकआउट (Zero Friction Checkout) 🌟
     st.markdown("---")
     st.markdown("### 📍 डिलीवरी की जानकारी")
-    st.info("ऑर्डर भेजने से पहले कृपया अपना पता और मोबाईल नंबर यहाँ भरें ताकि हम आपका माल भेज सकें।")
+    st.info("ऑर्डर भेजने से पहले आप चाहें तो अपना पता यहाँ भर सकते हैं, या सीधे WhatsApp पर भी बता सकते हैं।")
     
-    cust_name = st.text_input("आपका नाम (Your Name)")
-    cust_mobile = st.text_input("मोबाईल नंबर (WhatsApp Number)")
-    cust_address = st.text_area("पूरा पता (Full Address - पिन कोड सहित)")
+    cust_name = st.text_input("आपका नाम (Optional / ऐच्छिक)")
+    cust_mobile = st.text_input("मोबाईल नंबर (Optional / ऐच्छिक)")
+    cust_address = st.text_area("पूरा पता (Optional / ऐच्छिक)")
     
     st.write("") 
     
     final_msg = msg
     final_msg += "\n\n📍 *डिलीवरी की जानकारी:*\n"
-    final_msg += f"👤 नाम: {cust_name if cust_name else 'नहीं बताया'}\n"
-    final_msg += f"📞 मोबाईल: {cust_mobile if cust_mobile else 'नहीं बताया'}\n"
-    final_msg += f"🏠 पता: {cust_address if cust_address else 'नहीं बताया'}\n"
+    final_msg += f"👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n"
+    final_msg += f"📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n"
+    final_msg += f"🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
 
-    if st.button("✅ WhatsApp पर ऑर्डर भेजें"):
-        if len(cust_mobile) < 10 or len(cust_address) < 5:
-            st.error("⚠️ कृपया अपना सही मोबाईल नंबर और पूरा पता (पिन कोड के साथ) ज़रूर लिखें!")
-        else:
-            encoded_msg = urllib.parse.quote(final_msg)
-            wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
-            
-            st.markdown(f'''
-            <a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">
-                📲 यहाँ क्लिक करके WhatsApp पर भेजें
-            </a>
-            ''', unsafe_allow_html=True)
-            st.success("👆 ऊपर दिए गए हरे बटन पर क्लिक करें!")
+    # यह बटन अब सीधे बिना किसी वार्निंग के WhatsApp खोल देगा!
+    encoded_msg = urllib.parse.quote(final_msg)
+    wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
+    
+    st.markdown(f'''
+    <a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">
+        ✅ सीधा WhatsApp पर ऑर्डर भेजें
+    </a>
+    ''', unsafe_allow_html=True)
     
     st.write("")
     if st.button("🗑️ बास्केट खाली करें"):
