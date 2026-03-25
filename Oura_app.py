@@ -1051,4 +1051,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-st_components.html(drag_js_code, height=0, width=0)
+st_components.
