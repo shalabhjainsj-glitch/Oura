@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import streamlit.components.v1 as st_components
 import pandas as pd
 import os
 import urllib.parse
@@ -7,6 +7,8 @@ import json
 import requests
 import base64
 import time
+import random
+import string
 
 # --- 1. सबसे पहले सेटिंग्स और लोगो लोड करें ---
 CONFIG_FILE = "config.json"
@@ -32,10 +34,13 @@ def load_config():
         "upi_id": "",
         "has_banner": False,
         "has_logo": False,
-        "free_delivery_tag": True 
+        "free_delivery_tag": True,
+        "sellers": {} 
     }
 
 current_config = load_config()
+if "sellers" not in current_config:
+    current_config["sellers"] = {}
 
 if current_config.get("has_logo", False):
     app_icon_url = f"{GITHUB_RAW_URL}{LOGO_FILE}?t={int(time.time())}"
@@ -132,7 +137,7 @@ hide_streamlit_style = """
                 transform: translateX(-50%) scale(0.95);
             }
 
-            /* 📞 चमकता हुआ व्हाट्सएप बटन (Draggable) */
+            /* 📞 चमकता हुआ व्हाट्सएप बटन */
             @keyframes glowing {
               0% { box-shadow: 0 0 5px #25D366; }
               50% { box-shadow: 0 0 20px #25D366, 0 0 30px #25D366; transform: scale(1.05); }
@@ -163,12 +168,25 @@ hide_streamlit_style = """
                 cursor: grabbing;
             }
             
-            /* 💳 मल्टी UPI बटन के लिए होवर इफ़ेक्ट */
+            /* 💳 मल्टी UPI बटन */
             .multi-upi-btn {
                 transition: transform 0.1s;
             }
             .multi-upi-btn:active {
                 transform: scale(0.96);
+            }
+            
+            /* 💼 सेलर बटन डिज़ाइन */
+            .seller-btn {
+                background: linear-gradient(135deg, #FF9800, #F57C00);
+                color: white !important;
+                padding: 10px 15px;
+                border-radius: 8px;
+                text-decoration: none !important;
+                font-weight: bold;
+                display: inline-block;
+                text-align: center;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }
             </style>
             """
@@ -197,7 +215,7 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     mobIcon.href = '{app_icon_url}';
     </script>
     """
-    components.html(pwa_js, height=0, width=0)
+    st_components.html(pwa_js, height=0, width=0)
 
 def save_to_github(file_path, content, commit_message):
     try:
@@ -235,8 +253,7 @@ def save_config(config):
 if not os.path.exists("images"):
     os.makedirs("images")
 
-# 🌟 नया: डेटाबेस में 'Free_Delivery' का कॉलम जोड़ा गया है 🌟
-expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery"]
+expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name"]
 
 def init_db():
     if not os.path.exists(DATA_FILE):
@@ -247,7 +264,7 @@ def init_db():
             df = pd.read_csv(DATA_FILE)
             for col in expected_columns:
                 if col not in df.columns:
-                    df[col] = None
+                    df[col] = ""
             df.to_csv(DATA_FILE, index=False)
         except:
             df = pd.DataFrame(columns=expected_columns)
@@ -261,7 +278,7 @@ def load_products():
         df = pd.read_csv(DATA_FILE)
         for col in expected_columns:
             if col not in df.columns:
-                df[col] = None
+                df[col] = ""
         return df
     except:
         return pd.DataFrame(columns=expected_columns)
@@ -275,6 +292,8 @@ else:
 
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
+if 'seller_logged_in' not in st.session_state:
+    st.session_state.seller_logged_in = None
 if 'show_login' not in st.session_state:
     st.session_state.show_login = False
 if 'cart' not in st.session_state:
@@ -283,6 +302,14 @@ if 'share_msg' not in st.session_state:
     st.session_state.share_msg = None
 if 'share_img_path' not in st.session_state:
     st.session_state.share_img_path = None
+
+if st.session_state.seller_logged_in:
+    seller_name = st.session_state.seller_logged_in
+    valid_sellers = current_config.get("sellers", {}).values()
+    if seller_name not in valid_sellers:
+        st.session_state.seller_logged_in = None
+        st.error("⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!")
+        st.rerun()
 
 if current_config.get("has_banner", False):
     if os.path.exists(BANNER_FILE):
@@ -298,38 +325,58 @@ else:
 
 col1, col2 = st.columns([8, 2])
 with col2:
-    if not st.session_state.admin_logged_in:
-        if st.button("🔒 एडमिन लॉगिन"):
+    if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
+        if st.button("🔒 एडमिन / सेलर लॉगिन"):
             st.session_state.show_login = not st.session_state.show_login
     else:
         if st.button("🚪 लॉगआउट"):
             st.session_state.admin_logged_in = False
+            st.session_state.seller_logged_in = None
             st.session_state.show_login = False
             st.rerun()
 
-if st.session_state.show_login and not st.session_state.admin_logged_in:
+if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
-        st.subheader("एडमिन एक्सेस")
-        password = st.text_input("पासवर्ड डालें", type="password")
-        if st.button("लॉगिन करें"):
-            try:
-                correct_password = st.secrets["ADMIN_PASSWORD"]
-            except:
-                st.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला!")
-                correct_password = None
-                
-            if correct_password and password == correct_password:
-                st.session_state.admin_logged_in = True
-                st.session_state.show_login = False
-                st.rerun()
-            else:
-                st.error("❌ गलत पासवर्ड!")
+        st.subheader("दुकान में लॉगिन करें")
+        login_type = st.radio("लॉगिन का प्रकार चुनें:", ["सेलर (Seller)", "मालिक / एडमिन (Admin)"], horizontal=True)
+        
+        if login_type == "मालिक / एडमिन (Admin)":
+            password = st.text_input("एडमिन पासवर्ड डालें", type="password")
+            if st.button("लॉगिन करें"):
+                try:
+                    correct_password = st.secrets["ADMIN_PASSWORD"]
+                except:
+                    st.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला!")
+                    correct_password = None
+                    
+                if correct_password and password == correct_password:
+                    st.session_state.admin_logged_in = True
+                    st.session_state.seller_logged_in = None
+                    st.session_state.show_login = False
+                    st.rerun()
+                else:
+                    st.error("❌ गलत पासवर्ड!")
+        else:
+            seller_token = st.text_input("अपना सेलर टोकन (Token) डालें", type="password")
+            if st.button("लॉगिन करें"):
+                sellers_dict = current_config.get("sellers", {})
+                if seller_token in sellers_dict:
+                    st.session_state.seller_logged_in = sellers_dict[seller_token]
+                    st.session_state.admin_logged_in = False
+                    st.session_state.show_login = False
+                    st.rerun()
+                else:
+                    st.error("❌ गलत टोकन! कृपया एडमिन से संपर्क करें।")
     st.markdown("---")
 
-if st.session_state.admin_logged_in:
-    st.success("✅ आप एडमिन हैं।")
+if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     
-    tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर व लोगो", "⚙️ सेटिंग्स"])
+    if st.session_state.admin_logged_in:
+        st.success("✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।")
+        tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर व लोगो", "⚙️ सेटिंग्स"])
+    else:
+        st.success(f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)")
+        tab_add, = st.tabs(["➕ नया उत्पाद"])
     
     with tab_add:
         if st.session_state.share_msg:
@@ -363,9 +410,14 @@ if st.session_state.admin_logged_in:
                 with col_b:
                     new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
                     new_w_price = st.number_input("होलसेल / बॉक्स रेट (प्रति पीस)", min_value=1)
-                    # 🌟 नया: हर प्रोडक्ट के लिए डिलीवरी का अलग ऑप्शन 🌟
                     new_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"])
                 
+                if st.session_state.seller_logged_in:
+                    st.info(f"🏪 आपका ब्रांड/सेलर नाम: **{st.session_state.seller_logged_in}**")
+                    new_seller_name = st.session_state.seller_logged_in
+                else:
+                    new_seller_name = st.text_input("सेलर / ब्रांड का नाम (अगर यह आपका खुद का माल है, तो इसे खाली छोड़ दें)")
+
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
                 cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
                 selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
@@ -406,7 +458,9 @@ if st.session_state.admin_logged_in:
                                 final_path_str = "|".join(image_paths)
                                 df = load_products()
                                 is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
-                                new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str, is_free]], columns=expected_columns)
+                                seller_val = new_seller_name.strip() if new_seller_name else ""
+                                
+                                new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str, is_free, seller_val]], columns=expected_columns)
                                 df = pd.concat([df, new_row], ignore_index=True)
                                 df.to_csv(DATA_FILE, index=False)
                                 
@@ -418,90 +472,126 @@ if st.session_state.admin_logged_in:
                                     safe_cat_link = urllib.parse.quote(final_cat)
                                     app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
                                     
-                                    msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए हमने एक नया डिज़ाइन लॉन्च किया है!\n\n🎁 *नया उत्पाद:* {new_name}\n\nयह डिज़ाइन मार्केट में आते ही बिक रहा है। इससे पहले कि स्टॉक खत्म हो जाए...\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
+                                    msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए हमने एक नया डिज़ाइन लॉन्च किया है!\n\n🎁 *नया उत्पाद:* {new_name}\n"
+                                    if seller_val:
+                                        msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
+                                    msg += f"\nयह डिज़ाइन मार्केट में आते ही बिक रहा है। इससे पहले कि स्टॉक खत्म हो जाए...\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
                                     
                                     st.session_state.share_msg = msg
                                     st.session_state.share_img_path = image_paths[0] if image_paths else None
                                     st.rerun()
 
-    with tab_banner:
-        st.subheader("🖼️ ऐप का बैनर (Top Banner)")
-        new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
-        if st.button("बैनर सेव करें") and new_banner:
-            with st.spinner("बैनर सेव हो रहा है..."):
-                banner_bytes = new_banner.getvalue()
-                try:
-                    with open(BANNER_FILE, "wb") as f: f.write(banner_bytes)
-                except: pass
-                if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
-                    current_config["has_banner"] = True
+    if st.session_state.admin_logged_in:
+        with tab_banner:
+            st.subheader("🖼️ ऐप का बैनर (Top Banner)")
+            new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
+            if st.button("बैनर सेव करें") and new_banner:
+                with st.spinner("बैनर सेव हो रहा है..."):
+                    banner_bytes = new_banner.getvalue()
+                    try:
+                        with open(BANNER_FILE, "wb") as f: f.write(banner_bytes)
+                    except: pass
+                    if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
+                        current_config["has_banner"] = True
+                        save_config(current_config)
+                        st.success("✅ बैनर लग गया!")
+                        time.sleep(1)
+                        st.rerun()
+                        
+            if current_config.get("has_banner", False):
+                if st.button("❌ बैनर हटाएं"):
+                    current_config["has_banner"] = False
                     save_config(current_config)
-                    st.success("✅ बैनर लग गया!")
-                    time.sleep(1)
                     st.rerun()
                     
-        if current_config.get("has_banner", False):
-            if st.button("❌ बैनर हटाएं"):
-                current_config["has_banner"] = False
-                save_config(current_config)
-                st.rerun()
-                
-        st.markdown("---")
-        
-        st.subheader("📱 ऐप का लोगो (App Icon)")
-        st.info("यह लोगो तब दिखेगा जब ग्राहक ऐप को 'Add to Home Screen' करेंगे। (कृपया चकोर/Square फोटो ही चुनें)")
-        new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
-        if st.button("लोगो सेव करें") and new_logo:
-            with st.spinner("लोगो सेव हो रहा है..."):
-                logo_bytes = new_logo.getvalue()
-                try:
-                    with open(LOGO_FILE, "wb") as f: f.write(logo_bytes)
-                except: pass
-                if save_to_github(LOGO_FILE, logo_bytes, "Update app logo"):
-                    current_config["has_logo"] = True
-                    save_config(current_config)
-                    st.success("✅ आपका खुद का लोगो सेट हो गया!")
-                    time.sleep(1)
-                    st.rerun()
-                    
-        if current_config.get("has_logo", False):
-            if st.button("❌ लोगो हटाएं"):
-                current_config["has_logo"] = False
-                save_config(current_config)
-                st.rerun()
-
-    with tab_settings:
-        st.subheader("📱 संपर्क सेटिंग्स")
-        new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
-        
-        st.markdown("---")
-        st.subheader("🚚 डिफॉल्ट डिलीवरी सेटिंग्स (पुराने सामान के लिए)")
-        st.info("जिन पुराने उत्पादों पर डिलीवरी सेट नहीं है, उन पर क्या दिखाना है?")
-        show_free_delivery = st.checkbox("✅ बाय डिफ़ॉल्ट 'फ्री डिलीवरी' दिखाएं?", value=current_config.get("free_delivery_tag", True))
-
-        st.markdown("---")
-        st.subheader("💳 मल्टी UPI सेटिंग्स")
-        
-        col_u1, col_u2 = st.columns(2)
-        with col_u1:
-            new_phonepe = st.text_input("PhonePe UPI ID", value=current_config.get("phonepe_upi", current_config.get("upi_id", "")))
-            new_paytm = st.text_input("Paytm UPI ID", value=current_config.get("paytm_upi", ""))
-        with col_u2:
-            new_gpay = st.text_input("Google Pay (GPay) UPI ID", value=current_config.get("gpay_upi", ""))
-            new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
+            st.markdown("---")
             
-        if st.button("⚙️ सेटिंग्स सेव करें"):
-            current_config["admin_whatsapp"] = new_wa
-            current_config["free_delivery_tag"] = show_free_delivery
-            current_config["phonepe_upi"] = new_phonepe
-            current_config["paytm_upi"] = new_paytm
-            current_config["gpay_upi"] = new_gpay
-            current_config["bhim_upi"] = new_bhim
-            current_config["upi_id"] = "" 
-            save_config(current_config)
-            st.success("✅ सेटिंग्स सेव हो गईं!")
-            time.sleep(1)
-            st.rerun()
+            st.subheader("📱 ऐप का लोगो (App Icon)")
+            st.info("यह लोगो तब दिखेगा जब ग्राहक ऐप को 'Add to Home Screen' करेंगे। (कृपया चकोर/Square फोटो ही चुनें)")
+            new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
+            if st.button("लोगो सेव करें") and new_logo:
+                with st.spinner("लोगो सेव हो रहा है..."):
+                    logo_bytes = new_logo.getvalue()
+                    try:
+                        with open(LOGO_FILE, "wb") as f: f.write(logo_bytes)
+                    except: pass
+                    if save_to_github(LOGO_FILE, logo_bytes, "Update app logo"):
+                        current_config["has_logo"] = True
+                        save_config(current_config)
+                        st.success("✅ आपका खुद का लोगो सेट हो गया!")
+                        time.sleep(1)
+                        st.rerun()
+                        
+            if current_config.get("has_logo", False):
+                if st.button("❌ लोगो हटाएं"):
+                    current_config["has_logo"] = False
+                    save_config(current_config)
+                    st.rerun()
+    
+        with tab_settings:
+            st.subheader("📱 संपर्क सेटिंग्स")
+            new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
+            
+            st.markdown("---")
+            st.subheader("🚚 डिफॉल्ट डिलीवरी सेटिंग्स")
+            show_free_delivery = st.checkbox("✅ बाय डिफ़ॉल्ट 'फ्री डिलीवरी' दिखाएं?", value=current_config.get("free_delivery_tag", True))
+            
+            st.markdown("---")
+            st.subheader("👥 सेलर पार्टनर (Seller Management)")
+            st.info("यहाँ से आप नए सेलर्स को 'टोकन (Password)' दे सकते हैं। ⚠️ **एडमिन कंट्रोल:** अगर आप किसी सेलर का टोकन यहाँ से '❌ डिलीट' कर देंगे, तो वह सेलर तुरंत ब्लॉक हो जाएगा और वह ऐप में कुछ भी नहीं कर पाएगा।")
+            
+            col_s1, col_s2 = st.columns([3, 1])
+            with col_s1:
+                new_seller_brand = st.text_input("नये सेलर / ब्रांड का नाम")
+            with col_s2:
+                st.write("")
+                st.write("")
+                if st.button("➕ नया टोकन बनाएं"):
+                    if new_seller_brand:
+                        new_token = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                        current_config["sellers"][new_token] = new_seller_brand.strip()
+                        save_config(current_config)
+                        st.success(f"टोकन बन गया: {new_token}")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("नाम डालें")
+            
+            if current_config.get("sellers"):
+                st.write("**मौजूदा सेलर्स:**")
+                for tkn, s_name in list(current_config["sellers"].items()):
+                    col_list1, col_list2 = st.columns([8, 2])
+                    with col_list1:
+                        st.write(f"🏪 **{s_name}** (टोकन: `{tkn}`)")
+                    with col_list2:
+                        if st.button("❌ हटाएं (ब्लॉक करें)", key=f"del_seller_{tkn}"):
+                            del current_config["sellers"][tkn]
+                            save_config(current_config)
+                            st.rerun()
+    
+            st.markdown("---")
+            st.subheader("💳 मल्टी UPI सेटिंग्स")
+            
+            col_u1, col_u2 = st.columns(2)
+            with col_u1:
+                new_phonepe = st.text_input("PhonePe UPI ID", value=current_config.get("phonepe_upi", current_config.get("upi_id", "")))
+                new_paytm = st.text_input("Paytm UPI ID", value=current_config.get("paytm_upi", ""))
+            with col_u2:
+                new_gpay = st.text_input("Google Pay (GPay) UPI ID", value=current_config.get("gpay_upi", ""))
+                new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
+                
+            if st.button("⚙️ सभी सेटिंग्स सेव करें"):
+                current_config["admin_whatsapp"] = new_wa
+                current_config["free_delivery_tag"] = show_free_delivery
+                current_config["phonepe_upi"] = new_phonepe
+                current_config["paytm_upi"] = new_paytm
+                current_config["gpay_upi"] = new_gpay
+                current_config["bhim_upi"] = new_bhim
+                current_config["upi_id"] = "" 
+                save_config(current_config)
+                st.success("✅ सेटिंग्स सेव हो गईं!")
+                time.sleep(1)
+                st.rerun()
     st.markdown("---")
 
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
@@ -551,6 +641,10 @@ def show_product_card(row, idx, prefix):
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
+        seller_val = row.get("Seller_Name")
+        if pd.notna(seller_val) and str(seller_val).strip() != "":
+            st.markdown(f"🏪 **सेलर / ब्रांड:** <span style='color:#E65100; font-weight:bold;'>{str(seller_val).strip()}</span>", unsafe_allow_html=True)
+        
         try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
         except: w_qty = 1
         try: retail_price = row.get('Price', 0)
@@ -558,8 +652,7 @@ def show_product_card(row, idx, prefix):
         try: w_price = int(float(row.get('Wholesale_Price', retail_price)))
         except: w_price = retail_price
         
-        # 🌟 प्रोडक्ट की अपनी अलग डिलीवरी सेटिंग का लॉजिक 🌟
-        show_fd = current_config.get("free_delivery_tag", True) # पुरानी सेटिंग्स के लिए डिफ़ॉल्ट
+        show_fd = current_config.get("free_delivery_tag", True)
         val_fd = row.get("Free_Delivery")
         if pd.notna(val_fd) and str(val_fd).strip() != "":
             show_fd = str(val_fd).lower() in ['true', 'yes', '1']
@@ -587,9 +680,19 @@ def show_product_card(row, idx, prefix):
             }
             st.success("कार्ट में जुड़ गया! 🛒")
             
+        # 🌟 एडमिन का कंट्रोल: एडमिन सबको एडिट/डिलीट कर सकता है 🌟
+        show_edit_delete = False
         if st.session_state.admin_logged_in:
+            show_edit_delete = True
+        elif st.session_state.seller_logged_in and st.session_state.seller_logged_in == str(seller_val).strip():
+            show_edit_delete = True
+            
+        if show_edit_delete:
             st.markdown("---")
-            with st.expander("⚙️ एडिट / डिलीट"):
+            with st.expander("✏️ रेट, फोटो बदलें या डिलीट करें (Edit)"):
+                if st.session_state.admin_logged_in and str(seller_val).strip():
+                    st.caption(f"⚠️ **Admin Control:** आप {str(seller_val).strip()} का माल एडिट या डिलीट कर रहे हैं।")
+                
                 with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
@@ -598,9 +701,13 @@ def show_product_card(row, idx, prefix):
                         e_w_qty = st.number_input("होलसेल मात्रा", value=w_qty)
                     with col_y:
                         e_w_price = st.number_input("होलसेल (बॉक्स रेट)", value=w_price)
-                        # 🌟 एडिट फॉर्म में भी डिलीवरी सेटिंग दिखाएं 🌟
                         fd_index = 0 if show_fd else 1
                         e_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"], index=fd_index)
+                    
+                    if st.session_state.admin_logged_in:
+                        e_seller_name = st.text_input("सेलर / ब्रांड का नाम", value=str(seller_val) if pd.notna(seller_val) else "")
+                    else:
+                        e_seller_name = st.session_state.seller_logged_in
                         
                     existing_cats_edit = products_df['Category'].dropna().unique().tolist()
                     current_cat = str(row.get("Category", ""))
@@ -640,7 +747,7 @@ def show_product_card(row, idx, prefix):
 
                             if images_updated:
                                 e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
-                                df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path', 'Free_Delivery']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str, e_is_free]
+                                df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path', 'Free_Delivery', 'Seller_Name']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str, e_is_free, str(e_seller_name).strip()]
                                 df_edit.to_csv(DATA_FILE, index=False)
                                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                                     csv_content = f.read()
@@ -671,6 +778,24 @@ def show_product_card(row, idx, prefix):
                             st.success("डिलीट हो गया!")
                             time.sleep(1)
                             st.rerun()
+
+# --- यहाँ सेलर वाला ऑप्शन अब हर जगह दिखेगा ---
+if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
+    st.markdown("---")
+    with st.expander("💼 Oura पर अपना माल बेचें (Become a Seller)"):
+        st.info("क्या आप भी मैन्युफैक्चरर या होलसेलर हैं? Oura प्लैटफॉर्म पर जुड़ें और अपने उत्पादों को हज़ारों ग्राहकों तक पहुँचाएं।")
+        s_name = st.text_input("आपकी दुकान / कंपनी का नाम")
+        s_items = st.text_input("आप क्या माल बेचते हैं?")
+        s_city = st.text_input("शहर")
+        
+        if st.button("पार्टनरशिप के लिए संपर्क करें"):
+            if s_name and s_items:
+                s_msg = f"💼 *Oura Seller Partnership*\n\nनमस्ते, मैं Oura पर अपना माल बेचना चाहता हूँ।\n\n🏪 *दुकान:* {s_name}\n📦 *माल:* {s_items}\n📍 *शहर:* {s_city}\n\nकृपया मुझे सेलर बनने की जानकारी दें।"
+                encoded_s_msg = urllib.parse.quote(s_msg)
+                wa_seller_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={encoded_s_msg}"
+                st.markdown(f'<a href="{wa_seller_link}" target="_blank" class="seller-btn">✅ WhatsApp पर अपनी डिटेल भेजें</a>', unsafe_allow_html=True)
+            else:
+                st.error("कृपया अपनी दुकान का नाम और माल की जानकारी ज़रूर भरें।")
 
 if products_df.empty:
     st.info("जल्द ही नए उत्पाद आएंगे!")
@@ -725,7 +850,7 @@ else:
         '''
         st.markdown(floating_btn_html, unsafe_allow_html=True)
         
-        if st.session_state.admin_logged_in:
+        if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with st.expander(f"✏️ इस कैटेगरी का नाम/आइकॉन बदलें"):
                 new_cat_name = st.text_input("नया नाम या इमोजी डालें:", value=st.session_state.selected_category)
                 if st.button("✅ सेव करें", key="rename_cat_btn"):
@@ -772,7 +897,12 @@ if st.session_state.cart:
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
         count += 1
     
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लग सकता है।*\n"
+    show_fd = current_config.get("free_delivery_tag", True)
+    if show_fd:
+        msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
+    else:
+        msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
+        
     st.subheader(f"कुल बिल: ₹{total}")
     
     available_upis = {}
@@ -789,9 +919,9 @@ if st.session_state.cart:
         st.write("अपने पसंदीदा ऐप से 1-क्लिक में पेमेंट करें:")
         
         for name, data in available_upis.items():
-            upi_str = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
+            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
             st.markdown(f'''
-            <a href="{upi_str}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 {data['icon']} {name} से ₹{total} पे करें
             </a>
             ''', unsafe_allow_html=True)
@@ -801,7 +931,8 @@ if st.session_state.cart:
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(f'upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR')}"
+                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}"
                     st.image(qr_url, width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
@@ -920,4 +1051,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-components
+st_components.html(drag_js_code, height=0, width=0)
