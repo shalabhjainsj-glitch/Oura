@@ -8,8 +8,42 @@ import requests
 import base64
 import time
 
-# 1. ऐप का सेटअप (फास्ट लोडिंग के लिए)
-st.set_page_config(page_title="Oura - Wholesale", page_icon="🛍️", layout="wide")
+# --- 1. सबसे पहले सेटिंग्स और लोगो लोड करें ---
+CONFIG_FILE = "config.json"
+BANNER_FILE = "banner.png" 
+LOGO_FILE = "logo.png"
+DATA_FILE = "oura_products.csv"
+GITHUB_REPO = "shalabhjainsj-glitch/Oura"
+GITHUB_BRANCH = "main"
+GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except: pass
+    return {
+        "admin_whatsapp": "919891587437", 
+        "phonepe_upi": "",
+        "paytm_upi": "",
+        "gpay_upi": "",
+        "bhim_upi": "",
+        "upi_id": "",
+        "has_banner": False,
+        "has_logo": False
+    }
+
+current_config = load_config()
+
+# 🌟 असली ऐप वाला लोगो (App Icon) 🌟
+if current_config.get("has_logo", False):
+    app_icon_url = f"{GITHUB_RAW_URL}{LOGO_FILE}?t={int(time.time())}"
+else:
+    app_icon_url = "🛍️"
+
+# --- 2. ऐप का सेटअप (कस्टम लोगो के साथ) ---
+st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
 hide_streamlit_style = """
             <style>
@@ -141,12 +175,31 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-BANNER_FILE = "banner.png" 
-CONFIG_FILE = "config.json"
-DATA_FILE = "oura_products.csv"
-GITHUB_REPO = "shalabhjainsj-glitch/Oura"
-GITHUB_BRANCH = "main"
-GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
+# 🌟 मोबाइल 'Add to Home Screen' के लिए जावास्क्रिप्ट जादू 🌟
+if current_config.get("has_logo", False) and app_icon_url != "🛍️":
+    pwa_js = f"""
+    <script>
+    const parentHead = window.parent.document.head;
+    
+    let appleIcon = parentHead.querySelector('link[rel="apple-touch-icon"]');
+    if (!appleIcon) {{
+        appleIcon = window.parent.document.createElement('link');
+        appleIcon.rel = 'apple-touch-icon';
+        parentHead.appendChild(appleIcon);
+    }}
+    appleIcon.href = '{app_icon_url}';
+    
+    let mobIcon = parentHead.querySelector('link[rel="icon"][sizes="192x192"]');
+    if (!mobIcon) {{
+        mobIcon = window.parent.document.createElement('link');
+        mobIcon.rel = 'icon';
+        mobIcon.sizes = '192x192';
+        parentHead.appendChild(mobIcon);
+    }}
+    mobIcon.href = '{app_icon_url}';
+    </script>
+    """
+    components.html(pwa_js, height=0, width=0)
 
 def save_to_github(file_path, content, commit_message):
     try:
@@ -176,28 +229,10 @@ def save_to_github(file_path, content, commit_message):
     put_response = requests.put(url, headers=headers, json=data)
     return put_response.status_code in [200, 201]
 
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except: pass
-    return {
-        "admin_whatsapp": "919891587437", 
-        "phonepe_upi": "",
-        "paytm_upi": "",
-        "gpay_upi": "",
-        "bhim_upi": "",
-        "upi_id": "",
-        "has_banner": False
-    }
-
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
     save_to_github(CONFIG_FILE, json.dumps(config, indent=4), "Update settings.json")
-
-current_config = load_config()
 
 if not os.path.exists("images"):
     os.makedirs("images")
@@ -296,7 +331,8 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
 if st.session_state.admin_logged_in:
     st.success("✅ आप एडमिन हैं।")
     
-    tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर", "⚙️ सेटिंग्स"])
+    # 🌟 एडमिन टैब्स में लोगो का विकल्प जोड़ा गया है 🌟
+    tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर व लोगो", "⚙️ सेटिंग्स"])
     
     with tab_add:
         if st.session_state.share_msg:
@@ -391,6 +427,7 @@ if st.session_state.admin_logged_in:
                                     st.rerun()
 
     with tab_banner:
+        st.subheader("🖼️ ऐप का बैनर (Top Banner)")
         new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
         if st.button("बैनर सेव करें") and new_banner:
             with st.spinner("बैनर सेव हो रहा है..."):
@@ -408,6 +445,31 @@ if st.session_state.admin_logged_in:
         if current_config.get("has_banner", False):
             if st.button("❌ बैनर हटाएं"):
                 current_config["has_banner"] = False
+                save_config(current_config)
+                st.rerun()
+                
+        st.markdown("---")
+        
+        # 🌟 नया: होम स्क्रीन लोगो अपलोड करने का सेक्शन 🌟
+        st.subheader("📱 ऐप का लोगो (App Icon)")
+        st.info("यह लोगो तब दिखेगा जब ग्राहक ऐप को 'Add to Home Screen' करेंगे। (कृपया चकोर/Square फोटो ही चुनें)")
+        new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
+        if st.button("लोगो सेव करें") and new_logo:
+            with st.spinner("लोगो सेव हो रहा है..."):
+                logo_bytes = new_logo.getvalue()
+                try:
+                    with open(LOGO_FILE, "wb") as f: f.write(logo_bytes)
+                except: pass
+                if save_to_github(LOGO_FILE, logo_bytes, "Update app logo"):
+                    current_config["has_logo"] = True
+                    save_config(current_config)
+                    st.success("✅ आपका खुद का लोगो सेट हो गया!")
+                    time.sleep(1)
+                    st.rerun()
+                    
+        if current_config.get("has_logo", False):
+            if st.button("❌ लोगो हटाएं"):
+                current_config["has_logo"] = False
                 save_config(current_config)
                 st.rerun()
 
@@ -729,7 +791,7 @@ if st.session_state.cart:
     st.markdown("### 🤝 100% ग्राहक संतुष्टि (Customer Trust)")
     st.success("✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी। आप बिल्कुल बेफिक्र होकर ऑर्डर करें!")
     
-    msg += "\n\n🤝 *भरोसा:* आपके माल की पैकिंग की लाइव वीडियो और फोटो डिस्पैच से पहले आपको WhatsApp पर भेजी जाएगी।\n"
+    msg += "\n\n🤝 *भरोसा:* आपके माल की पैकिंग की लाइव वीडियो और फोटो डिस्पैच से पहले आपको WhatsApp पर भेजी जाएगी。\n"
 
     st.markdown("---")
     st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
@@ -742,7 +804,6 @@ if st.session_state.cart:
     
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
-    # 🌟 सुरक्षित और बिना रोक-टोक वाला चेकआउट (Zero Friction Checkout) 🌟
     st.markdown("---")
     st.markdown("### 📍 डिलीवरी की जानकारी")
     st.info("ऑर्डर भेजने से पहले आप चाहें तो अपना पता यहाँ भर सकते हैं, या सीधे WhatsApp पर भी बता सकते हैं।")
@@ -759,7 +820,6 @@ if st.session_state.cart:
     final_msg += f"📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n"
     final_msg += f"🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
 
-    # यह बटन अब सीधे बिना किसी वार्निंग के WhatsApp खोल देगा!
     encoded_msg = urllib.parse.quote(final_msg)
     wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
     
