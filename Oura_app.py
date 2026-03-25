@@ -9,6 +9,15 @@ import base64
 import time
 import random
 import string
+import re
+import io
+from PIL import Image
+
+# Tesseract-OCR के लिए इम्पोर्ट (यह फोटो में से टेक्स्ट पढ़ेगा)
+try:
+    import pytesseract
+except ImportError:
+    pass
 
 # --- 1. सबसे पहले सेटिंग्स और लोगो लोड करें ---
 CONFIG_FILE = "config.json"
@@ -56,7 +65,6 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* 📸 स्मार्ट स्वाइप गैलरी */
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -66,9 +74,7 @@ hide_streamlit_style = """
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
             }
-            .swipe-gallery::-webkit-scrollbar {
-                display: none;
-            }
+            .swipe-gallery::-webkit-scrollbar { display: none; }
             .swipe-gallery a {
                 scroll-snap-align: center;
                 flex: 0 0 100%;
@@ -84,7 +90,6 @@ hide_streamlit_style = """
                 border: 1px solid #eee;
             }
             
-            /* 🌟 4-कॉलम स्मार्ट बॉक्स डिज़ाइन */
             .category-grid {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
@@ -108,11 +113,8 @@ hide_streamlit_style = """
                 transition: transform 0.1s;
                 border: 1px solid rgba(0,0,0,0.05);
             }
-            .category-box:active {
-                transform: scale(0.95);
-            }
+            .category-box:active { transform: scale(0.95); }
             
-            /* 🚀 हवा में तैरने वाला (Floating) बैक बटन */
             .floating-back-btn {
                 position: fixed;
                 bottom: 25px;
@@ -137,7 +139,6 @@ hide_streamlit_style = """
                 transform: translateX(-50%) scale(0.95);
             }
 
-            /* 📞 चमकता हुआ व्हाट्सएप बटन */
             @keyframes glowing {
               0% { box-shadow: 0 0 5px #25D366; }
               50% { box-shadow: 0 0 20px #25D366, 0 0 30px #25D366; transform: scale(1.05); }
@@ -164,19 +165,11 @@ hide_streamlit_style = """
                 user-select: none;
                 touch-action: none;
             }
-            #oura-wa-btn:active {
-                cursor: grabbing;
-            }
+            #oura-wa-btn:active { cursor: grabbing; }
             
-            /* 💳 मल्टी UPI बटन */
-            .multi-upi-btn {
-                transition: transform 0.1s;
-            }
-            .multi-upi-btn:active {
-                transform: scale(0.96);
-            }
+            .multi-upi-btn { transition: transform 0.1s; }
+            .multi-upi-btn:active { transform: scale(0.96); }
             
-            /* 💼 सेलर बटन डिज़ाइन */
             .seller-btn {
                 background: linear-gradient(135deg, #FF9800, #F57C00);
                 color: white !important;
@@ -196,7 +189,6 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     pwa_js = f"""
     <script>
     const parentHead = window.parent.document.head;
-    
     let appleIcon = parentHead.querySelector('link[rel="apple-touch-icon"]');
     if (!appleIcon) {{
         appleIcon = window.parent.document.createElement('link');
@@ -204,7 +196,6 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
         parentHead.appendChild(appleIcon);
     }}
     appleIcon.href = '{app_icon_url}';
-    
     let mobIcon = parentHead.querySelector('link[rel="icon"][sizes="192x192"]');
     if (!mobIcon) {{
         mobIcon = window.parent.document.createElement('link');
@@ -434,52 +425,90 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     if len(uploaded_imgs) > 3:
                         st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
                     else:
-                        with st.spinner("डेटा सेव हो रहा है..."):
-                            image_paths = []
-                            all_images_saved = True
+                        with st.spinner("AI आपकी फोटो स्कैन कर रहा है... कृपया प्रतीक्षा करें (इसमें थोड़ा समय लग सकता है)..."):
                             
-                            for idx, img in enumerate(uploaded_imgs):
-                                safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                timestamp = int(time.time())
-                                final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
-                                path = f"images/{final_filename}"
-                                img_bytes = img.getvalue()
-                                try:
-                                    with open(path, "wb") as f: f.write(img_bytes)
-                                except: pass
-
-                                if save_to_github(path, img_bytes, f"Add image {final_filename}"):
-                                    image_paths.append(path)
-                                else:
-                                    all_images_saved = False
-                                    break
-
-                            if all_images_saved:
-                                final_path_str = "|".join(image_paths)
-                                df = load_products()
-                                is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
-                                seller_val = new_seller_name.strip() if new_seller_name else ""
+                            # 🛡️ --- OCR: फोटो में नंबर और लिंक चेक करने का सिस्टम --- 🛡️
+                            has_violation = False
+                            violation_type = ""
+                            violation_img_name = ""
+                            
+                            try:
+                                for img in uploaded_imgs:
+                                    img_bytes = img.getvalue()
+                                    pil_img = Image.open(io.BytesIO(img_bytes))
+                                    
+                                    # फोटो से टेक्स्ट निकालें
+                                    text_in_image = pytesseract.image_to_string(pil_img).lower()
+                                    
+                                    # स्पेस और डैश हटाएं ताकि नंबर आसानी से पकड़ा जा सके
+                                    clean_text = re.sub(r'[\s\-\(\)\+]+', '', text_in_image)
+                                    
+                                    # 1. मोबाईल नंबर चेक (लगातार 10 अंक)
+                                    if re.search(r'\d{10}', clean_text):
+                                        has_violation = True
+                                        violation_type = "मोबाईल नंबर"
+                                        violation_img_name = img.name
+                                        break
+                                        
+                                    # 2. वेबसाइट लिंक चेक (http, www, .com, .in आदि)
+                                    if re.search(r'(https?://|www\.)[^\s]+', text_in_image) or re.search(r'\b[a-z0-9\-]+\.(com|in|org|net|co|store|shop)\b', text_in_image):
+                                        has_violation = True
+                                        violation_type = "वेबसाइट लिंक"
+                                        violation_img_name = img.name
+                                        break
+                            except Exception as e:
+                                pass # अगर OCR फेल हो जाए, तो फोटो अपलोड होने दें
+                            
+                            # अगर फोटो में नंबर/लिंक मिला तो एरर दिखाएं और अपलोड रोक दें
+                            if has_violation:
+                                st.error(f"🚨 **अपलोड फेल:** आपकी फोटो ('{violation_img_name}') में **{violation_type}** लिखा हुआ मिला है! Oura की पॉलिसी के अनुसार आप ऐसी फोटो अपलोड नहीं कर सकते जिसमें कोई कांटेक्ट नंबर या लिंक हो। कृपया साफ फोटो चुनें।")
+                            else:
+                                # अगर सब सही है, तो फोटो और डेटा सेव करें
+                                image_paths = []
+                                all_images_saved = True
                                 
-                                new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str, is_free, seller_val]], columns=expected_columns)
-                                df = pd.concat([df, new_row], ignore_index=True)
-                                df.to_csv(DATA_FILE, index=False)
-                                
-                                with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                    csv_content = f.read()
-                                if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                                    load_products.clear()
+                                for idx, img in enumerate(uploaded_imgs):
+                                    safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
+                                    timestamp = int(time.time())
+                                    final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
+                                    path = f"images/{final_filename}"
+                                    img_bytes = img.getvalue()
+                                    try:
+                                        with open(path, "wb") as f: f.write(img_bytes)
+                                    except: pass
+
+                                    if save_to_github(path, img_bytes, f"Add image {final_filename}"):
+                                        image_paths.append(path)
+                                    else:
+                                        all_images_saved = False
+                                        break
+
+                                if all_images_saved:
+                                    final_path_str = "|".join(image_paths)
+                                    df = load_products()
+                                    is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
+                                    seller_val = new_seller_name.strip() if new_seller_name else ""
                                     
-                                    safe_cat_link = urllib.parse.quote(final_cat)
-                                    app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
+                                    new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str, is_free, seller_val]], columns=expected_columns)
+                                    df = pd.concat([df, new_row], ignore_index=True)
+                                    df.to_csv(DATA_FILE, index=False)
                                     
-                                    msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए हमने एक नया डिज़ाइन लॉन्च किया है!\n\n🎁 *नया उत्पाद:* {new_name}\n"
-                                    if seller_val:
-                                        msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
-                                    msg += f"\nयह डिज़ाइन मार्केट में आते ही बिक रहा है। इससे पहले कि स्टॉक खत्म हो जाए...\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
-                                    
-                                    st.session_state.share_msg = msg
-                                    st.session_state.share_img_path = image_paths[0] if image_paths else None
-                                    st.rerun()
+                                    with open(DATA_FILE, "r", encoding="utf-8") as f:
+                                        csv_content = f.read()
+                                    if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
+                                        load_products.clear()
+                                        
+                                        safe_cat_link = urllib.parse.quote(final_cat)
+                                        app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
+                                        
+                                        msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए हमने एक नया डिज़ाइन लॉन्च किया है!\n\n🎁 *नया उत्पाद:* {new_name}\n"
+                                        if seller_val:
+                                            msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
+                                        msg += f"\nयह डिज़ाइन मार्केट में आते ही बिक रहा है। इससे पहले कि स्टॉक खत्म हो जाए...\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
+                                        
+                                        st.session_state.share_msg = msg
+                                        st.session_state.share_img_path = image_paths[0] if image_paths else None
+                                        st.rerun()
 
     if st.session_state.admin_logged_in:
         with tab_banner:
@@ -680,7 +709,6 @@ def show_product_card(row, idx, prefix):
             }
             st.success("कार्ट में जुड़ गया! 🛒")
             
-        # 🌟 एडमिन का कंट्रोल: एडमिन सबको एडिट/डिलीट कर सकता है 🌟
         show_edit_delete = False
         if st.session_state.admin_logged_in:
             show_edit_delete = True
@@ -779,7 +807,6 @@ def show_product_card(row, idx, prefix):
                             time.sleep(1)
                             st.rerun()
 
-# --- यहाँ सेलर वाला ऑप्शन अब हर जगह दिखेगा ---
 if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     st.markdown("---")
     with st.expander("💼 Oura पर अपना माल बेचें (Become a Seller)"):
@@ -1051,4 +1078,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-st_components.
+st_components.html(drag_js_code, height=0, width=0)
