@@ -7,7 +7,5 @@
     "gpay_upi": "",
     "bhim_upi": "9891587437@upi",
     "has_logo": true,
-    "sellers": {
-        "9B5LYG": "Kj ,paper"
-    }
+    "sellers": {}
 }
