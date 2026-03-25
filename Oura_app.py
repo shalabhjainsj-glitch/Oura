@@ -902,4 +902,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-components.html(drag_js_code, height=0, width=0)
+components.html
