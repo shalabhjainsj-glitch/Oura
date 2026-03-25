@@ -31,18 +31,17 @@ def load_config():
         "bhim_upi": "",
         "upi_id": "",
         "has_banner": False,
-        "has_logo": False
+        "has_logo": False,
+        "free_delivery_tag": True 
     }
 
 current_config = load_config()
 
-# 🌟 असली ऐप वाला लोगो (App Icon) 🌟
 if current_config.get("has_logo", False):
     app_icon_url = f"{GITHUB_RAW_URL}{LOGO_FILE}?t={int(time.time())}"
 else:
     app_icon_url = "🛍️"
 
-# --- 2. ऐप का सेटअप (कस्टम लोगो के साथ) ---
 st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
 hide_streamlit_style = """
@@ -175,7 +174,6 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# 🌟 मोबाइल 'Add to Home Screen' के लिए जावास्क्रिप्ट जादू 🌟
 if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     pwa_js = f"""
     <script>
@@ -237,7 +235,8 @@ def save_config(config):
 if not os.path.exists("images"):
     os.makedirs("images")
 
-expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path"]
+# 🌟 नया: डेटाबेस में 'Free_Delivery' का कॉलम जोड़ा गया है 🌟
+expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery"]
 
 def init_db():
     if not os.path.exists(DATA_FILE):
@@ -269,7 +268,6 @@ def load_products():
 
 products_df = load_products()
 
-# --- 🌟 सुरक्षित नेविगेशन 🌟 ---
 if "cat" in st.query_params:
     st.session_state.selected_category = st.query_params["cat"]
 else:
@@ -331,7 +329,6 @@ if st.session_state.show_login and not st.session_state.admin_logged_in:
 if st.session_state.admin_logged_in:
     st.success("✅ आप एडमिन हैं।")
     
-    # 🌟 एडमिन टैब्स में लोगो का विकल्प जोड़ा गया है 🌟
     tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर व लोगो", "⚙️ सेटिंग्स"])
     
     with tab_add:
@@ -351,8 +348,6 @@ if st.session_state.admin_logged_in:
             </a>
             ''', unsafe_allow_html=True)
             
-            st.write("*(नोट: WhatsApp लिंक में सीधे फोटो नहीं भेजता, लेकिन इस लिंक पर क्लिक करते ही ग्राहक सीधा इसी प्रोडक्ट की फोटो देखेगा!)*")
-            
             if st.button("➕ एक और नया उत्पाद जोड़ें"):
                 st.session_state.share_msg = None
                 st.session_state.share_img_path = None
@@ -364,10 +359,12 @@ if st.session_state.admin_logged_in:
                 with col_a:
                     new_id = st.text_input("ID (यूनिक रखें)")
                     new_name = st.text_input("नाम")
-                    new_price = st.number_input("सिंगल पीस रेट (कोरियर चार्ज जोड़कर लिखें)", min_value=1)
+                    new_price = st.number_input("सिंगल पीस रेट", min_value=1)
                 with col_b:
                     new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
                     new_w_price = st.number_input("होलसेल / बॉक्स रेट (प्रति पीस)", min_value=1)
+                    # 🌟 नया: हर प्रोडक्ट के लिए डिलीवरी का अलग ऑप्शन 🌟
+                    new_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"])
                 
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
                 cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
@@ -408,7 +405,8 @@ if st.session_state.admin_logged_in:
                             if all_images_saved:
                                 final_path_str = "|".join(image_paths)
                                 df = load_products()
-                                new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str]], columns=expected_columns)
+                                is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
+                                new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str, is_free]], columns=expected_columns)
                                 df = pd.concat([df, new_row], ignore_index=True)
                                 df.to_csv(DATA_FILE, index=False)
                                 
@@ -450,7 +448,6 @@ if st.session_state.admin_logged_in:
                 
         st.markdown("---")
         
-        # 🌟 नया: होम स्क्रीन लोगो अपलोड करने का सेक्शन 🌟
         st.subheader("📱 ऐप का लोगो (App Icon)")
         st.info("यह लोगो तब दिखेगा जब ग्राहक ऐप को 'Add to Home Screen' करेंगे। (कृपया चकोर/Square फोटो ही चुनें)")
         new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
@@ -478,8 +475,12 @@ if st.session_state.admin_logged_in:
         new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
         
         st.markdown("---")
+        st.subheader("🚚 डिफॉल्ट डिलीवरी सेटिंग्स (पुराने सामान के लिए)")
+        st.info("जिन पुराने उत्पादों पर डिलीवरी सेट नहीं है, उन पर क्या दिखाना है?")
+        show_free_delivery = st.checkbox("✅ बाय डिफ़ॉल्ट 'फ्री डिलीवरी' दिखाएं?", value=current_config.get("free_delivery_tag", True))
+
+        st.markdown("---")
         st.subheader("💳 मल्टी UPI सेटिंग्स")
-        st.info("आप अलग-अलग ऐप्स के लिए अलग-अलग UPI ID डाल सकते हैं। जो बॉक्स आप खाली छोड़ेंगे, उसका बटन ग्राहक को नहीं दिखेगा।")
         
         col_u1, col_u2 = st.columns(2)
         with col_u1:
@@ -491,13 +492,14 @@ if st.session_state.admin_logged_in:
             
         if st.button("⚙️ सेटिंग्स सेव करें"):
             current_config["admin_whatsapp"] = new_wa
+            current_config["free_delivery_tag"] = show_free_delivery
             current_config["phonepe_upi"] = new_phonepe
             current_config["paytm_upi"] = new_paytm
             current_config["gpay_upi"] = new_gpay
             current_config["bhim_upi"] = new_bhim
             current_config["upi_id"] = "" 
             save_config(current_config)
-            st.success("✅ नई UPI सेटिंग्स सेव हो गईं!")
+            st.success("✅ सेटिंग्स सेव हो गईं!")
             time.sleep(1)
             st.rerun()
     st.markdown("---")
@@ -556,10 +558,22 @@ def show_product_card(row, idx, prefix):
         try: w_price = int(float(row.get('Wholesale_Price', retail_price)))
         except: w_price = retail_price
         
+        # 🌟 प्रोडक्ट की अपनी अलग डिलीवरी सेटिंग का लॉजिक 🌟
+        show_fd = current_config.get("free_delivery_tag", True) # पुरानी सेटिंग्स के लिए डिफ़ॉल्ट
+        val_fd = row.get("Free_Delivery")
+        if pd.notna(val_fd) and str(val_fd).strip() != "":
+            show_fd = str(val_fd).lower() in ['true', 'yes', '1']
+        
         if w_qty > 1:
-            st.markdown(f"🛵 **सिंगल पीस (फ्री डिलीवरी):** ₹{retail_price} <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस)*", unsafe_allow_html=True)
+            if show_fd:
+                st.markdown(f"🛵 **सिंगल पीस (फ्री डिलीवरी):** ₹{retail_price} <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस, <span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
+            else:
+                st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)* <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस, <span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
         else:
-            st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(फ्री डिलीवरी)*")
+            if show_fd:
+                st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(फ्री डिलीवरी)*")
+            else:
+                st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
             
         qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
         
@@ -580,10 +594,13 @@ def show_product_card(row, idx, prefix):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
                     with col_x:
-                        e_price = st.number_input("सिंगल पीस (कोरियर सहित)", value=retail_price)
+                        e_price = st.number_input("सिंगल पीस रेट", value=retail_price)
                         e_w_qty = st.number_input("होलसेल मात्रा", value=w_qty)
                     with col_y:
                         e_w_price = st.number_input("होलसेल (बॉक्स रेट)", value=w_price)
+                        # 🌟 एडिट फॉर्म में भी डिलीवरी सेटिंग दिखाएं 🌟
+                        fd_index = 0 if show_fd else 1
+                        e_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"], index=fd_index)
                         
                     existing_cats_edit = products_df['Category'].dropna().unique().tolist()
                     current_cat = str(row.get("Category", ""))
@@ -622,7 +639,8 @@ def show_product_card(row, idx, prefix):
                                 if images_updated: final_path_str = "|".join(new_image_paths)
 
                             if images_updated:
-                                df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str]
+                                e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
+                                df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path', 'Free_Delivery']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str, e_is_free]
                                 df_edit.to_csv(DATA_FILE, index=False)
                                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                                     csv_content = f.read()
@@ -754,7 +772,7 @@ if st.session_state.cart:
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
         count += 1
     
-    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर ट्रांसपोर्ट/पैकिंग अलग से लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
+    msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लग सकता है।*\n"
     st.subheader(f"कुल बिल: ₹{total}")
     
     available_upis = {}
@@ -902,4 +920,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-components.html
+components.html(drag_js_code, height=0, width=0)
