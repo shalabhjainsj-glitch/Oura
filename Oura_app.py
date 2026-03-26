@@ -40,7 +40,6 @@ if not firebase_admin._apps:
             key_dict['private_key'] = key_dict['private_key'].replace('\\n', '\n')
             
         cred = credentials.Certificate(key_dict)
-        # अब हम स्टोरेज बकेट को हटा रहे हैं, क्योंकि हम ImgBB इस्तेमाल करेंगे
         firebase_admin.initialize_app(cred)
     except Exception as e:
         st.error(f"🚨 Firebase सेटअप में गलती: {e}")
@@ -71,8 +70,26 @@ def upload_image_to_imgbb(file_bytes):
         return None
 
 def dummy_delete_image(url):
-    # ImgBB में फोटो खुद डिलीट करने की ज़रूरत नहीं है
     pass
+
+# --- ऑटो-कंप्रेसर फंक्शन (फोटो हल्की करने के लिए) ---
+def compress_image(image_bytes):
+    try:
+        pil_img = Image.open(io.BytesIO(image_bytes))
+        if pil_img.mode != 'RGB':
+            pil_img = pil_img.convert('RGB')
+        
+        max_width = 800
+        if pil_img.width > max_width:
+            ratio = max_width / float(pil_img.width)
+            new_height = int((float(pil_img.height) * float(ratio)))
+            pil_img = pil_img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+            
+        compressed_io = io.BytesIO()
+        pil_img.save(compressed_io, format='JPEG', quality=75)
+        return compressed_io.getvalue(), pil_img
+    except Exception as e:
+        return image_bytes, None
 
 # --- सेटिंग्स लोड करना ---
 def load_config():
@@ -412,31 +429,33 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             has_violation = False
                             violation_type = ""
                             violation_img_name = ""
+                            image_paths = []
                             
-                            try:
-                                for img in uploaded_imgs:
-                                    img_bytes = img.getvalue()
-                                    pil_img = Image.open(io.BytesIO(img_bytes))
-                                    text_in_image = pytesseract.image_to_string(pil_img).lower()
-                                    clean_text = re.sub(r'[\s\-\(\)\+]+', '', text_in_image)
-                                    
-                                    if re.search(r'\d{10}', clean_text):
-                                        has_violation = True; violation_type = "मोबाईल नंबर"; violation_img_name = img.name; break
+                            for img in uploaded_imgs:
+                                # फोटो को कंप्रेस करना
+                                compressed_bytes, pil_img = compress_image(img.getvalue())
+                                
+                                try:
+                                    if pil_img:
+                                        text_in_image = pytesseract.image_to_string(pil_img).lower()
+                                        clean_text = re.sub(r'[\s\-\(\)\+]+', '', text_in_image)
                                         
-                                    if re.search(r'(https?://|www\.)[^\s]+', text_in_image) or re.search(r'\b[a-z0-9\-]+\.(com|in|org|net|co|store|shop)\b', text_in_image):
-                                        has_violation = True; violation_type = "वेबसाइट लिंक"; violation_img_name = img.name; break
-                            except Exception as e:
-                                pass 
-                            
-                            if has_violation:
-                                st.error(f"🚨 **अपलोड फेल:** फोटो ('{violation_img_name}') में **{violation_type}** मिला है! Oura की पॉलिसी के अनुसार ऐसी फोटो नहीं डाल सकते।")
-                            else:
-                                image_paths = []
-                                for idx, img in enumerate(uploaded_imgs):
-                                    img_url = upload_image_to_imgbb(img.getvalue())
+                                        if re.search(r'\d{10}', clean_text):
+                                            has_violation = True; violation_type = "मोबाईल नंबर"; violation_img_name = img.name; break
+                                            
+                                        if re.search(r'(https?://|www\.)[^\s]+', text_in_image) or re.search(r'\b[a-z0-9\-]+\.(com|in|org|net|co|store|shop)\b', text_in_image):
+                                            has_violation = True; violation_type = "वेबसाइट लिंक"; violation_img_name = img.name; break
+                                except Exception as e:
+                                    pass 
+                                
+                                if not has_violation:
+                                    img_url = upload_image_to_imgbb(compressed_bytes)
                                     if img_url:
                                         image_paths.append(img_url)
 
+                            if has_violation:
+                                st.error(f"🚨 **अपलोड फेल:** फोटो ('{violation_img_name}') में **{violation_type}** मिला है! Oura की पॉलिसी के अनुसार ऐसी फोटो नहीं डाल सकते।")
+                            else:
                                 final_path_str = "|".join(image_paths)
                                 is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
                                 seller_val = new_seller_name.strip() if new_seller_name else ""
@@ -468,7 +487,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             if st.button("बैनर सेव करें") and new_banner:
                 with st.spinner("बैनर सेव हो रहा है..."):
                     dummy_delete_image(current_config.get("banner_url", ""))
-                    b_url = upload_image_to_imgbb(new_banner.getvalue())
+                    compressed_bytes, _ = compress_image(new_banner.getvalue())
+                    b_url = upload_image_to_imgbb(compressed_bytes)
                     if b_url:
                         current_config["has_banner"] = True
                         current_config["banner_url"] = b_url
@@ -492,7 +512,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             if st.button("लोगो सेव करें") and new_logo:
                 with st.spinner("लोगो सेव हो रहा है..."):
                     dummy_delete_image(current_config.get("logo_url", ""))
-                    l_url = upload_image_to_imgbb(new_logo.getvalue())
+                    compressed_bytes, _ = compress_image(new_logo.getvalue())
+                    l_url = upload_image_to_imgbb(compressed_bytes)
                     if l_url:
                         current_config["has_logo"] = True
                         current_config["logo_url"] = l_url
@@ -710,7 +731,8 @@ def show_product_card(row, idx, prefix):
                                 dummy_delete_image(final_path_str)
                                 new_image_paths = []
                                 for img in e_uploaded_imgs:
-                                    img_url = upload_image_to_imgbb(img.getvalue())
+                                    compressed_bytes, _ = compress_image(img.getvalue())
+                                    img_url = upload_image_to_imgbb(compressed_bytes)
                                     if img_url:
                                         new_image_paths.append(img_url)
                                 final_path_str = "|".join(new_image_paths)
