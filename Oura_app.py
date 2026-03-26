@@ -8,6 +8,7 @@ import random
 import string
 import re
 import io
+import os
 from PIL import Image
 
 # --- नया फायरबेस सिस्टम ---
@@ -19,18 +20,20 @@ try:
 except ImportError:
     pass
 
+GITHUB_REPO = "shalabhjainsj-glitch/Oura"
+GITHUB_BRANCH = "main"
+GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
+
 # --- Firebase को चालू करना (Initialization - Smart Filter) ---
 if not firebase_admin._apps:
     try:
         firebase_secrets = st.secrets["FIREBASE_JSON"]
         if isinstance(firebase_secrets, str):
-            # स्मार्ट फिल्टर: मोबाइल के गलत कोट्स और लाइन-ब्रेक को ठीक करना
             cleaned_str = firebase_secrets.replace('“', '"').replace('”', '"')
             key_dict = json.loads(cleaned_str, strict=False)
         else:
             key_dict = dict(firebase_secrets)
         
-        # Private Key को सुरक्षित तरीके से पढ़ना
         if 'private_key' in key_dict:
             key_dict['private_key'] = key_dict['private_key'].replace('\\n', '\n')
             
@@ -38,7 +41,7 @@ if not firebase_admin._apps:
         project_id = key_dict.get('project_id')
         firebase_admin.initialize_app(cred, {'storageBucket': f"{project_id}.appspot.com"})
     except Exception as e:
-        st.error(f"🚨 Firebase सेटअप में गलती: कृपया Streamlit Settings -> Secrets में चेक करें कि कोड सही से पेस्ट हुआ है या नहीं। (एरर: {e})")
+        st.error(f"🚨 Firebase सेटअप में गलती: {e}")
 
 db = firestore.client()
 bucket = storage.bucket()
@@ -551,6 +554,40 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.success("✅ सेटिंग्स सेव हो गईं!")
                 time.sleep(1)
                 st.rerun()
+            
+            # 🚀 जादुई बटन: पुराना माल वापस लाने के लिए 🚀
+            st.markdown("---")
+            with st.expander("🛠️ पुराना माल वापस लाएं (Data Migration)"):
+                st.warning("⚠️ इस बटन को सिर्फ 1 बार दबाएं! यह आपके पुराने GitHub गोदाम से सारा माल निकालकर नए Firebase में डाल देगा। माल आने के बाद इस बटन की कोई ज़रूरत नहीं है।")
+                if st.button("🚀 पुराना माल Firebase में डालें"):
+                    try:
+                        old_data_file = "oura_products.csv"
+                        if os.path.exists(old_data_file):
+                            old_df = pd.read_csv(old_data_file)
+                            for _, r in old_df.iterrows():
+                                if pd.isna(r['ID']) or str(r['ID']).strip() == "": continue
+                                p_id = str(r['ID'])
+                                data = {
+                                    "ID": p_id,
+                                    "Name": str(r.get('Name', '')),
+                                    "Price": float(r.get('Price', 0) if pd.notna(r.get('Price')) else 0),
+                                    "Wholesale_Price": float(r.get('Wholesale_Price', 0) if pd.notna(r.get('Wholesale_Price')) else 0),
+                                    "Wholesale_Qty": int(r.get('Wholesale_Qty', 1) if pd.notna(r.get('Wholesale_Qty')) else 1),
+                                    "Category": str(r.get('Category', '')),
+                                    "Image_Path": str(r.get('Image_Path', '')),
+                                    "Free_Delivery": str(r.get('Free_Delivery', 'True')).lower() in ['true', 'yes', '1'],
+                                    "Seller_Name": str(r.get('Seller_Name', '')) if pd.notna(r.get('Seller_Name')) else ""
+                                }
+                                db.collection('products').document(p_id).set(data)
+                            st.success("✅ सारा पुराना माल Firebase में सफलतापूर्वक आ गया! अब आप ऐप को रिफ्रेश कर सकते हैं।")
+                            load_products.clear()
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("पुराना डेटा नहीं मिला।")
+                    except Exception as e:
+                        st.error(f"एरर आ गया: {e}")
+
     st.markdown("---")
 
 search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)", "")
@@ -564,6 +601,9 @@ def show_swipe_gallery(path_str):
 
     html_code = '<div class="swipe-gallery">'
     for src in paths:
+        # अगर फोटो पुरानी (GitHub वाली) है, तो उसे सही लिंक दें
+        if not src.startswith("http"):
+            src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
         html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
     html_code += '</div>'
     
@@ -578,6 +618,8 @@ def show_product_card(row, idx, prefix):
         all_paths = show_swipe_gallery(image_path_str)
         
         img_link_for_wa = all_paths[0] if all_paths else ""
+        if img_link_for_wa and not img_link_for_wa.startswith("http"):
+            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
@@ -651,12 +693,10 @@ def show_product_card(row, idx, prefix):
                     else:
                         with st.spinner("अपडेट हो रहा है..."):
                             p_id = str(row['ID'])
-                            final_path_str = row.get("Image_Path", "")
+                            final_path_str = str(row.get("Image_Path", ""))
                             
                             if e_uploaded_imgs:
-                                # पुरानी फोटो डिलीट करें
                                 for old_p in all_paths: delete_file_from_firebase(old_p)
-                                # नई फोटो डालें
                                 new_image_paths = []
                                 for idx_img, img in enumerate(e_uploaded_imgs):
                                     safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
@@ -680,7 +720,7 @@ def show_product_card(row, idx, prefix):
                 if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
                         p_id = str(row['ID'])
-                        for old_p in all_paths: delete_file_from_firebase(old_p) # फोटो भी डिलीट
+                        for old_p in all_paths: delete_file_from_firebase(old_p) 
                         db.collection('products').document(p_id).delete()
                         load_products.clear()
                         st.success("डिलीट हो गया!")
@@ -798,7 +838,7 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown("### 💳 सुरक्षित অনলাইনে पेमेंट")
+        st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
         for name, data in available_upis.items():
             qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
             st.markdown(f'''<a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
