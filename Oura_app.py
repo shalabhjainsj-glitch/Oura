@@ -19,20 +19,26 @@ try:
 except ImportError:
     pass
 
-# --- Firebase को चालू करना (Initialization) ---
+# --- Firebase को चालू करना (Initialization - Smart Filter) ---
 if not firebase_admin._apps:
     try:
         firebase_secrets = st.secrets["FIREBASE_JSON"]
         if isinstance(firebase_secrets, str):
-            key_dict = json.loads(firebase_secrets)
+            # स्मार्ट फिल्टर: मोबाइल के गलत कोट्स और लाइन-ब्रेक को ठीक करना
+            cleaned_str = firebase_secrets.replace('“', '"').replace('”', '"')
+            key_dict = json.loads(cleaned_str, strict=False)
         else:
             key_dict = dict(firebase_secrets)
+        
+        # Private Key को सुरक्षित तरीके से पढ़ना
+        if 'private_key' in key_dict:
+            key_dict['private_key'] = key_dict['private_key'].replace('\\n', '\n')
+            
         cred = credentials.Certificate(key_dict)
-        project_id = key_dict['project_id']
-        # फोटो रखने के लिए आपका डिफ़ॉल्ट स्टोरेज बकेट
+        project_id = key_dict.get('project_id')
         firebase_admin.initialize_app(cred, {'storageBucket': f"{project_id}.appspot.com"})
     except Exception as e:
-        st.error(f"🚨 Firebase सेटअप में गलती: {e}")
+        st.error(f"🚨 Firebase सेटअप में गलती: कृपया Streamlit Settings -> Secrets में चेक करें कि कोड सही से पेस्ट हुआ है या नहीं। (एरर: {e})")
 
 db = firestore.client()
 bucket = storage.bucket()
@@ -792,7 +798,7 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
+        st.markdown("### 💳 सुरक्षित অনলাইনে पेमेंट")
         for name, data in available_upis.items():
             qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
             st.markdown(f'''<a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
@@ -868,4 +874,3 @@ if (btn && !btn.dataset.draggable) {
 </script>
 """
 st_components.html(drag_js_code, height=0, width=0)
-
