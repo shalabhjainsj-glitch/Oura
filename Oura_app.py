@@ -1,11 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as st_components
 import pandas as pd
-import os
 import urllib.parse
 import json
-import requests
-import base64
 import time
 import random
 import string
@@ -13,48 +10,55 @@ import re
 import io
 from PIL import Image
 
-# Tesseract-OCR के लिए इम्पोर्ट (यह फोटो में से टेक्स्ट पढ़ेगा)
+# --- नया फायरबेस सिस्टम ---
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+
 try:
     import pytesseract
 except ImportError:
     pass
 
-# --- 1. सबसे पहले सेटिंग्स और लोगो लोड करें ---
-CONFIG_FILE = "config.json"
-BANNER_FILE = "banner.png" 
-LOGO_FILE = "logo.png"
-DATA_FILE = "oura_products.csv"
-GITHUB_REPO = "shalabhjainsj-glitch/Oura"
-GITHUB_BRANCH = "main"
-GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
+# --- Firebase को चालू करना (Initialization) ---
+if not firebase_admin._apps:
+    try:
+        firebase_secrets = st.secrets["FIREBASE_JSON"]
+        if isinstance(firebase_secrets, str):
+            key_dict = json.loads(firebase_secrets)
+        else:
+            key_dict = dict(firebase_secrets)
+        cred = credentials.Certificate(key_dict)
+        project_id = key_dict['project_id']
+        # फोटो रखने के लिए आपका डिफ़ॉल्ट स्टोरेज बकेट
+        firebase_admin.initialize_app(cred, {'storageBucket': f"{project_id}.appspot.com"})
+    except Exception as e:
+        st.error(f"🚨 Firebase सेटअप में गलती: {e}")
 
+db = firestore.client()
+bucket = storage.bucket()
+
+# --- सेटिंग्स लोड करना (Firebase से) ---
 def load_config():
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except: pass
+    try:
+        doc = db.collection('settings').document('config').get()
+        if doc.exists:
+            return doc.to_dict()
+    except: pass
     return {
         "admin_whatsapp": "919891587437", 
-        "phonepe_upi": "",
-        "paytm_upi": "",
-        "gpay_upi": "",
-        "bhim_upi": "",
-        "upi_id": "",
-        "has_banner": False,
-        "has_logo": False,
-        "free_delivery_tag": True,
-        "sellers": {} 
+        "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
+        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
+        "banner_url": "", "logo_url": ""
     }
+
+def save_config(config):
+    db.collection('settings').document('config').set(config)
 
 current_config = load_config()
 if "sellers" not in current_config:
     current_config["sellers"] = {}
 
-if current_config.get("has_logo", False):
-    app_icon_url = f"{GITHUB_RAW_URL}{LOGO_FILE}?t={int(time.time())}"
-else:
-    app_icon_url = "🛍️"
+app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
 st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
@@ -208,71 +212,33 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     """
     st_components.html(pwa_js, height=0, width=0)
 
-def save_to_github(file_path, content, commit_message):
+# --- Firebase फोटो अपलोडर ---
+def upload_file_to_firebase(file_bytes, filename, content_type):
+    blob = bucket.blob(f"images/{filename}")
+    blob.upload_from_string(file_bytes, content_type=content_type)
+    return f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{urllib.parse.quote(blob.name, safe='')}?alt=media"
+
+def delete_file_from_firebase(url):
     try:
-        token = st.secrets["GITHUB_TOKEN"]
-    except Exception as e:
-        st.error("⚠️ GitHub Token नहीं मिला या गलत है! कृपया ऐप की सेटिंग्स चेक करें।")
-        return False
-
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
-    response = requests.get(url, headers=headers)
-    sha = response.json().get("sha") if response.status_code == 200 else None
-        
-    if isinstance(content, str):
-        encoded_content = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-    else:
-        encoded_content = base64.b64encode(content).decode('utf-8')
-        
-    data = {"message": commit_message, "content": encoded_content, "branch": GITHUB_BRANCH}
-    if sha:
-        data["sha"] = sha
-        
-    put_response = requests.put(url, headers=headers, json=data)
-    return put_response.status_code in [200, 201]
-
-def save_config(config):
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, ensure_ascii=False, indent=4)
-    save_to_github(CONFIG_FILE, json.dumps(config, indent=4), "Update settings.json")
-
-if not os.path.exists("images"):
-    os.makedirs("images")
+        path_start = url.find('/o/') + 3
+        path_end = url.find('?alt=media')
+        if path_start > 2 and path_end > -1:
+            blob_name = urllib.parse.unquote(url[path_start:path_end])
+            blob = bucket.blob(blob_name)
+            blob.delete()
+    except: pass
 
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name"]
-
-def init_db():
-    if not os.path.exists(DATA_FILE):
-        df = pd.DataFrame(columns=expected_columns)
-        df.to_csv(DATA_FILE, index=False)
-    else:
-        try:
-            df = pd.read_csv(DATA_FILE)
-            for col in expected_columns:
-                if col not in df.columns:
-                    df[col] = ""
-            df.to_csv(DATA_FILE, index=False)
-        except:
-            df = pd.DataFrame(columns=expected_columns)
-            df.to_csv(DATA_FILE, index=False)
-
-init_db()
 
 @st.cache_data(ttl=5)
 def load_products():
     try:
-        df = pd.read_csv(DATA_FILE)
-        for col in expected_columns:
-            if col not in df.columns:
-                df[col] = ""
-        return df
-    except:
-        return pd.DataFrame(columns=expected_columns)
+        docs = db.collection('products').stream()
+        data = [doc.to_dict() for doc in docs]
+        if data:
+            return pd.DataFrame(data)
+    except: pass
+    return pd.DataFrame(columns=expected_columns)
 
 products_df = load_products()
 
@@ -302,15 +268,11 @@ if st.session_state.seller_logged_in:
         st.error("⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!")
         st.rerun()
 
-if current_config.get("has_banner", False):
-    if os.path.exists(BANNER_FILE):
-        st.image(BANNER_FILE, use_container_width=True)
-    else:
-        banner_img_link = f"{GITHUB_RAW_URL}{BANNER_FILE}?t={int(time.time())}"
-        try:
-            st.image(banner_img_link, use_container_width=True)
-        except:
-            st.title("🛍️ Oura Wholesale")
+if current_config.get("has_banner", False) and current_config.get("banner_url"):
+    try:
+        st.image(current_config["banner_url"], use_container_width=True)
+    except:
+        st.title("🛍️ Oura Wholesale")
 else:
     st.title("🛍️ Oura Wholesale")
 
@@ -371,11 +333,11 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     
     with tab_add:
         if st.session_state.share_msg:
-            st.success("✅ शानदार! आपका नया उत्पाद दुकान में जुड़ गया है।")
+            st.success("✅ शानदार! आपका नया उत्पाद Oura पर लाइव है।")
             
-            if st.session_state.share_img_path and os.path.exists(st.session_state.share_img_path):
+            if st.session_state.share_img_path:
                 st.image(st.session_state.share_img_path, width=200)
-                st.info("💡 **टिप:** इस फोटो को WhatsApp पर भेजने के लिए, फोटो पर उंगली दबाए रखें (Long Press) और **'Copy Image'** चुनें, फिर WhatsApp में Paste कर दें।")
+                st.info("💡 **टिप:** इस फोटो को WhatsApp पर भेजने के लिए, फोटो पर उंगली दबाए रखें और **'Copy Image'** चुनें, फिर WhatsApp में Paste कर दें।")
             
             encoded_share = urllib.parse.quote(st.session_state.share_msg)
             wa_share_link = f"https://wa.me/?text={encoded_share}"
@@ -425,9 +387,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     if len(uploaded_imgs) > 3:
                         st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
                     else:
-                        with st.spinner("AI आपकी फोटो स्कैन कर रहा है... कृपया प्रतीक्षा करें (इसमें थोड़ा समय लग सकता है)..."):
-                            
-                            # 🛡️ --- OCR: फोटो में नंबर और लिंक चेक करने का सिस्टम --- 🛡️
+                        with st.spinner("AI फोटो चेक कर रहा है और Firebase में सेव कर रहा है..."):
                             has_violation = False
                             violation_type = ""
                             violation_img_name = ""
@@ -436,124 +396,94 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 for img in uploaded_imgs:
                                     img_bytes = img.getvalue()
                                     pil_img = Image.open(io.BytesIO(img_bytes))
-                                    
-                                    # फोटो से टेक्स्ट निकालें
                                     text_in_image = pytesseract.image_to_string(pil_img).lower()
-                                    
-                                    # स्पेस और डैश हटाएं ताकि नंबर आसानी से पकड़ा जा सके
                                     clean_text = re.sub(r'[\s\-\(\)\+]+', '', text_in_image)
                                     
-                                    # 1. मोबाईल नंबर चेक (लगातार 10 अंक)
                                     if re.search(r'\d{10}', clean_text):
-                                        has_violation = True
-                                        violation_type = "मोबाईल नंबर"
-                                        violation_img_name = img.name
-                                        break
+                                        has_violation = True; violation_type = "मोबाईल नंबर"; violation_img_name = img.name; break
                                         
-                                    # 2. वेबसाइट लिंक चेक (http, www, .com, .in आदि)
                                     if re.search(r'(https?://|www\.)[^\s]+', text_in_image) or re.search(r'\b[a-z0-9\-]+\.(com|in|org|net|co|store|shop)\b', text_in_image):
-                                        has_violation = True
-                                        violation_type = "वेबसाइट लिंक"
-                                        violation_img_name = img.name
-                                        break
+                                        has_violation = True; violation_type = "वेबसाइट लिंक"; violation_img_name = img.name; break
                             except Exception as e:
-                                pass # अगर OCR फेल हो जाए, तो फोटो अपलोड होने दें
+                                pass 
                             
-                            # अगर फोटो में नंबर/लिंक मिला तो एरर दिखाएं और अपलोड रोक दें
                             if has_violation:
-                                st.error(f"🚨 **अपलोड फेल:** आपकी फोटो ('{violation_img_name}') में **{violation_type}** लिखा हुआ मिला है! Oura की पॉलिसी के अनुसार आप ऐसी फोटो अपलोड नहीं कर सकते जिसमें कोई कांटेक्ट नंबर या लिंक हो। कृपया साफ फोटो चुनें।")
+                                st.error(f"🚨 **अपलोड फेल:** फोटो ('{violation_img_name}') में **{violation_type}** मिला है! Oura की पॉलिसी के अनुसार ऐसी फोटो नहीं डाल सकते।")
                             else:
-                                # अगर सब सही है, तो फोटो और डेटा सेव करें
                                 image_paths = []
-                                all_images_saved = True
-                                
                                 for idx, img in enumerate(uploaded_imgs):
                                     safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                    timestamp = int(time.time())
-                                    final_filename = f"{new_id}_{idx}_{timestamp}_{safe_filename}"
-                                    path = f"images/{final_filename}"
-                                    img_bytes = img.getvalue()
-                                    try:
-                                        with open(path, "wb") as f: f.write(img_bytes)
-                                    except: pass
+                                    final_filename = f"{new_id}_{idx}_{int(time.time())}_{safe_filename}"
+                                    img_url = upload_file_to_firebase(img.getvalue(), final_filename, img.type)
+                                    image_paths.append(img_url)
 
-                                    if save_to_github(path, img_bytes, f"Add image {final_filename}"):
-                                        image_paths.append(path)
-                                    else:
-                                        all_images_saved = False
-                                        break
-
-                                if all_images_saved:
-                                    final_path_str = "|".join(image_paths)
-                                    df = load_products()
-                                    is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
-                                    seller_val = new_seller_name.strip() if new_seller_name else ""
-                                    
-                                    new_row = pd.DataFrame([[new_id, new_name, new_price, new_w_price, new_w_qty, final_cat, final_path_str, is_free, seller_val]], columns=expected_columns)
-                                    df = pd.concat([df, new_row], ignore_index=True)
-                                    df.to_csv(DATA_FILE, index=False)
-                                    
-                                    with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                        csv_content = f.read()
-                                    if save_to_github(DATA_FILE, csv_content, f"Add product {new_name}"):
-                                        load_products.clear()
-                                        
-                                        safe_cat_link = urllib.parse.quote(final_cat)
-                                        app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
-                                        
-                                        msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए हमने एक नया डिज़ाइन लॉन्च किया है!\n\n🎁 *नया उत्पाद:* {new_name}\n"
-                                        if seller_val:
-                                            msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
-                                        msg += f"\nयह डिज़ाइन मार्केट में आते ही बिक रहा है। इससे पहले कि स्टॉक खत्म हो जाए...\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
-                                        
-                                        st.session_state.share_msg = msg
-                                        st.session_state.share_img_path = image_paths[0] if image_paths else None
-                                        st.rerun()
+                                final_path_str = "|".join(image_paths)
+                                is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
+                                seller_val = new_seller_name.strip() if new_seller_name else ""
+                                
+                                data = {
+                                    "ID": new_id, "Name": new_name, "Price": new_price, "Wholesale_Price": new_w_price,
+                                    "Wholesale_Qty": new_w_qty, "Category": final_cat, "Image_Path": final_path_str,
+                                    "Free_Delivery": is_free, "Seller_Name": seller_val
+                                }
+                                
+                                db.collection('products').document(str(new_id)).set(data)
+                                load_products.clear()
+                                
+                                safe_cat_link = urllib.parse.quote(final_cat)
+                                app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
+                                
+                                msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए नया डिज़ाइन!\n\n🎁 *उत्पाद:* {new_name}\n"
+                                if seller_val: msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
+                                msg += f"\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
+                                
+                                st.session_state.share_msg = msg
+                                st.session_state.share_img_path = image_paths[0] if image_paths else None
+                                st.rerun()
 
     if st.session_state.admin_logged_in:
         with tab_banner:
             st.subheader("🖼️ ऐप का बैनर (Top Banner)")
             new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
             if st.button("बैनर सेव करें") and new_banner:
-                with st.spinner("बैनर सेव हो रहा है..."):
-                    banner_bytes = new_banner.getvalue()
-                    try:
-                        with open(BANNER_FILE, "wb") as f: f.write(banner_bytes)
-                    except: pass
-                    if save_to_github(BANNER_FILE, banner_bytes, "Update banner image"):
-                        current_config["has_banner"] = True
-                        save_config(current_config)
-                        st.success("✅ बैनर लग गया!")
-                        time.sleep(1)
-                        st.rerun()
+                with st.spinner("बैनर Firebase में सेव हो रहा है..."):
+                    if current_config.get("banner_url"): delete_file_from_firebase(current_config["banner_url"])
+                    b_url = upload_file_to_firebase(new_banner.getvalue(), f"banner_{int(time.time())}.jpg", new_banner.type)
+                    current_config["has_banner"] = True
+                    current_config["banner_url"] = b_url
+                    save_config(current_config)
+                    st.success("✅ बैनर लग गया!")
+                    time.sleep(1)
+                    st.rerun()
                         
             if current_config.get("has_banner", False):
                 if st.button("❌ बैनर हटाएं"):
+                    if current_config.get("banner_url"): delete_file_from_firebase(current_config["banner_url"])
                     current_config["has_banner"] = False
+                    current_config["banner_url"] = ""
                     save_config(current_config)
                     st.rerun()
                     
             st.markdown("---")
             
             st.subheader("📱 ऐप का लोगो (App Icon)")
-            st.info("यह लोगो तब दिखेगा जब ग्राहक ऐप को 'Add to Home Screen' करेंगे। (कृपया चकोर/Square फोटो ही चुनें)")
             new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
             if st.button("लोगो सेव करें") and new_logo:
-                with st.spinner("लोगो सेव हो रहा है..."):
-                    logo_bytes = new_logo.getvalue()
-                    try:
-                        with open(LOGO_FILE, "wb") as f: f.write(logo_bytes)
-                    except: pass
-                    if save_to_github(LOGO_FILE, logo_bytes, "Update app logo"):
-                        current_config["has_logo"] = True
-                        save_config(current_config)
-                        st.success("✅ आपका खुद का लोगो सेट हो गया!")
-                        time.sleep(1)
-                        st.rerun()
+                with st.spinner("लोगो Firebase में सेव हो रहा है..."):
+                    if current_config.get("logo_url"): delete_file_from_firebase(current_config["logo_url"])
+                    l_url = upload_file_to_firebase(new_logo.getvalue(), f"logo_{int(time.time())}.jpg", new_logo.type)
+                    current_config["has_logo"] = True
+                    current_config["logo_url"] = l_url
+                    save_config(current_config)
+                    st.success("✅ आपका लोगो सेट हो गया!")
+                    time.sleep(1)
+                    st.rerun()
                         
             if current_config.get("has_logo", False):
                 if st.button("❌ लोगो हटाएं"):
+                    if current_config.get("logo_url"): delete_file_from_firebase(current_config["logo_url"])
                     current_config["has_logo"] = False
+                    current_config["logo_url"] = ""
                     save_config(current_config)
                     st.rerun()
     
@@ -567,11 +497,9 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             
             st.markdown("---")
             st.subheader("👥 सेलर पार्टनर (Seller Management)")
-            st.info("यहाँ से आप नए सेलर्स को 'टोकन (Password)' दे सकते हैं। ⚠️ **एडमिन कंट्रोल:** अगर आप किसी सेलर का टोकन यहाँ से '❌ डिलीट' कर देंगे, तो वह सेलर तुरंत ब्लॉक हो जाएगा और वह ऐप में कुछ भी नहीं कर पाएगा।")
             
             col_s1, col_s2 = st.columns([3, 1])
-            with col_s1:
-                new_seller_brand = st.text_input("नये सेलर / ब्रांड का नाम")
+            with col_s1: new_seller_brand = st.text_input("नये सेलर / ब्रांड का नाम")
             with col_s2:
                 st.write("")
                 st.write("")
@@ -583,27 +511,24 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         st.success(f"टोकन बन गया: {new_token}")
                         time.sleep(1)
                         st.rerun()
-                    else:
-                        st.error("नाम डालें")
+                    else: st.error("नाम डालें")
             
             if current_config.get("sellers"):
                 st.write("**मौजूदा सेलर्स:**")
                 for tkn, s_name in list(current_config["sellers"].items()):
                     col_list1, col_list2 = st.columns([8, 2])
-                    with col_list1:
-                        st.write(f"🏪 **{s_name}** (टोकन: `{tkn}`)")
+                    with col_list1: st.write(f"🏪 **{s_name}** (टोकन: `{tkn}`)")
                     with col_list2:
-                        if st.button("❌ हटाएं (ब्लॉक करें)", key=f"del_seller_{tkn}"):
+                        if st.button("❌ हटाएं", key=f"del_seller_{tkn}"):
                             del current_config["sellers"][tkn]
                             save_config(current_config)
                             st.rerun()
     
             st.markdown("---")
             st.subheader("💳 मल्टी UPI सेटिंग्स")
-            
             col_u1, col_u2 = st.columns(2)
             with col_u1:
-                new_phonepe = st.text_input("PhonePe UPI ID", value=current_config.get("phonepe_upi", current_config.get("upi_id", "")))
+                new_phonepe = st.text_input("PhonePe UPI ID", value=current_config.get("phonepe_upi", ""))
                 new_paytm = st.text_input("Paytm UPI ID", value=current_config.get("paytm_upi", ""))
             with col_u2:
                 new_gpay = st.text_input("Google Pay (GPay) UPI ID", value=current_config.get("gpay_upi", ""))
@@ -616,25 +541,13 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 current_config["paytm_upi"] = new_paytm
                 current_config["gpay_upi"] = new_gpay
                 current_config["bhim_upi"] = new_bhim
-                current_config["upi_id"] = "" 
                 save_config(current_config)
                 st.success("✅ सेटिंग्स सेव हो गईं!")
                 time.sleep(1)
                 st.rerun()
     st.markdown("---")
 
-search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Shirt, Watch...)", "")
-
-@st.cache_data(max_entries=100) 
-def get_image_src(path):
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            data = f.read()
-        b64 = base64.b64encode(data).decode()
-        return f"data:image/jpeg;base64,{b64}"
-    else:
-        img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(path.replace('\\', '/'), safe='/')}"
-        return img_link
+search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)", "")
 
 def show_swipe_gallery(path_str):
     if not path_str:
@@ -644,17 +557,11 @@ def show_swipe_gallery(path_str):
     if not paths: return []
 
     html_code = '<div class="swipe-gallery">'
-    for p in paths:
-        src = get_image_src(p)
-        full_url = f"{GITHUB_RAW_URL}{urllib.parse.quote(p.replace('\\', '/'), safe='/')}"
-        html_code += f'<a href="{full_url}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
+    for src in paths:
+        html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
     html_code += '</div>'
     
-    if len(paths) > 1:
-        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">फोटो बड़ी करने के लिए उस पर क्लिक करें 🔍</div>'
-    else:
-        html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">ज़ूम करने के लिए फोटो पर क्लिक करें 🔍</div>'
-        
+    html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">ज़ूम करने के लिए फोटो पर क्लिक करें 🔍</div>'
     st.markdown(html_code, unsafe_allow_html=True)
     return paths
 
@@ -664,9 +571,7 @@ def show_product_card(row, idx, prefix):
         image_path_str = str(row.get("Image_Path", ""))
         all_paths = show_swipe_gallery(image_path_str)
         
-        img_link_for_wa = ""
-        if all_paths:
-            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(all_paths[0].replace('\\', '/'), safe='/')}"
+        img_link_for_wa = all_paths[0] if all_paths else ""
             
         st.write(f"**{row.get('Name', 'Unknown')}**")
         
@@ -701,12 +606,7 @@ def show_product_card(row, idx, prefix):
         
         if st.button("कार्ट में डालें", key=f"b_{prefix_idx}"):
             final_price = w_price if qty >= w_qty else retail_price
-            st.session_state.cart[prefix_idx] = {
-                "name": row.get('Name', 'Item'), 
-                "price": final_price, 
-                "qty": qty,
-                "img_link": img_link_for_wa
-            }
+            st.session_state.cart[prefix_idx] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
             st.success("कार्ट में जुड़ गया! 🛒")
             
         show_edit_delete = False
@@ -718,9 +618,6 @@ def show_product_card(row, idx, prefix):
         if show_edit_delete:
             st.markdown("---")
             with st.expander("✏️ रेट, फोटो बदलें या डिलीट करें (Edit)"):
-                if st.session_state.admin_logged_in and str(seller_val).strip():
-                    st.caption(f"⚠️ **Admin Control:** आप {str(seller_val).strip()} का माल एडिट या डिलीट कर रहे हैं।")
-                
                 with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
@@ -732,15 +629,11 @@ def show_product_card(row, idx, prefix):
                         fd_index = 0 if show_fd else 1
                         e_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"], index=fd_index)
                     
-                    if st.session_state.admin_logged_in:
-                        e_seller_name = st.text_input("सेलर / ब्रांड का नाम", value=str(seller_val) if pd.notna(seller_val) else "")
-                    else:
-                        e_seller_name = st.session_state.seller_logged_in
+                    e_seller_name = st.text_input("सेलर / ब्रांड का नाम", value=str(seller_val) if pd.notna(seller_val) else "") if st.session_state.admin_logged_in else st.session_state.seller_logged_in
                         
                     existing_cats_edit = products_df['Category'].dropna().unique().tolist()
                     current_cat = str(row.get("Category", ""))
-                    if current_cat not in existing_cats_edit:
-                        existing_cats_edit.insert(0, current_cat)
+                    if current_cat not in existing_cats_edit: existing_cats_edit.insert(0, current_cat)
                     e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat))
                     
                     e_uploaded_imgs = st.file_uploader("नई फोटो (Optional, max 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"edit_imgs_{prefix_idx}")
@@ -751,61 +644,42 @@ def show_product_card(row, idx, prefix):
                         st.error("⚠️ अधिकतम 3 फोटो ही चुनें।")
                     else:
                         with st.spinner("अपडेट हो रहा है..."):
-                            df_edit = load_products()
                             p_id = str(row['ID'])
                             final_path_str = row.get("Image_Path", "")
-                            images_updated = True
                             
                             if e_uploaded_imgs:
+                                # पुरानी फोटो डिलीट करें
+                                for old_p in all_paths: delete_file_from_firebase(old_p)
+                                # नई फोटो डालें
                                 new_image_paths = []
-                                timestamp = int(time.time())
                                 for idx_img, img in enumerate(e_uploaded_imgs):
                                     safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                    final_filename = f"{p_id}_{idx_img}_{timestamp}_{safe_filename}"
-                                    path = f"images/{final_filename}"
-                                    try:
-                                        with open(path, "wb") as f: f.write(img.getvalue())
-                                    except: pass
-                                    if save_to_github(path, img.getvalue(), f"Update image"):
-                                        new_image_paths.append(path)
-                                    else:
-                                        images_updated = False
-                                        break
-                                if images_updated: final_path_str = "|".join(new_image_paths)
+                                    final_filename = f"{p_id}_{idx_img}_{int(time.time())}_{safe_filename}"
+                                    img_url = upload_file_to_firebase(img.getvalue(), final_filename, img.type)
+                                    new_image_paths.append(img_url)
+                                final_path_str = "|".join(new_image_paths)
 
-                            if images_updated:
-                                e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
-                                df_edit.loc[df_edit['ID'].astype(str) == p_id, ['Name', 'Price', 'Wholesale_Price', 'Wholesale_Qty', 'Category', 'Image_Path', 'Free_Delivery', 'Seller_Name']] = [e_name, e_price, e_w_price, e_w_qty, e_cat, final_path_str, e_is_free, str(e_seller_name).strip()]
-                                df_edit.to_csv(DATA_FILE, index=False)
-                                with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                    csv_content = f.read()
-                                if save_to_github(DATA_FILE, csv_content, f"Update product"):
-                                    load_products.clear()
-                                    get_image_src.clear() 
-                                    st.success("✅ अपडेट हो गया!")
-                                    time.sleep(1)
-                                    st.rerun()
+                            e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
+                            data = {
+                                "ID": p_id, "Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price,
+                                "Wholesale_Qty": e_w_qty, "Category": e_cat, "Image_Path": final_path_str,
+                                "Free_Delivery": e_is_free, "Seller_Name": str(e_seller_name).strip()
+                            }
+                            db.collection('products').document(p_id).set(data)
+                            load_products.clear()
+                            st.success("✅ अपडेट हो गया!")
+                            time.sleep(1)
+                            st.rerun()
 
                 if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
-                        df_del = load_products()
                         p_id = str(row['ID'])
-                        current_cat_before_delete = st.session_state.selected_category
-                        
-                        df_updated = df_del[df_del['ID'].astype(str) != p_id]
-                        df_updated.to_csv(DATA_FILE, index=False)
-                        with open(DATA_FILE, "r", encoding="utf-8") as f:
-                            csv_content = f.read()
-                        if save_to_github(DATA_FILE, csv_content, f"Delete product"):
-                            load_products.clear()
-                            get_image_src.clear()
-                            
-                            st.session_state.selected_category = current_cat_before_delete
-                            if current_cat_before_delete:
-                                st.query_params["cat"] = current_cat_before_delete
-                            st.success("डिलीट हो गया!")
-                            time.sleep(1)
-                            st.rerun()
+                        for old_p in all_paths: delete_file_from_firebase(old_p) # फोटो भी डिलीट
+                        db.collection('products').document(p_id).delete()
+                        load_products.clear()
+                        st.success("डिलीट हो गया!")
+                        time.sleep(1)
+                        st.rerun()
 
 if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     st.markdown("---")
@@ -840,23 +714,17 @@ else:
         st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
-        if len(valid_categories) == 0:
-            st.write("अभी कोई कैटेगरी नहीं है।")
+        if len(valid_categories) == 0: st.write("अभी कोई कैटेगरी नहीं है।")
         else:
             colors = [
-                ("#e1f5fe", "#0288d1"), ("#fce4ec", "#c2185b"), 
-                ("#e8f5e9", "#388e3c"), ("#fff3e0", "#f57c00"), 
-                ("#f3e5f5", "#7b1fa2"), ("#e0f7fa", "#0097a7"), 
-                ("#fff8e1", "#ffa000"), ("#ffebee", "#d32f2f")
+                ("#e1f5fe", "#0288d1"), ("#fce4ec", "#c2185b"), ("#e8f5e9", "#388e3c"), ("#fff3e0", "#f57c00"), 
+                ("#f3e5f5", "#7b1fa2"), ("#e0f7fa", "#0097a7"), ("#fff8e1", "#ffa000"), ("#ffebee", "#d32f2f")
             ]
-            
             html_grid = '<div class="category-grid">'
             for i, cat in enumerate(valid_categories):
                 safe_cat = urllib.parse.quote(cat)
                 bg_color, text_color = colors[i % len(colors)]
-                
                 html_grid += f'<a href="?cat={safe_cat}" target="_self" class="category-box" style="background-color: {bg_color}; color: {text_color};">{cat}</a>'
-            
             html_grid += '</div>'
             st.markdown(html_grid, unsafe_allow_html=True)
             
@@ -867,14 +735,9 @@ else:
                 st.query_params.clear()
                 st.session_state.selected_category = None
                 st.rerun()
-        with col_title:
-            st.subheader(f"📂 {st.session_state.selected_category}")
+        with col_title: st.subheader(f"📂 {st.session_state.selected_category}")
         
-        floating_btn_html = '''
-        <a href="?" target="_self" class="floating-back-btn">
-            🔙 सभी कैटेगरीज 
-        </a>
-        '''
+        floating_btn_html = '''<a href="?" target="_self" class="floating-back-btn">🔙 सभी कैटेगरीज</a>'''
         st.markdown(floating_btn_html, unsafe_allow_html=True)
         
         if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
@@ -883,31 +746,23 @@ else:
                 if st.button("✅ सेव करें", key="rename_cat_btn"):
                     if new_cat_name and new_cat_name != st.session_state.selected_category:
                         with st.spinner("नाम बदला जा रहा है..."):
-                            df_update = load_products()
                             old_cat = st.session_state.selected_category
-                            df_update.loc[df_update['Category'] == old_cat, 'Category'] = new_cat_name
-                            df_update.to_csv(DATA_FILE, index=False)
-                            
-                            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                                csv_content = f.read()
-                            if save_to_github(DATA_FILE, csv_content, f"Rename category to {new_cat_name}"):
-                                load_products.clear()
-                                st.session_state.selected_category = new_cat_name
-                                st.query_params["cat"] = new_cat_name
-                                st.success("✅ नाम बदल गया!")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error("डेटाबेस अपडेट करने में समस्या आई।")
+                            docs = db.collection('products').where('Category', '==', old_cat).stream()
+                            for doc in docs:
+                                db.collection('products').document(doc.id).update({'Category': new_cat_name})
+                            load_products.clear()
+                            st.session_state.selected_category = new_cat_name
+                            st.query_params["cat"] = new_cat_name
+                            st.success("✅ नाम बदल गया!")
+                            time.sleep(1)
+                            st.rerun()
 
         cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
-        if cat_products.empty: 
-            st.write("इस कैटेगरी में अभी कोई उत्पाद नहीं है।")
+        if cat_products.empty: st.write("इस कैटेगरी में अभी कोई उत्पाद नहीं है।")
         else:
             cols = st.columns(3)
             for idx, row in cat_products.reset_index().iterrows():
-                with cols[idx % 3]: 
-                    show_product_card(row, idx, "cat_view")
+                with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
 st.markdown("<br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
@@ -925,10 +780,8 @@ if st.session_state.cart:
         count += 1
     
     show_fd = current_config.get("free_delivery_tag", True)
-    if show_fd:
-        msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
-    else:
-        msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
+    if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
+    else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
         
     st.subheader(f"कुल बिल: ₹{total}")
     
@@ -937,21 +790,12 @@ if st.session_state.cart:
     if current_config.get("paytm_upi"): available_upis["Paytm"] = {"id": current_config["paytm_upi"], "color": "#00baf2", "icon": "🔵"}
     if current_config.get("gpay_upi"): available_upis["Google Pay"] = {"id": current_config["gpay_upi"], "color": "#1a73e8", "icon": "🔴"}
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
-    
-    if not available_upis and current_config.get("upi_id"):
-        available_upis["UPI App"] = {"id": current_config["upi_id"], "color": "#673AB7", "icon": "📲"}
 
     if available_upis:
         st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
-        st.write("अपने पसंदीदा ऐप से 1-क्लिक में पेमेंट करें:")
-        
         for name, data in available_upis.items():
             qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
-            st.markdown(f'''
-            <a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                {data['icon']} {name} से ₹{total} पे करें
-            </a>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'''<a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
             msg += f"\n💳 *{name} UPI:* {data['id']}"
         
         with st.expander("स्कैन करके पेमेंट करें (QR Code)"):
@@ -959,69 +803,69 @@ if st.session_state.cart:
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
                     qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}"
-                    st.image(qr_url, width=150)
+                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
     st.markdown("### 🤝 100% ग्राहक संतुष्टि (Customer Trust)")
     st.success("✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी। आप बिल्कुल बेफिक्र होकर ऑर्डर करें!")
-    
     msg += "\n\n🤝 *भरोसा:* आपके माल की पैकिंग की लाइव वीडियो और फोटो डिस्पैच से पहले आपको WhatsApp पर भेजी जाएगी。\n"
 
     st.markdown("---")
     st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
-    st.warning("""
-    ⚠️ **ध्यान दें:**
-    1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** की स्थिति में ही होगी।
-    2. ट्रांसपोर्ट या कूरियर में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी या रिफंड नहीं होगा।
-    3. **इम्पोर्टेड (Imported) आइटम की कोई गारंटी नहीं होगी।**
-    """)
-    
+    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की कोई गारंटी नहीं।**")
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
     st.markdown("---")
     st.markdown("### 📍 डिलीवरी की जानकारी")
-    st.info("ऑर्डर भेजने से पहले आप चाहें तो अपना पता यहाँ भर सकते हैं, या सीधे WhatsApp पर भी बता सकते हैं।")
+    cust_name = st.text_input("आपका नाम (Optional)")
+    cust_mobile = st.text_input("मोबाईल नंबर (Optional)")
+    cust_address = st.text_area("पूरा पता (Optional)")
     
-    cust_name = st.text_input("आपका नाम (Optional / ऐच्छिक)")
-    cust_mobile = st.text_input("मोबाईल नंबर (Optional / ऐच्छिक)")
-    cust_address = st.text_area("पूरा पता (Optional / ऐच्छिक)")
-    
-    st.write("") 
-    
-    final_msg = msg
-    final_msg += "\n\n📍 *डिलीवरी की जानकारी:*\n"
-    final_msg += f"👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n"
-    final_msg += f"📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n"
-    final_msg += f"🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
+    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
 
-    encoded_msg = urllib.parse.quote(final_msg)
-    wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={encoded_msg}"
+    wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
+    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
     
-    st.markdown(f'''
-    <a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">
-        ✅ सीधा WhatsApp पर ऑर्डर भेजें
-    </a>
-    ''', unsafe_allow_html=True)
-    
-    st.write("")
     if st.button("🗑️ बास्केट खाली करें"):
         st.session_state.cart = {}
         st.rerun()
 
-# ---------------------------------------------------------
-# 📞 खिसकने (Draggable) और चमकने वाला WhatsApp नंबर
-# ---------------------------------------------------------
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
-wa_chat_link = f"https://wa.me/{admin_wa_number}"
-
-floating_wa_html = f"""
-<a id="oura-wa-btn" href="{wa_chat_link}" target="_blank" title="WhatsApp Us">
-    📞 {admin_wa_number}
-</a>
-"""
-st.markdown(floating_wa_html, unsafe_allow_html=True)
+st.markdown(f'''<a id="oura-wa-btn" href="https://wa.me/{admin_wa_number}" target="_blank" title="WhatsApp Us">📞 {admin_wa_number}</a>''', unsafe_allow_html=True)
 
 drag_js_code = """
-.html(drag_js_code
+<script>
+const parentDoc = window.parent.document;
+const btn = parentDoc.getElementById('oura-wa-btn');
+if (btn && !btn.dataset.draggable) {
+    btn.dataset.draggable = "true";
+    let isDragging = false, startY, startTop;
+    const onStart = (e) => {
+        if(e.type === 'mousedown' || e.type === 'touchstart') {
+            isDragging = true; startY = e.touches ? e.touches[0].clientY : e.clientY;
+            startTop = btn.offsetTop; btn.style.animation = 'none'; btn.style.transition = 'none';
+        }
+    };
+    const onMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault(); 
+        let currentY = e.touches ? e.touches[0].clientY : e.clientY;
+        let newTop = startTop + (currentY - startY);
+        if (newTop < 80) newTop = 80;
+        if (newTop > parentDoc.documentElement.clientHeight - 80) newTop = parentDoc.documentElement.clientHeight - 80;
+        btn.style.top = newTop + 'px'; btn.style.bottom = 'auto'; 
+    };
+    const onEnd = () => { isDragging = false; btn.style.animation = 'glowing 2s infinite'; };
+    btn.addEventListener('touchstart', onStart, {passive: false});
+    parentDoc.addEventListener('touchmove', onMove, {passive: false});
+    parentDoc.addEventListener('touchend', onEnd);
+    btn.addEventListener('mousedown', onStart);
+    parentDoc.addEventListener('mousemove', onMove);
+    parentDoc.addEventListener('mouseup', onEnd);
+    btn.addEventListener('click', (e) => { if (Math.abs(btn.offsetTop - startTop) > 10) e.preventDefault(); });
+}
+</script>
+"""
+st_components.html(drag_js_code, height=0, width=0)
+
