@@ -9,11 +9,13 @@ import string
 import re
 import io
 import os
+import requests
+import base64
 from PIL import Image
 
-# --- नया फायरबेस सिस्टम ---
+# --- नया फायरबेस सिस्टम (सिर्फ डेटाबेस के लिए) ---
 import firebase_admin
-from firebase_admin import credentials, firestore, storage
+from firebase_admin import credentials, firestore
 
 try:
     import pytesseract
@@ -24,7 +26,7 @@ GITHUB_REPO = "shalabhjainsj-glitch/Oura"
 GITHUB_BRANCH = "main"
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
 
-# --- Firebase को चालू करना (Initialization - Smart Filter) ---
+# --- Firebase को चालू करना ---
 if not firebase_admin._apps:
     try:
         firebase_secrets = st.secrets["FIREBASE_JSON"]
@@ -38,15 +40,41 @@ if not firebase_admin._apps:
             key_dict['private_key'] = key_dict['private_key'].replace('\\n', '\n')
             
         cred = credentials.Certificate(key_dict)
-        project_id = key_dict.get('project_id')
-        firebase_admin.initialize_app(cred, {'storageBucket': f"{project_id}.appspot.com"})
+        # अब हम स्टोरेज बकेट को हटा रहे हैं, क्योंकि हम ImgBB इस्तेमाल करेंगे
+        firebase_admin.initialize_app(cred)
     except Exception as e:
         st.error(f"🚨 Firebase सेटअप में गलती: {e}")
 
 db = firestore.client()
-bucket = storage.bucket()
 
-# --- सेटिंग्स लोड करना (Firebase से) ---
+# --- नया 100% फ्री ImgBB फोटो अपलोडर ---
+def upload_image_to_imgbb(file_bytes):
+    try:
+        imgbb_key = st.secrets.get("IMGBB_API_KEY")
+        if not imgbb_key:
+            st.error("🚨 ImgBB की चाबी तिजोरी (Secrets) में नहीं मिली!")
+            return None
+            
+        url = "https://api.imgbb.com/1/upload"
+        payload = {
+            "key": imgbb_key,
+            "image": base64.b64encode(file_bytes).decode('utf-8')
+        }
+        res = requests.post(url, data=payload)
+        if res.status_code == 200:
+            return res.json()["data"]["url"]
+        else:
+            st.error("फोटो अपलोड फेल हो गई।")
+            return None
+    except Exception as e:
+        st.error(f"एरर: {e}")
+        return None
+
+def dummy_delete_image(url):
+    # ImgBB में फोटो खुद डिलीट करने की ज़रूरत नहीं है
+    pass
+
+# --- सेटिंग्स लोड करना ---
 def load_config():
     try:
         doc = db.collection('settings').document('config').get()
@@ -221,22 +249,6 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     """
     st_components.html(pwa_js, height=0, width=0)
 
-# --- Firebase फोटो अपलोडर ---
-def upload_file_to_firebase(file_bytes, filename, content_type):
-    blob = bucket.blob(f"images/{filename}")
-    blob.upload_from_string(file_bytes, content_type=content_type)
-    return f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{urllib.parse.quote(blob.name, safe='')}?alt=media"
-
-def delete_file_from_firebase(url):
-    try:
-        path_start = url.find('/o/') + 3
-        path_end = url.find('?alt=media')
-        if path_start > 2 and path_end > -1:
-            blob_name = urllib.parse.unquote(url[path_start:path_end])
-            blob = bucket.blob(blob_name)
-            blob.delete()
-    except: pass
-
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name"]
 
 @st.cache_data(ttl=5)
@@ -396,7 +408,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     if len(uploaded_imgs) > 3:
                         st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
                     else:
-                        with st.spinner("AI फोटो चेक कर रहा है और Firebase में सेव कर रहा है..."):
+                        with st.spinner("AI फोटो चेक कर रहा है और सेव कर रहा है..."):
                             has_violation = False
                             violation_type = ""
                             violation_img_name = ""
@@ -421,10 +433,9 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             else:
                                 image_paths = []
                                 for idx, img in enumerate(uploaded_imgs):
-                                    safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                    final_filename = f"{new_id}_{idx}_{int(time.time())}_{safe_filename}"
-                                    img_url = upload_file_to_firebase(img.getvalue(), final_filename, img.type)
-                                    image_paths.append(img_url)
+                                    img_url = upload_image_to_imgbb(img.getvalue())
+                                    if img_url:
+                                        image_paths.append(img_url)
 
                                 final_path_str = "|".join(image_paths)
                                 is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
@@ -455,19 +466,20 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             st.subheader("🖼️ ऐप का बैनर (Top Banner)")
             new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
             if st.button("बैनर सेव करें") and new_banner:
-                with st.spinner("बैनर Firebase में सेव हो रहा है..."):
-                    if current_config.get("banner_url"): delete_file_from_firebase(current_config["banner_url"])
-                    b_url = upload_file_to_firebase(new_banner.getvalue(), f"banner_{int(time.time())}.jpg", new_banner.type)
-                    current_config["has_banner"] = True
-                    current_config["banner_url"] = b_url
-                    save_config(current_config)
-                    st.success("✅ बैनर लग गया!")
-                    time.sleep(1)
-                    st.rerun()
+                with st.spinner("बैनर सेव हो रहा है..."):
+                    dummy_delete_image(current_config.get("banner_url", ""))
+                    b_url = upload_image_to_imgbb(new_banner.getvalue())
+                    if b_url:
+                        current_config["has_banner"] = True
+                        current_config["banner_url"] = b_url
+                        save_config(current_config)
+                        st.success("✅ बैनर लग गया!")
+                        time.sleep(1)
+                        st.rerun()
                         
             if current_config.get("has_banner", False):
                 if st.button("❌ बैनर हटाएं"):
-                    if current_config.get("banner_url"): delete_file_from_firebase(current_config["banner_url"])
+                    dummy_delete_image(current_config.get("banner_url", ""))
                     current_config["has_banner"] = False
                     current_config["banner_url"] = ""
                     save_config(current_config)
@@ -478,19 +490,20 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             st.subheader("📱 ऐप का लोगो (App Icon)")
             new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
             if st.button("लोगो सेव करें") and new_logo:
-                with st.spinner("लोगो Firebase में सेव हो रहा है..."):
-                    if current_config.get("logo_url"): delete_file_from_firebase(current_config["logo_url"])
-                    l_url = upload_file_to_firebase(new_logo.getvalue(), f"logo_{int(time.time())}.jpg", new_logo.type)
-                    current_config["has_logo"] = True
-                    current_config["logo_url"] = l_url
-                    save_config(current_config)
-                    st.success("✅ आपका लोगो सेट हो गया!")
-                    time.sleep(1)
-                    st.rerun()
+                with st.spinner("लोगो सेव हो रहा है..."):
+                    dummy_delete_image(current_config.get("logo_url", ""))
+                    l_url = upload_image_to_imgbb(new_logo.getvalue())
+                    if l_url:
+                        current_config["has_logo"] = True
+                        current_config["logo_url"] = l_url
+                        save_config(current_config)
+                        st.success("✅ आपका लोगो सेट हो गया!")
+                        time.sleep(1)
+                        st.rerun()
                         
             if current_config.get("has_logo", False):
                 if st.button("❌ लोगो हटाएं"):
-                    if current_config.get("logo_url"): delete_file_from_firebase(current_config["logo_url"])
+                    dummy_delete_image(current_config.get("logo_url", ""))
                     current_config["has_logo"] = False
                     current_config["logo_url"] = ""
                     save_config(current_config)
@@ -555,10 +568,9 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 time.sleep(1)
                 st.rerun()
             
-            # 🚀 जादुई बटन: पुराना माल वापस लाने के लिए 🚀
             st.markdown("---")
             with st.expander("🛠️ पुराना माल वापस लाएं (Data Migration)"):
-                st.warning("⚠️ इस बटन को सिर्फ 1 बार दबाएं! यह आपके पुराने GitHub गोदाम से सारा माल निकालकर नए Firebase में डाल देगा। माल आने के बाद इस बटन की कोई ज़रूरत नहीं है।")
+                st.warning("⚠️ इस बटन को सिर्फ 1 बार दबाएं! यह आपके पुराने GitHub गोदाम से सारा माल निकालकर नए Firebase में डाल देगा।")
                 if st.button("🚀 पुराना माल Firebase में डालें"):
                     try:
                         old_data_file = "oura_products.csv"
@@ -601,7 +613,6 @@ def show_swipe_gallery(path_str):
 
     html_code = '<div class="swipe-gallery">'
     for src in paths:
-        # अगर फोटो पुरानी (GitHub वाली) है, तो उसे सही लिंक दें
         if not src.startswith("http"):
             src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
         html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
@@ -696,13 +707,12 @@ def show_product_card(row, idx, prefix):
                             final_path_str = str(row.get("Image_Path", ""))
                             
                             if e_uploaded_imgs:
-                                for old_p in all_paths: delete_file_from_firebase(old_p)
+                                dummy_delete_image(final_path_str)
                                 new_image_paths = []
-                                for idx_img, img in enumerate(e_uploaded_imgs):
-                                    safe_filename = img.name.replace(" ", "_").replace("(", "").replace(")", "")
-                                    final_filename = f"{p_id}_{idx_img}_{int(time.time())}_{safe_filename}"
-                                    img_url = upload_file_to_firebase(img.getvalue(), final_filename, img.type)
-                                    new_image_paths.append(img_url)
+                                for img in e_uploaded_imgs:
+                                    img_url = upload_image_to_imgbb(img.getvalue())
+                                    if img_url:
+                                        new_image_paths.append(img_url)
                                 final_path_str = "|".join(new_image_paths)
 
                             e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
@@ -720,7 +730,7 @@ def show_product_card(row, idx, prefix):
                 if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
                         p_id = str(row['ID'])
-                        for old_p in all_paths: delete_file_from_firebase(old_p) 
+                        dummy_delete_image(image_path_str) 
                         db.collection('products').document(p_id).delete()
                         load_products.clear()
                         st.success("डिलीट हो गया!")
