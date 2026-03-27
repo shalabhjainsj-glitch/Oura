@@ -123,6 +123,36 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
+            /* --- नया: फ्लोटिंग कार्ट बास्केट CSS (ऐप जैसा लुक) --- */
+            div[data-testid="stPopover"] {
+                position: fixed !important;
+                top: 15px !important;
+                right: 15px !important;
+                z-index: 999999 !important;
+            }
+
+            div[data-testid="stPopover"] > button {
+                background: linear-gradient(135deg, #008CBF, #005f82) !important;
+                color: white !important;
+                border-radius: 50px !important;
+                padding: 8px 18px !important;
+                border: 2px solid white !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+                transition: transform 0.2s !important;
+            }
+            
+            div[data-testid="stPopover"] > button p {
+                font-size: 16px !important;
+                margin: 0 !important;
+                font-weight: 900 !important;
+                color: white !important;
+            }
+            
+            div[data-testid="stPopover"] > button:active {
+                transform: scale(0.95) !important;
+            }
+            /* ---------------------------------------------------- */
+            
             .swipe-gallery {
                 display: flex;
                 overflow-x: auto;
@@ -306,10 +336,8 @@ if st.session_state.seller_logged_in:
         st.error("⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!")
         st.rerun()
 
-
-# --- टॉप बार: बैनर, लॉगिन बटन और डायनामिक बास्केट (Drop-down Cart) ---
-col_logo, col_login, col_cart = st.columns([5, 2, 3])
-
+# --- टॉप हेडर और लोगो ---
+col_logo, col_login = st.columns([7, 3])
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
         try:
@@ -320,7 +348,7 @@ with col_logo:
         st.title("🛍️ Oura Wholesale")
 
 with col_login:
-    st.write("") # Alignment adjust
+    st.write("") # Alignment
     if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
         if st.button("🔒 लॉगिन", use_container_width=True):
             st.session_state.show_login = not st.session_state.show_login
@@ -331,66 +359,67 @@ with col_login:
             st.session_state.show_login = False
             st.rerun()
 
-with col_cart:
-    st.write("") # Alignment adjust
-    cart_item_count = sum(item['qty'] for item in st.session_state.cart.values()) if st.session_state.cart else 0
-    
-    # 🛒 पॉपओवर बास्केट: यहीं से ग्राहक कार्ट देख, एडिट और चेकआउट कर सकते हैं
-    with st.popover(f"🛒 बास्केट ({cart_item_count})", use_container_width=True):
-        st.markdown("### 🛒 आपकी बास्केट")
-        if not st.session_state.cart:
-            st.info("बास्केट अभी खाली है।")
-        else:
-            total = 0
-            msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
-            count = 1
-            keys_to_remove = []
-            
-            for k, item in st.session_state.cart.items():
-                subtotal = item['price'] * item['qty']
-                total += subtotal
-                
-                cart_col1, cart_col2, cart_col3 = st.columns([2, 5, 2])
-                with cart_col1:
-                    if item.get('img_link'): st.image(item['img_link'])
-                    else: st.write("📷")
-                with cart_col2:
-                    st.write(f"**{item['name']}**")
-                    st.write(f"{item['qty']} x ₹{item['price']} = ₹{subtotal}")
-                with cart_col3:
-                    if st.button("❌", key=f"top_del_{k}", help="आइटम हटाएँ"):
-                        keys_to_remove.append(k)
-                        
-                st.markdown("---")
-                
-                msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
-                if item.get('img_link'):
-                    msg += f"👉 फोटो: {item['img_link']}\n"
-                count += 1
+# --- सर्च बार (बिल्कुल ऊपर JioMart की तरह) ---
+search_query = st.text_input("🔍 सर्च करें (Search in Oura)", placeholder="प्रोडक्ट का नाम लिखें...", label_visibility="collapsed")
 
-            for k in keys_to_remove:
-                del st.session_state.cart[k]
-                st.rerun()
-                
-            show_fd = current_config.get("free_delivery_tag", True)
-            if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
-            else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
-                
-            st.success(f"**कुल बिल: ₹{total}**")
-            
-            with st.expander("📍 डिलीवरी की जानकारी (चेकआउट)"):
-                cust_name = st.text_input("आपका नाम (Optional)", key="c_name")
-                cust_mobile = st.text_input("मोबाईल नंबर (Optional)", key="c_mob")
-                cust_address = st.text_area("पूरा पता (Optional)", key="c_add")
-                
-                final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
-                
-                wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
-                st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; font-size:16px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top:10px;">✅ WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
+# --- 🛒 फ्लोटिंग बास्केट (हमेशा टॉप राइट में रहेगी) ---
+cart_item_count = sum(item['qty'] for item in st.session_state.cart.values()) if st.session_state.cart else 0
 
-            if st.button("🗑️ पूरी बास्केट खाली करें", use_container_width=True):
-                st.session_state.cart = {}
-                st.rerun()
+with st.popover(f"🛒 {cart_item_count} आइटम"):
+    st.markdown("### 🛒 आपकी बास्केट")
+    if not st.session_state.cart:
+        st.info("बास्केट अभी खाली है।")
+    else:
+        total = 0
+        msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
+        count = 1
+        keys_to_remove = []
+        
+        for k, item in st.session_state.cart.items():
+            subtotal = item['price'] * item['qty']
+            total += subtotal
+            
+            cart_col1, cart_col2, cart_col3 = st.columns([2, 5, 2])
+            with cart_col1:
+                if item.get('img_link'): st.image(item['img_link'])
+                else: st.write("📷")
+            with cart_col2:
+                st.write(f"**{item['name']}**")
+                st.write(f"{item['qty']} x ₹{item['price']} = ₹{subtotal}")
+            with cart_col3:
+                if st.button("❌", key=f"top_del_{k}", help="आइटम हटाएँ"):
+                    keys_to_remove.append(k)
+                    
+            st.markdown("---")
+            
+            msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+            if item.get('img_link'):
+                msg += f"👉 फोटो: {item['img_link']}\n"
+            count += 1
+
+        for k in keys_to_remove:
+            del st.session_state.cart[k]
+            st.rerun()
+            
+        show_fd = current_config.get("free_delivery_tag", True)
+        if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
+        else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
+            
+        st.success(f"**कुल बिल: ₹{total}**")
+        
+        with st.expander("📍 डिलीवरी की जानकारी (चेकआउट)"):
+            cust_name = st.text_input("आपका नाम (Optional)", key="c_name")
+            cust_mobile = st.text_input("मोबाईल नंबर (Optional)", key="c_mob")
+            cust_address = st.text_area("पूरा पता (Optional)", key="c_add")
+            
+            final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
+            
+            wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
+            st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; font-size:16px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top:10px;">✅ WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
+
+        if st.button("🗑️ पूरी बास्केट खाली करें", use_container_width=True):
+            st.session_state.cart = {}
+            st.rerun()
 
 # --- सेलर्स को जोड़ने के लिए मल्टी-कलर चलती हुई लाइन (Marquee) ---
 multi_color_marquee = """
@@ -699,8 +728,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)", "")
-
 def show_swipe_gallery(path_str):
     if not path_str:
         st.info("📷 फोटो उपलब्ध नहीं है")
@@ -799,7 +826,7 @@ def show_product_card(row, idx, prefix):
                     if e_uploaded_imgs and len(e_uploaded_imgs) > 3:
                         st.error("⚠️ अधिकतम 3 फोटो ही चुनें।")
                     else:
-                        with st.spinner("अपडेट हो रहा है..."):
+                        with st.spinner("अपडेट हो رہا है..."):
                             p_id = str(row['ID'])
                             final_path_str = str(row.get("Image_Path", ""))
                             
