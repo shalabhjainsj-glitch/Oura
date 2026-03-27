@@ -148,7 +148,47 @@ hide_streamlit_style = """
                 border: 1px solid #eee;
             }
             
-            /* हमने HTML केटेगरी ग्रिड CSS हटा दी है क्योंकि अब हम Streamlit बटन्स उपयोग कर रहे हैं */
+            /* HTML केटेगरी ग्रिड CSS (4 बॉक्स एक लाइन में) */
+            .category-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+                padding: 10px 0;
+            }
+            .category-box {
+                background: linear-gradient(135deg, #ffffff, #f1f2f6);
+                border: 1px solid #e1e8ed;
+                border-radius: 12px;
+                padding: 15px 5px;
+                text-align: center;
+                text-decoration: none !important;
+                color: #2f3542 !important;
+                font-weight: bold;
+                font-size: 13px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 70px;
+                word-wrap: break-word;
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .category-box:active {
+                transform: scale(0.95);
+                box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+            }
+            @media (max-width: 600px) {
+                .category-grid {
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 5px;
+                }
+                .category-box {
+                    font-size: 11px;
+                    padding: 10px 2px;
+                    min-height: 60px;
+                    border-radius: 8px;
+                }
+            }
 
             @keyframes glowing {
               0% { box-shadow: 0 0 5px #25D366; }
@@ -396,7 +436,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             image_paths = []
                             
                             for img in uploaded_imgs:
-                                # फोटो को कंप्रेस करना
                                 compressed_bytes, pil_img = compress_image(img.getvalue())
                                 
                                 try:
@@ -756,16 +795,16 @@ else:
         st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
-        if len(valid_categories) == 0: st.write("अभी कोई कैटेगरी नहीं है।")
+        if len(valid_categories) == 0: 
+            st.write("अभी कोई कैटेगरी नहीं है।")
         else:
-            # नया Streamlit Button वाला कैटेगरी ग्रिड
-            cols = st.columns(4)
-            for i, cat in enumerate(valid_categories):
-                with cols[i % 4]:
-                    if st.button(cat, key=f"cat_btn_{i}", use_container_width=True):
-                        st.query_params["cat"] = cat
-                        st.session_state.selected_category = cat
-                        st.rerun()
+            # HTML/CSS वाला 4-कॉलम कैटेगरी ग्रिड
+            grid_html = '<div class="category-grid">'
+            for cat in valid_categories:
+                safe_cat = urllib.parse.quote(cat)
+                grid_html += f'<a href="?cat={safe_cat}" target="_self" class="category-box">{cat}</a>'
+            grid_html += '</div>'
+            st.markdown(grid_html, unsafe_allow_html=True)
             
     else:
         col_back, col_title = st.columns([2, 8])
