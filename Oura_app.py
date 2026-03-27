@@ -306,7 +306,6 @@ if st.session_state.seller_logged_in:
         st.error("⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!")
         st.rerun()
 
-# --- मुख्य बैनर / टाइटल ---
 if current_config.get("has_banner", False) and current_config.get("banner_url"):
     try:
         st.image(current_config["banner_url"], use_container_width=True)
@@ -314,17 +313,6 @@ if current_config.get("has_banner", False) and current_config.get("banner_url"):
         st.title("🛍️ Oura Wholesale")
 else:
     st.title("🛍️ Oura Wholesale")
-
-# --- सेलर्स को जोड़ने के लिए मल्टी-कलर चलती हुई लाइन (Marquee) ---
-multi_color_marquee = """
-<div style="background: linear-gradient(90deg, #FF512F, #DD2476, #8A2387, #E94057, #F27121); padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
-    <marquee behavior="scroll" direction="left" scrollamount="7" style="color: white; font-size: 16px; font-weight: bold; font-family: sans-serif; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">
-        🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀
-    </marquee>
-</div>
-"""
-st.markdown(multi_color_marquee, unsafe_allow_html=True)
-# -------------------------------------------------------------------
 
 col1, col2 = st.columns([8, 2])
 with col2:
@@ -761,7 +749,7 @@ def show_product_card(row, idx, prefix):
                             time.sleep(1)
                             st.rerun()
 
-                if st.button("❌ पक्का डिली পণ্ডিত करें", key=f"del_{prefix_idx}"):
+                if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
                         p_id = str(row['ID'])
                         dummy_delete_image(image_path_str) 
@@ -804,7 +792,7 @@ else:
         st.subheader("🛍️ कैटेगरीज")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
-        if len(valid_categories) == 0: st.write("अभी कोई कैटेगरी नहीं ক্ষমতায়।")
+        if len(valid_categories) == 0: st.write("अभी कोई कैटेगरी नहीं है।")
         else:
             colors = [
                 ("#e1f5fe", "#0288d1"), ("#fce4ec", "#c2185b"), ("#e8f5e9", "#388e3c"), ("#fff3e0", "#f57c00"), 
@@ -973,4 +961,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-st_components.html(drag_js_code
+st_components.html(drag_js_code, height=0, width=0)
