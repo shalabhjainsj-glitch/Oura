@@ -853,8 +853,24 @@ if st.session_state.cart:
     for k, item in st.session_state.cart.items():
         subtotal = item['price'] * item['qty']
         total += subtotal
-        st.write(f"✔️ **{item['name']}** ({item['qty']} x ₹{item['price']}) = **₹{subtotal}**")
+        
+        # 1. ऐप की बास्केट में फोटो और डिटेल दिखाना
+        col_img, col_details = st.columns([2, 8])
+        with col_img:
+            if item.get('img_link'):
+                st.image(item['img_link'], use_container_width=True)
+            else:
+                st.write("📷")
+        with col_details:
+            st.write(f"✔️ **{item['name']}**")
+            st.write(f"मात्रा: {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
+            
+        st.markdown("---")
+        
+        # 2. WhatsApp मैसेज में फोटो का लिंक जोड़ना
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+        if item.get('img_link'):
+            msg += f"👉 फोटो देखें: {item['img_link']}\n"
         count += 1
     
     show_fd = current_config.get("free_delivery_tag", True)
