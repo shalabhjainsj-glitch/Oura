@@ -314,6 +314,17 @@ if current_config.get("has_banner", False) and current_config.get("banner_url"):
 else:
     st.title("🛍️ Oura Wholesale")
 
+# --- सेलर्स को जोड़ने के लिए मल्टी-कलर चलती हुई लाइन (Marquee) ---
+multi_color_marquee = """
+<div style="background: linear-gradient(90deg, #FF512F, #DD2476, #8A2387, #E94057, #F27121); padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+    <marquee behavior="scroll" direction="left" scrollamount="7" style="color: white; font-size: 16px; font-weight: bold; font-family: sans-serif; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">
+        🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀
+    </marquee>
+</div>
+"""
+st.markdown(multi_color_marquee, unsafe_allow_html=True)
+# -------------------------------------------------------------------
+
 col1, col2 = st.columns([8, 2])
 with col2:
     if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
