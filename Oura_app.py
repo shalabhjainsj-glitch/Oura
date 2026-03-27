@@ -306,13 +306,91 @@ if st.session_state.seller_logged_in:
         st.error("⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!")
         st.rerun()
 
-if current_config.get("has_banner", False) and current_config.get("banner_url"):
-    try:
-        st.image(current_config["banner_url"], use_container_width=True)
-    except:
+
+# --- टॉप बार: बैनर, लॉगिन बटन और डायनामिक बास्केट (Drop-down Cart) ---
+col_logo, col_login, col_cart = st.columns([5, 2, 3])
+
+with col_logo:
+    if current_config.get("has_banner", False) and current_config.get("banner_url"):
+        try:
+            st.image(current_config["banner_url"], use_container_width=True)
+        except:
+            st.title("🛍️ Oura Wholesale")
+    else:
         st.title("🛍️ Oura Wholesale")
-else:
-    st.title("🛍️ Oura Wholesale")
+
+with col_login:
+    st.write("") # Alignment adjust
+    if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
+        if st.button("🔒 लॉगिन", use_container_width=True):
+            st.session_state.show_login = not st.session_state.show_login
+    else:
+        if st.button("🚪 लॉगआउट", use_container_width=True):
+            st.session_state.admin_logged_in = False
+            st.session_state.seller_logged_in = None
+            st.session_state.show_login = False
+            st.rerun()
+
+with col_cart:
+    st.write("") # Alignment adjust
+    cart_item_count = sum(item['qty'] for item in st.session_state.cart.values()) if st.session_state.cart else 0
+    
+    # 🛒 पॉपओवर बास्केट: यहीं से ग्राहक कार्ट देख, एडिट और चेकआउट कर सकते हैं
+    with st.popover(f"🛒 बास्केट ({cart_item_count})", use_container_width=True):
+        st.markdown("### 🛒 आपकी बास्केट")
+        if not st.session_state.cart:
+            st.info("बास्केट अभी खाली है।")
+        else:
+            total = 0
+            msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
+            count = 1
+            keys_to_remove = []
+            
+            for k, item in st.session_state.cart.items():
+                subtotal = item['price'] * item['qty']
+                total += subtotal
+                
+                cart_col1, cart_col2, cart_col3 = st.columns([2, 5, 2])
+                with cart_col1:
+                    if item.get('img_link'): st.image(item['img_link'])
+                    else: st.write("📷")
+                with cart_col2:
+                    st.write(f"**{item['name']}**")
+                    st.write(f"{item['qty']} x ₹{item['price']} = ₹{subtotal}")
+                with cart_col3:
+                    if st.button("❌", key=f"top_del_{k}", help="आइटम हटाएँ"):
+                        keys_to_remove.append(k)
+                        
+                st.markdown("---")
+                
+                msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+                if item.get('img_link'):
+                    msg += f"👉 फोटो: {item['img_link']}\n"
+                count += 1
+
+            for k in keys_to_remove:
+                del st.session_state.cart[k]
+                st.rerun()
+                
+            show_fd = current_config.get("free_delivery_tag", True)
+            if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
+            else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
+                
+            st.success(f"**कुल बिल: ₹{total}**")
+            
+            with st.expander("📍 डिलीवरी की जानकारी (चेकआउट)"):
+                cust_name = st.text_input("आपका नाम (Optional)", key="c_name")
+                cust_mobile = st.text_input("मोबाईल नंबर (Optional)", key="c_mob")
+                cust_address = st.text_area("पूरा पता (Optional)", key="c_add")
+                
+                final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
+                
+                wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
+                st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; font-size:16px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top:10px;">✅ WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
+
+            if st.button("🗑️ पूरी बास्केट खाली करें", use_container_width=True):
+                st.session_state.cart = {}
+                st.rerun()
 
 # --- सेलर्स को जोड़ने के लिए मल्टी-कलर चलती हुई लाइन (Marquee) ---
 multi_color_marquee = """
@@ -324,18 +402,6 @@ multi_color_marquee = """
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 # -------------------------------------------------------------------
-
-col1, col2 = st.columns([8, 2])
-with col2:
-    if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
-        if st.button("🔒 एडमिन / सेलर लॉगिन"):
-            st.session_state.show_login = not st.session_state.show_login
-    else:
-        if st.button("🚪 लॉगआउट"):
-            st.session_state.admin_logged_in = False
-            st.session_state.seller_logged_in = None
-            st.session_state.show_login = False
-            st.rerun()
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -443,7 +509,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             image_paths = []
                             
                             for img in uploaded_imgs:
-                                # फोटो को कंप्रेस करना
                                 compressed_bytes, pil_img = compress_image(img.getvalue())
                                 
                                 try:
@@ -854,87 +919,6 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
 st.markdown("<br><br><br>", unsafe_allow_html=True) 
-st.markdown("---")
-st.header("🛒 आपकी बास्केट (कच्चा बिल)")
-
-if st.session_state.cart:
-    total = 0
-    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
-    count = 1
-    for k, item in st.session_state.cart.items():
-        subtotal = item['price'] * item['qty']
-        total += subtotal
-        
-        # 1. ऐप की बास्केट में फोटो और डिटेल दिखाना
-        col_img, col_details = st.columns([2, 8])
-        with col_img:
-            if item.get('img_link'):
-                st.image(item['img_link'], use_container_width=True)
-            else:
-                st.write("📷")
-        with col_details:
-            st.write(f"✔️ **{item['name']}**")
-            st.write(f"मात्रा: {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
-            
-        st.markdown("---")
-        
-        # 2. WhatsApp मैसेज में फोटो का लिंक जोड़ना
-        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
-        if item.get('img_link'):
-            msg += f"👉 फोटो देखें: {item['img_link']}\n"
-        count += 1
-    
-    show_fd = current_config.get("free_delivery_tag", True)
-    if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
-    else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
-        
-    st.subheader(f"कुल बिल: ₹{total}")
-    
-    available_upis = {}
-    if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
-    if current_config.get("paytm_upi"): available_upis["Paytm"] = {"id": current_config["paytm_upi"], "color": "#00baf2", "icon": "🔵"}
-    if current_config.get("gpay_upi"): available_upis["Google Pay"] = {"id": current_config["gpay_upi"], "color": "#1a73e8", "icon": "🔴"}
-    if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
-
-    if available_upis:
-        st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
-        for name, data in available_upis.items():
-            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
-            st.markdown(f'''<a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
-            msg += f"\n💳 *{name} UPI:* {data['id']}"
-        
-        with st.expander("स्कैन करके पेमेंट करें (QR Code)"):
-            qr_tabs = st.tabs(list(available_upis.keys()))
-            for idx, (name, data) in enumerate(available_upis.items()):
-                with qr_tabs[idx]:
-                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
-                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
-                    st.success(f"**{name} UPI ID:** `{data['id']}`")
-
-    st.markdown("---")
-    st.markdown("### 🤝 100% ग्राहक संतुष्टि (Customer Trust)")
-    st.success("✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी। आप बिल्कुल बेफिक्र होकर ऑर्डर करें!")
-    msg += "\n\n🤝 *भरोसा:* आपके माल की पैकिंग की लाइव वीडियो और फोटो डिस्पैच से पहले आपको WhatsApp पर भेजी जाएगी。\n"
-
-    st.markdown("---")
-    st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
-    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की कोई गारंटी नहीं।**")
-    msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
-
-    st.markdown("---")
-    st.markdown("### 📍 डिलीवरी की जानकारी")
-    cust_name = st.text_input("आपका नाम (Optional)")
-    cust_mobile = st.text_input("मोबाईल नंबर (Optional)")
-    cust_address = st.text_area("पूरा पता (Optional)")
-    
-    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
-
-    wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
-    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
-    
-    if st.button("🗑️ बास्केट खाली करें"):
-        st.session_state.cart = {}
-        st.rerun()
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 st.markdown(f'''<a id="oura-wa-btn" href="https://wa.me/{admin_wa_number}" target="_blank" title="WhatsApp Us">📞 {admin_wa_number}</a>''', unsafe_allow_html=True)
