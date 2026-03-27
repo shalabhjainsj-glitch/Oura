@@ -148,54 +148,7 @@ hide_streamlit_style = """
                 border: 1px solid #eee;
             }
             
-            .category-grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 10px;
-                padding: 10px 0;
-            }
-            .category-box {
-                border-radius: 12px;
-                padding: 10px 5px;
-                text-align: center;
-                font-size: 13px;
-                font-weight: 700;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 75px; 
-                text-decoration: none !important;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.06);
-                line-height: 1.3;
-                overflow: hidden;
-                transition: transform 0.1s;
-                border: 1px solid rgba(0,0,0,0.05);
-            }
-            .category-box:active { transform: scale(0.95); }
-            
-            .floating-back-btn {
-                position: fixed;
-                bottom: 25px;
-                left: 50%;
-                transform: translateX(-50%);
-                background-color: #222222;
-                color: #ffffff !important;
-                padding: 12px 24px;
-                border-radius: 40px;
-                font-size: 15px;
-                font-weight: 700;
-                box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-                z-index: 999999;
-                text-decoration: none !important;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                transition: background-color 0.2s;
-            }
-            .floating-back-btn:active {
-                background-color: #000000;
-                transform: translateX(-50%) scale(0.95);
-            }
+            /* हमने HTML केटेगरी ग्रिड CSS हटा दी है क्योंकि अब हम Streamlit बटन्स उपयोग कर रहे हैं */
 
             @keyframes glowing {
               0% { box-shadow: 0 0 5px #25D366; }
@@ -805,17 +758,14 @@ else:
         
         if len(valid_categories) == 0: st.write("अभी कोई कैटेगरी नहीं है।")
         else:
-            colors = [
-                ("#e1f5fe", "#0288d1"), ("#fce4ec", "#c2185b"), ("#e8f5e9", "#388e3c"), ("#fff3e0", "#f57c00"), 
-                ("#f3e5f5", "#7b1fa2"), ("#e0f7fa", "#0097a7"), ("#fff8e1", "#ffa000"), ("#ffebee", "#d32f2f")
-            ]
-            html_grid = '<div class="category-grid">'
+            # नया Streamlit Button वाला कैटेगरी ग्रिड
+            cols = st.columns(4)
             for i, cat in enumerate(valid_categories):
-                safe_cat = urllib.parse.quote(cat)
-                bg_color, text_color = colors[i % len(colors)]
-                html_grid += f'<a href="?cat={safe_cat}" target="_self" class="category-box" style="background-color: {bg_color}; color: {text_color};">{cat}</a>'
-            html_grid += '</div>'
-            st.markdown(html_grid, unsafe_allow_html=True)
+                with cols[i % 4]:
+                    if st.button(cat, key=f"cat_btn_{i}", use_container_width=True):
+                        st.query_params["cat"] = cat
+                        st.session_state.selected_category = cat
+                        st.rerun()
             
     else:
         col_back, col_title = st.columns([2, 8])
@@ -825,9 +775,6 @@ else:
                 st.session_state.selected_category = None
                 st.rerun()
         with col_title: st.subheader(f"📂 {st.session_state.selected_category}")
-        
-        floating_btn_html = '''<a href="?" target="_self" class="floating-back-btn">🔙 सभी कैटेगरीज</a>'''
-        st.markdown(floating_btn_html, unsafe_allow_html=True)
         
         if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with st.expander(f"✏️ इस कैटेगरी का नाम/आइकॉन बदलें"):
@@ -861,7 +808,9 @@ if st.session_state.cart:
     total = 0
     msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
     count = 1
-    for k, item in st.session_state.cart.items():
+    
+    # कार्ट में बदलाव: लिस्ट का इस्तेमाल ताकि एरर ना आए, और डिलीट बटन जोड़ना
+    for k, item in list(st.session_state.cart.items()):
         subtotal = item['price'] * item['qty']
         total += subtotal
         
@@ -874,7 +823,14 @@ if st.session_state.cart:
                 st.write("📷")
         with col_details:
             st.write(f"✔️ **{item['name']}**")
-            st.write(f"मात्रा: {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
+            
+            c1, c2 = st.columns([7, 3])
+            with c1:
+                st.write(f"मात्रा: {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
+            with c2:
+                if st.button("❌ हटाएं", key=f"del_item_{k}"):
+                    del st.session_state.cart[k]
+                    st.rerun()
             
         st.markdown("---")
         
@@ -897,7 +853,7 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown("### 💳 सुरक्षित ऑनलाइन पेमेंट")
+        st.markdown("### 💳 सुरक्षित online पेमेंट")
         for name, data in available_upis.items():
             qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
             st.markdown(f'''<a href="{qr_data}" class="multi-upi-btn" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
