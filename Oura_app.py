@@ -311,9 +311,8 @@ def load_products():
 
 products_df = load_products()
 
-if "cat" in st.query_params:
-    st.session_state.selected_category = st.query_params["cat"]
-else:
+# --- URL QUERY PARAMS हटा दिए गए हैं ताकि पेज रिफ्रेश न हो ---
+if 'selected_category' not in st.session_state:
     st.session_state.selected_category = None
 
 if 'admin_logged_in' not in st.session_state:
@@ -482,12 +481,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 }
                                 db.collection('products').document(str(new_id)).set(data)
                                 load_products.clear()
-                                safe_cat_link = urllib.parse.quote(final_cat)
-                                app_link = f"https://ouraindia.streamlit.app/?cat={safe_cat_link}"
-                                msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\nआपकी दुकान की सेल बढ़ाने के लिए नया डिज़ाइन!\n\n🎁 *उत्पाद:* {new_name}\n"
-                                if seller_val: msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
-                                msg += f"\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\n{app_link}"
-                                st.session_state.share_msg = msg
+                                # URL वाला सिस्टम यहाँ से भी हटा दिया गया है
+                                st.session_state.share_msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\n🎁 *उत्पाद:* {new_name}\n"
+                                if seller_val: st.session_state.share_msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
+                                st.session_state.share_msg += "\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\nhttps://ouraindia.streamlit.app/"
                                 st.session_state.share_img_path = image_paths[0] if image_paths else None
                                 st.rerun()
 
@@ -609,6 +606,9 @@ def show_swipe_gallery(path_str):
 
 def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
+    # --- महत्वपूर्ण बदलाव: बास्केट में सेव करने के लिए प्रोडक्ट की ID का इस्तेमाल ---
+    p_id = str(row.get('ID', prefix_idx)) 
+
     with st.container(border=True):
         image_path_str = str(row.get("Image_Path", ""))
         all_paths = show_swipe_gallery(image_path_str)
@@ -639,9 +639,18 @@ def show_product_card(row, idx, prefix):
             else: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
             
         qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
+        
+        # --- बास्केट में जोड़ने का एडवांस और पक्का तरीका ---
         if st.button("🛒 कार्ट में डालें", key=f"b_{prefix_idx}"):
             final_price = w_price if qty >= w_qty else retail_price
-            st.session_state.cart[prefix_idx] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
+            
+            if p_id in st.session_state.cart:
+                st.session_state.cart[p_id]["qty"] += qty
+                # अगर जोड़ने पर मात्रा होलसेल रेट पर पहुँच गई है, तो प्राइस अपडेट कर दें
+                if st.session_state.cart[p_id]["qty"] >= w_qty:
+                    st.session_state.cart[p_id]["price"] = w_price
+            else:
+                st.session_state.cart[p_id] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
             st.success("कार्ट में जुड़ गया! 🛒")
             
         show_edit_delete = False
@@ -672,7 +681,7 @@ def show_product_card(row, idx, prefix):
                     if e_uploaded_imgs and len(e_uploaded_imgs) > 3: st.error("⚠️ अधिकतम 3 फोटो ही चुनें।")
                     else:
                         with st.spinner("अपडेट हो रहा है..."):
-                            p_id = str(row['ID'])
+                            target_id = str(row['ID'])
                             final_path_str = str(row.get("Image_Path", ""))
                             if e_uploaded_imgs:
                                 dummy_delete_image(final_path_str)
@@ -684,20 +693,20 @@ def show_product_card(row, idx, prefix):
                                 final_path_str = "|".join(new_image_paths)
                             e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
                             data = {
-                                "ID": p_id, "Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price,
+                                "ID": target_id, "Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price,
                                 "Wholesale_Qty": e_w_qty, "Category": e_cat, "Image_Path": final_path_str,
                                 "Free_Delivery": e_is_free, "Seller_Name": str(e_seller_name).strip()
                             }
-                            db.collection('products').document(p_id).set(data)
+                            db.collection('products').document(target_id).set(data)
                             load_products.clear()
                             st.success("✅ अपडेट हो गया!")
                             time.sleep(1)
                             st.rerun()
                 if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
                     with st.spinner("डिलीट हो रहा है..."):
-                        p_id = str(row['ID'])
+                        target_id = str(row['ID'])
                         dummy_delete_image(image_path_str) 
-                        db.collection('products').document(p_id).delete()
+                        db.collection('products').document(target_id).delete()
                         load_products.clear()
                         st.success("डिलीट हो गया!")
                         time.sleep(1)
@@ -744,17 +753,16 @@ else:
                     if i + j < len(valid_categories):
                         cat = valid_categories[i + j]
                         with cols[j]:
+                            # --- URL सिस्टम हटाकर सिर्फ Session State का इस्तेमाल ---
                             if st.button(cat, key=f"cat_btn_{i+j}", use_container_width=True):
                                 st.session_state.selected_category = cat
-                                st.query_params["cat"] = cat
                                 st.rerun()
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        # --- असली (Native) स्ट्रीमलिट बटन जो कार्ट को डिलीट नहीं होने देगा ---
+        # --- असली (Native) स्ट्रीमलिट बटन जो पेज रिफ्रेश नहीं होने देगा ---
         if st.button("🏠 सारी कैटेगरीज", key="float_back_btn"):
-            st.query_params.clear()
             st.session_state.selected_category = None
             st.rerun()
             
@@ -763,7 +771,6 @@ else:
         <script>
         const parentDoc = window.parent.document;
         
-        // एनीमेशन स्टाइल (CSS) डालना
         if (!parentDoc.getElementById('glowing-home-style')) {
             const style = parentDoc.createElement('style');
             style.id = 'glowing-home-style';
@@ -777,7 +784,6 @@ else:
             parentDoc.head.appendChild(style);
         }
 
-        // 'सारी कैटेगरीज' वाले बटन को ढूंढकर डिज़ाइन करना
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && btn.innerText.includes('सारी कैटेगरीज')) {
@@ -813,7 +819,6 @@ else:
                                 db.collection('products').document(doc.id).update({'Category': new_cat_name})
                             load_products.clear()
                             st.session_state.selected_category = new_cat_name
-                            st.query_params["cat"] = new_cat_name
                             st.success("✅ नाम बदल गया!")
                             time.sleep(1)
                             st.rerun()
