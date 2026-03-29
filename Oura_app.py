@@ -113,7 +113,7 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# --- नया लाइट और ब्राइट मल्टी-कलर थीम ---
+# --- लाइट और ब्राइट मल्टी-कलर थीम ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -752,37 +752,53 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        # --- नया फ्लोटिंग होम / कैटेगरीज बटन ---
-        floating_home_html = """
-        <style>
-        @keyframes glowing-home {
-            0% { box-shadow: 0 0 5px #00c6ff; }
-            50% { box-shadow: 0 0 20px #bc4e9c, 0 0 30px #f80759; transform: scale(1.05); }
-            100% { box-shadow: 0 0 5px #00c6ff; }
+        # --- असली (Native) स्ट्रीमलिट बटन जो कार्ट को डिलीट नहीं होने देगा ---
+        if st.button("🏠 सारी कैटेगरीज", key="float_back_btn"):
+            st.query_params.clear()
+            st.session_state.selected_category = None
+            st.rerun()
+            
+        # --- इस बटन को जावास्क्रिप्ट से हवा में तैराना (Floating Effect) ---
+        float_js = """
+        <script>
+        const parentDoc = window.parent.document;
+        
+        // एनीमेशन स्टाइल (CSS) डालना
+        if (!parentDoc.getElementById('glowing-home-style')) {
+            const style = parentDoc.createElement('style');
+            style.id = 'glowing-home-style';
+            style.innerHTML = `
+            @keyframes glowing-home {
+                0% { box-shadow: 0 0 5px #00c6ff; }
+                50% { box-shadow: 0 0 20px #bc4e9c, 0 0 30px #f80759; transform: scale(1.05); }
+                100% { box-shadow: 0 0 5px #00c6ff; }
+            }
+            `;
+            parentDoc.head.appendChild(style);
         }
-        .floating-home-btn {
-            position: fixed;
-            bottom: 120px;
-            left: 15px;
-            background: linear-gradient(45deg, #f80759, #bc4e9c, #0072ff);
-            color: white !important;
-            padding: 12px 18px;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: bold;
-            text-decoration: none !important;
-            z-index: 9999999;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            animation: glowing-home 2s infinite;
-            border: 2px solid white;
-            cursor: pointer;
-        }
-        </style>
-        <a onclick="window.parent.location.search='';" class="floating-home-btn">🏠 सारी कैटेगरीज</a>
+
+        // 'सारी कैटेगरीज' वाले बटन को ढूंढकर डिज़ाइन करना
+        const buttons = parentDoc.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.innerText && btn.innerText.includes('सारी कैटेगरीज')) {
+                btn.style.position = 'fixed';
+                btn.style.bottom = '120px';
+                btn.style.left = '15px';
+                btn.style.zIndex = '999999';
+                btn.style.background = 'linear-gradient(45deg, #f80759, #bc4e9c, #0072ff)';
+                btn.style.color = 'white';
+                btn.style.padding = '12px 18px';
+                btn.style.borderRadius = '50px';
+                btn.style.border = '2px solid white';
+                btn.style.fontWeight = 'bold';
+                btn.style.animation = 'glowing-home 2s infinite';
+                btn.style.minHeight = 'auto'; 
+                btn.style.width = 'auto';
+            }
+        });
+        </script>
         """
-        st.markdown(floating_home_html, unsafe_allow_html=True)
+        st_components.html(float_js, height=0, width=0)
         # -------------------------------------
         
         if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
