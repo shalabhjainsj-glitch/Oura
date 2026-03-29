@@ -113,7 +113,7 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# --- नया कलरफुल थीम और स्मार्ट CSS ---
+# --- नया लाइट और ब्राइट मल्टी-कलर थीम ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -121,26 +121,33 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* कलरफुल ऐप बैकग्राउंड */
+            /* लाइट और ब्राइट मल्टी-कलर ऐप बैकग्राउंड */
             .stApp {
-                background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+                background: linear-gradient(135deg, #ffffff 0%, #e0f7fa 50%, #fce4ec 100%);
             }
 
-            /* सभी बटन्स को कलरफुल और 3D लुक देना */
+            /* सभी बटन्स को ब्राइट मल्टी-कलर और 3D लुक देना */
             div.stButton > button {
-                background: linear-gradient(135deg, #FF416C, #FF4B2B);
+                background: linear-gradient(45deg, #00c6ff, #0072ff, #bc4e9c, #f80759);
+                background-size: 300% 300%;
+                animation: multi-gradient 4s ease infinite;
                 color: white !important;
                 border: none !important;
                 border-radius: 12px !important;
                 font-weight: 800 !important;
-                box-shadow: 0 4px 10px rgba(255, 65, 108, 0.3) !important;
+                box-shadow: 0 4px 10px rgba(0, 198, 255, 0.4) !important;
                 transition: transform 0.2s, box-shadow 0.2s;
                 padding: 10px !important;
                 min-height: 55px;
             }
+            @keyframes multi-gradient {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
             div.stButton > button:hover {
                 transform: scale(1.05);
-                box-shadow: 0 6px 15px rgba(255, 65, 108, 0.5) !important;
+                box-shadow: 0 6px 15px rgba(188, 78, 156, 0.6) !important;
             }
             div.stButton > button:active {
                 transform: scale(0.95);
@@ -150,22 +157,22 @@ hide_streamlit_style = """
             div[data-testid="stContainer"] {
                 background-color: #ffffff;
                 border-radius: 15px !important;
-                border: 2px solid #ffe3e3 !important;
+                border: 2px solid #b3e5fc !important;
                 box-shadow: 0 8px 20px rgba(0,0,0,0.06);
                 padding: 15px;
                 transition: all 0.3s;
             }
             div[data-testid="stContainer"]:hover {
-                box-shadow: 0 10px 25px rgba(255, 65, 108, 0.2);
-                border-color: #FF416C !important;
+                box-shadow: 0 10px 25px rgba(188, 78, 156, 0.2);
+                border-color: #bc4e9c !important;
                 transform: translateY(-2px);
             }
 
             /* एक्सपैंडर (Drop-downs) को कलरफुल बनाना */
             div[data-testid="stExpander"] {
-                background: linear-gradient(to right, #ffffff, #fff3f3);
+                background: linear-gradient(to right, #ffffff, #f0f8ff);
                 border-radius: 12px;
-                border-left: 6px solid #FF4B2B !important;
+                border-left: 6px solid #00c6ff !important;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             }
 
@@ -176,7 +183,6 @@ hide_streamlit_style = """
                     flex-wrap: wrap !important;
                 }
                 
-                /* 1. कैटेगरी: अगर एक लाइन में 4 कॉलम हैं, तो उन्हें सिकुड़ने दें */
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) > div[data-testid="column"] {
                     min-width: 23% !important;
                     max-width: 25% !important;
@@ -192,7 +198,6 @@ hide_streamlit_style = """
                     white-space: normal !important;
                 }
                 
-                /* 2. कार्ट: इमेज और टेक्स्ट वाले 2 कॉलम */
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(2)):not(:has(> div:nth-child(3))) > div[data-testid="column"]:first-child {
                     min-width: 25% !important;
                     flex: 1 1 25% !important;
@@ -202,7 +207,6 @@ hide_streamlit_style = """
                     flex: 1 1 70% !important;
                 }
                 
-                /* 3. प्रोडक्ट्स: 3 कॉलम वाले आइटम को एक के नीचे एक दिखाएं */
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div[data-testid="column"] {
                     min-width: 100% !important;
                     flex: 1 1 100% !important;
@@ -342,7 +346,7 @@ else:
     st.title("🛍️ Oura Wholesale")
 
 multi_color_marquee = """
-<div style="background: linear-gradient(90deg, #FF512F, #DD2476, #8A2387, #E94057, #F27121); padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+<div style="background: linear-gradient(90deg, #00c6ff, #0072ff, #bc4e9c, #f80759); padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
     <marquee behavior="scroll" direction="left" scrollamount="7" style="color: white; font-size: 16px; font-weight: bold; font-family: sans-serif; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">
         🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀
     </marquee>
@@ -734,7 +738,6 @@ else:
         if len(valid_categories) == 0: 
             st.write("अभी कोई कैटेगरी नहीं है।")
         else:
-            # नया सुरक्षित कैटेगरी ग्रिड - इससे पेज रिफ्रेश नहीं होगा और बास्केट सुरक्षित रहेगी
             for i in range(0, len(valid_categories), 4):
                 cols = st.columns(4)
                 for j in range(4):
@@ -747,13 +750,40 @@ else:
                                 st.rerun()
             
     else:
-        col_back, col_title = st.columns([2, 8])
-        with col_back:
-            if st.button("🔙 बाहर आएं", use_container_width=True):
-                st.query_params.clear()
-                st.session_state.selected_category = None
-                st.rerun()
-        with col_title: st.subheader(f"📂 {st.session_state.selected_category}")
+        st.subheader(f"📂 {st.session_state.selected_category}")
+        
+        # --- नया फ्लोटिंग होम / कैटेगरीज बटन ---
+        floating_home_html = """
+        <style>
+        @keyframes glowing-home {
+            0% { box-shadow: 0 0 5px #00c6ff; }
+            50% { box-shadow: 0 0 20px #bc4e9c, 0 0 30px #f80759; transform: scale(1.05); }
+            100% { box-shadow: 0 0 5px #00c6ff; }
+        }
+        .floating-home-btn {
+            position: fixed;
+            bottom: 120px;
+            left: 15px;
+            background: linear-gradient(45deg, #f80759, #bc4e9c, #0072ff);
+            color: white !important;
+            padding: 12px 18px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none !important;
+            z-index: 9999999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: glowing-home 2s infinite;
+            border: 2px solid white;
+            cursor: pointer;
+        }
+        </style>
+        <a onclick="window.parent.location.search='';" class="floating-home-btn">🏠 सारी कैटेगरीज</a>
+        """
+        st.markdown(floating_home_html, unsafe_allow_html=True)
+        # -------------------------------------
         
         if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with st.expander(f"✏️ इस कैटेगरी का नाम/आइकॉन बदलें"):
