@@ -311,8 +311,57 @@ def load_products():
 
 products_df = load_products()
 
-# --- URL QUERY PARAMS हटा दिए गए हैं ताकि पेज रिफ्रेश न हो ---
-if 'selected_category' not in st.session_state:
+# --- नया स्मार्ट URL कार्ट ट्रैकिंग सिस्टम (Cart Persistence) ---
+def save_cart_to_url():
+    """यह फंक्शन कार्ट को चुपचाप URL में सेव करता है ताकि रिफ्रेश होने पर गायब न हो"""
+    if st.session_state.cart:
+        # कार्ट के प्रोडक्ट्स की ID और Quantity को जोड़कर एक छोटा कोड बनाते हैं
+        cart_str = "_".join([f"{k}-{v['qty']}" for k, v in st.session_state.cart.items()])
+        st.query_params["cart"] = cart_str
+    else:
+        if "cart" in st.query_params:
+            del st.query_params["cart"]
+
+# अगर ऐप पहली बार खुला है या रिफ्रेश हुआ है, तो URL से बास्केट वापस निकालें
+if 'cart_loaded' not in st.session_state:
+    st.session_state.cart = {}
+    if "cart" in st.query_params and not products_df.empty:
+        cart_str = st.query_params["cart"]
+        items = cart_str.split("_")
+        for item in items:
+            if "-" in item:
+                try:
+                    p_id, qty_str = item.split("-", 1)
+                    qty = int(qty_str)
+                    match = products_df[products_df['ID'].astype(str) == p_id]
+                    if not match.empty:
+                        row = match.iloc[0]
+                        # प्राइस की कैलकुलेशन दोबारा करना
+                        w_qty = int(float(row.get('Wholesale_Qty', 1)))
+                        retail_price = row.get('Price', 0)
+                        w_price = int(float(row.get('Wholesale_Price', retail_price)))
+                        final_price = w_price if qty >= w_qty else retail_price
+                        
+                        image_path_str = str(row.get("Image_Path", ""))
+                        paths = [p.strip() for p in image_path_str.split('|') if p.strip()]
+                        img_link = paths[0] if paths else ""
+                        if img_link and not img_link.startswith("http"):
+                            img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
+                            
+                        st.session_state.cart[p_id] = {
+                            "name": row.get('Name', 'Item'),
+                            "price": final_price,
+                            "qty": qty,
+                            "img_link": img_link
+                        }
+                except Exception as e:
+                    pass
+    st.session_state.cart_loaded = True
+# -------------------------------------------------------------
+
+if "cat" in st.query_params:
+    st.session_state.selected_category = st.query_params["cat"]
+else:
     st.session_state.selected_category = None
 
 if 'admin_logged_in' not in st.session_state:
@@ -321,8 +370,6 @@ if 'seller_logged_in' not in st.session_state:
     st.session_state.seller_logged_in = None
 if 'show_login' not in st.session_state:
     st.session_state.show_login = False
-if 'cart' not in st.session_state:
-    st.session_state.cart = {}
 if 'share_msg' not in st.session_state:
     st.session_state.share_msg = None
 if 'share_img_path' not in st.session_state:
@@ -481,7 +528,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 }
                                 db.collection('products').document(str(new_id)).set(data)
                                 load_products.clear()
-                                # URL वाला सिस्टम यहाँ से भी हटा दिया गया है
                                 st.session_state.share_msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\n🎁 *उत्पाद:* {new_name}\n"
                                 if seller_val: st.session_state.share_msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
                                 st.session_state.share_msg += "\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\nhttps://ouraindia.streamlit.app/"
@@ -606,7 +652,6 @@ def show_swipe_gallery(path_str):
 
 def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
-    # --- महत्वपूर्ण बदलाव: बास्केट में सेव करने के लिए प्रोडक्ट की ID का इस्तेमाल ---
     p_id = str(row.get('ID', prefix_idx)) 
 
     with st.container(border=True):
@@ -640,17 +685,17 @@ def show_product_card(row, idx, prefix):
             
         qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
         
-        # --- बास्केट में जोड़ने का एडवांस और पक्का तरीका ---
         if st.button("🛒 कार्ट में डालें", key=f"b_{prefix_idx}"):
             final_price = w_price if qty >= w_qty else retail_price
             
             if p_id in st.session_state.cart:
                 st.session_state.cart[p_id]["qty"] += qty
-                # अगर जोड़ने पर मात्रा होलसेल रेट पर पहुँच गई है, तो प्राइस अपडेट कर दें
                 if st.session_state.cart[p_id]["qty"] >= w_qty:
                     st.session_state.cart[p_id]["price"] = w_price
             else:
                 st.session_state.cart[p_id] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
+            
+            save_cart_to_url() # <--- यह कार्ट को सुरक्षित करेगा
             st.success("कार्ट में जुड़ गया! 🛒")
             
         show_edit_delete = False
@@ -753,20 +798,21 @@ else:
                     if i + j < len(valid_categories):
                         cat = valid_categories[i + j]
                         with cols[j]:
-                            # --- URL सिस्टम हटाकर सिर्फ Session State का इस्तेमाल ---
                             if st.button(cat, key=f"cat_btn_{i+j}", use_container_width=True):
                                 st.session_state.selected_category = cat
+                                st.query_params["cat"] = cat
                                 st.rerun()
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        # --- असली (Native) स्ट्रीमलिट बटन जो पेज रिफ्रेश नहीं होने देगा ---
+        # --- सारी कैटेगरीज बटन ---
         if st.button("🏠 सारी कैटेगरीज", key="float_back_btn"):
             st.session_state.selected_category = None
+            if "cat" in st.query_params:
+                del st.query_params["cat"]  # सिर्फ कैटेगरी हटा रहे हैं, कार्ट सुरक्षित रहेगा
             st.rerun()
             
-        # --- इस बटन को जावास्क्रिप्ट से हवा में तैराना (Floating Effect) ---
         float_js = """
         <script>
         const parentDoc = window.parent.document;
@@ -805,7 +851,6 @@ else:
         </script>
         """
         st_components.html(float_js, height=0, width=0)
-        # -------------------------------------
         
         if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with st.expander(f"✏️ इस कैटेगरी का नाम/आइकॉन बदलें"):
@@ -819,6 +864,7 @@ else:
                                 db.collection('products').document(doc.id).update({'Category': new_cat_name})
                             load_products.clear()
                             st.session_state.selected_category = new_cat_name
+                            st.query_params["cat"] = new_cat_name
                             st.success("✅ नाम बदल गया!")
                             time.sleep(1)
                             st.rerun()
@@ -853,6 +899,7 @@ if st.session_state.cart:
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
+                    save_cart_to_url() # <--- डिलीट करने पर भी URL अपडेट
                     st.rerun()
         st.markdown("---")
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
@@ -909,6 +956,7 @@ if st.session_state.cart:
     
     if st.button("🗑️ बास्केट खाली करें"):
         st.session_state.cart = {}
+        save_cart_to_url() # <--- बास्केट खाली करने पर भी URL क्लीन
         st.rerun()
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
