@@ -12,6 +12,8 @@ import os
 import requests
 import base64
 from PIL import Image
+import datetime
+from fpdf import FPDF
 
 # --- नया फायरबेस सिस्टम (सिर्फ डेटाबेस के लिए) ---
 import firebase_admin
@@ -97,6 +99,7 @@ def load_config():
     except: pass
     return {
         "admin_whatsapp": "919891587437", 
+        "admin_gst": "", # 🚀 Oura का GST नंबर सेव करने के लिए
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
         "banner_url": "", "logo_url": ""
@@ -109,11 +112,146 @@ current_config = load_config()
 if "sellers" not in current_config:
     current_config["sellers"] = {}
 
+# 🚀 PDF जनरेट करने का नया फंक्शन 🚀
+def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, config):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # --- हैडर (कंपनी का नाम और एड्रेस) ---
+    pdf.set_font("Arial", 'B', 20)
+    pdf.set_text_color(43, 108, 176) # नीला रंग
+    pdf.cell(0, 10, "OURA WHOLESALE", ln=True, align='C')
+    
+    pdf.set_font("Arial", '', 10)
+    pdf.set_text_color(100, 100, 100)
+    admin_phone = config.get("admin_whatsapp", "9891587437")
+    admin_gst_number = config.get("admin_gst", "")
+    
+    pdf.cell(0, 6, f"Delhi, India | Ph: +91 {admin_phone}", ln=True, align='C')
+    
+    # अगर पक्का बिल है और एडमिन ने सेटिंग में GST डाला है
+    if gst_rate > 0 and admin_gst_number:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(0, 6, f"GSTIN: {admin_gst_number}", ln=True, align='C')
+        
+    pdf.ln(5)
+    
+    # --- इनवॉइस की जानकारी ---
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", 'B', 14)
+    pdf.set_text_color(0, 0, 0)
+    title = "TAX INVOICE" if gst_rate > 0 else "ESTIMATE / QUOTATION"
+    pdf.cell(0, 8, title, ln=True, align='C')
+    pdf.ln(5)
+    
+    # --- ग्राहक की जानकारी ---
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(20, 6, "Billed To:")
+    pdf.set_font("Arial", '', 10)
+    c_name = cust_name if cust_name else "Cash/Walk-in Customer"
+    pdf.cell(100, 6, c_name)
+    
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(30, 6, "Invoice Date: ")
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(40, 6, str(datetime.date.today()), ln=True)
+    
+    pdf.cell(20, 6, "")
+    pdf.cell(100, 6, f"Ph: {cust_mobile if cust_mobile else 'N/A'}")
+    
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(30, 6, "Invoice No: ")
+    pdf.set_font("Arial", '', 10)
+    inv_no = f"OURA-{datetime.datetime.now().strftime('%m%d%H%M')}"
+    pdf.cell(40, 6, inv_no, ln=True)
+    
+    if cust_address:
+        pdf.cell(20, 6, "")
+        pdf.multi_cell(100, 6, f"Address: {cust_address}")
+        
+    # पक्के बिल के लिए GST लॉजिक (B2B और B2C दोनों के लिए)
+    if gst_rate > 0:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(20, 6, "")
+        if cust_gst and cust_gst.strip():
+            pdf.cell(100, 6, f"GSTIN: {cust_gst.strip()}", ln=True)
+        else:
+            pdf.cell(100, 6, "GSTIN: Unregistered Consumer", ln=True)
+        
+    pdf.ln(10)
+    
+    # --- टेबल का हैडर ---
+    pdf.set_fill_color(230, 240, 255) # हल्का नीला बैकग्राउंड
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(15, 10, "S.No", border=1, align='C', fill=True)
+    pdf.cell(90, 10, "Item Description", border=1, align='L', fill=True)
+    pdf.cell(25, 10, "Qty", border=1, align='C', fill=True)
+    pdf.cell(30, 10, "Rate (Rs)", border=1, align='C', fill=True)
+    pdf.cell(30, 10, "Amount", border=1, align='C', fill=True)
+    pdf.ln()
+    
+    # --- टेबल का डेटा ---
+    pdf.set_font("Arial", '', 10)
+    subtotal = 0
+    idx = 1
+    
+    for k, item in cart.items():
+        amt = item['price'] * item['qty']
+        subtotal += amt
+        clean_name = re.sub(r'[^\x00-\x7F]+', ' ', str(item['name'])) 
+        if len(clean_name) > 40: clean_name = clean_name[:37] + "..."
+        
+        pdf.cell(15, 10, str(idx), border=1, align='C')
+        pdf.cell(90, 10, clean_name, border=1, align='L')
+        pdf.cell(25, 10, f"{item['qty']} Pcs", border=1, align='C')
+        pdf.cell(30, 10, f"{item['price']:.2f}", border=1, align='R')
+        pdf.cell(30, 10, f"{amt:.2f}", border=1, align='R')
+        pdf.ln()
+        idx += 1
+        
+    # --- टोटल्स (Totals) ---
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(160, 10, "Subtotal", border=1, align='R')
+    pdf.cell(30, 10, f"{subtotal:.2f}", border=1, align='R')
+    pdf.ln()
+    
+    gst_amt = 0
+    if gst_rate > 0:
+        gst_amt = (subtotal * gst_rate) / 100
+        pdf.cell(160, 10, f"Add: GST @ {gst_rate}%", border=1, align='R')
+        pdf.cell(30, 10, f"{gst_amt:.2f}", border=1, align='R')
+        pdf.ln()
+        
+    grand_total = subtotal + gst_amt
+    
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_fill_color(220, 255, 220) # हल्का हरा
+    pdf.cell(160, 12, "GRAND TOTAL (Rs)", border=1, align='R', fill=True)
+    pdf.cell(30, 12, f"{grand_total:.2f}", border=1, align='R', fill=True)
+    pdf.ln(20)
+    
+    # --- फुटर (Footer) ---
+    pdf.set_font("Arial", 'I', 9)
+    pdf.cell(0, 5, "Terms & Conditions:", ln=True)
+    pdf.cell(0, 5, "1. Goods once sold will not be taken back without valid manufacturing defect.", ln=True)
+    pdf.cell(0, 5, "2. We are not responsible for any transit/courier damages.", ln=True)
+    pdf.ln(10)
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(0, 5, "For OURA WHOLESALE", ln=True, align='R')
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(0, 5, "(Authorized Signatory)", ln=True, align='R')
+    
+    return pdf.output(dest='S').encode('latin1')
+
+
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
 st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# --- लाइट और डिसेंट थीम (स्पीड के लिए ऑप्टिमाइज़्ड) ---
+# --- लाइट और डिसेंट थीम ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -121,12 +259,8 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* सोबर और लाइट बैकग्राउंड */
-            .stApp {
-                background-color: #f4f6f9;
-            }
+            .stApp { background-color: #f4f6f9; }
 
-            /* बटन्स को प्रोफेशनल और लाइट लुक देना */
             div.stButton > button {
                 background-color: #2b6cb0;
                 color: white !important;
@@ -138,14 +272,9 @@ hide_streamlit_style = """
                 padding: 10px !important;
                 min-height: 50px;
             }
-            div.stButton > button:hover {
-                background-color: #2c5282;
-            }
-            div.stButton > button:active {
-                transform: scale(0.98);
-            }
+            div.stButton > button:hover { background-color: #2c5282; }
+            div.stButton > button:active { transform: scale(0.98); }
 
-            /* प्रोडक्ट बॉक्स को सिंपल और क्लीन शेडो देना */
             div[data-testid="stContainer"] {
                 background-color: #ffffff;
                 border-radius: 10px !important;
@@ -159,7 +288,6 @@ hide_streamlit_style = """
                 border-color: #cbd5e0 !important;
             }
 
-            /* एक्सपैंडर (Drop-downs) */
             div[data-testid="stExpander"] {
                 background-color: #ffffff;
                 border-radius: 8px;
@@ -170,91 +298,40 @@ hide_streamlit_style = """
                 box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             }
 
-            /* स्मार्ट CSS - मोबाइल पर कैटेगरी को 4-इन-ए-लाइन करने का जादू */
             @media (max-width: 600px) {
-                div[data-testid="stHorizontalBlock"] {
-                    display: flex !important;
-                    flex-wrap: wrap !important;
-                }
-                
+                div[data-testid="stHorizontalBlock"] { display: flex !important; flex-wrap: wrap !important; }
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) > div[data-testid="column"] {
-                    min-width: 23% !important;
-                    max-width: 25% !important;
-                    flex: 1 1 23% !important;
-                    padding: 0 2px !important;
-                    margin-bottom: 5px;
+                    min-width: 23% !important; max-width: 25% !important; flex: 1 1 23% !important;
+                    padding: 0 2px !important; margin-bottom: 5px;
                 }
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) div.stButton > button {
-                    font-size: 11px !important;
-                    padding: 5px !important;
-                    min-height: 60px !important;
-                    word-wrap: break-word !important;
-                    white-space: normal !important;
+                    font-size: 11px !important; padding: 5px !important; min-height: 60px !important;
+                    word-wrap: break-word !important; white-space: normal !important;
                 }
-                
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(2)):not(:has(> div:nth-child(3))) > div[data-testid="column"]:first-child {
-                    min-width: 25% !important;
-                    flex: 1 1 25% !important;
+                    min-width: 25% !important; flex: 1 1 25% !important;
                 }
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(2)):not(:has(> div:nth-child(3))) > div[data-testid="column"]:nth-child(2) {
-                    min-width: 70% !important;
-                    flex: 1 1 70% !important;
+                    min-width: 70% !important; flex: 1 1 70% !important;
                 }
-                
                 div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div[data-testid="column"] {
-                    min-width: 100% !important;
-                    flex: 1 1 100% !important;
-                    margin-bottom: 15px;
+                    min-width: 100% !important; flex: 1 1 100% !important; margin-bottom: 15px;
                 }
             }
 
-            /* स्वाइप गैलरी CSS */
             .swipe-gallery {
-                display: flex;
-                overflow-x: auto;
-                scroll-snap-type: x mandatory;
-                gap: 10px;
-                padding-bottom: 5px;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
+                display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 5px;
+                -webkit-overflow-scrolling: touch; scrollbar-width: none;
             }
             .swipe-gallery::-webkit-scrollbar { display: none; }
-            .swipe-gallery a {
-                scroll-snap-align: center;
-                flex: 0 0 100%;
-                max-width: 100%;
-                text-decoration: none;
-            }
-            .swipe-img {
-                width: 100%;
-                height: 300px;
-                object-fit: contain;
-                background-color: #ffffff;
-                border-radius: 8px;
-                border: 1px solid #e2e8f0;
-            }
+            .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
+            .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; }
 
-            /* WhatsApp बटन का ग्लो कम किया गया ताकि फ़ोन हैंग न हो */
             #oura-wa-btn {
-                position: fixed;
-                bottom: 120px;
-                right: 15px;
-                background-color: #25D366;
-                color: white !important;
-                padding: 12px 18px;
-                border-radius: 50px;
-                font-size: 16px;
-                font-weight: bold;
-                text-decoration: none !important;
-                z-index: 9999999;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4);
-                cursor: grab;
-                border: 2px solid white;
-                user-select: none;
-                touch-action: none;
+                position: fixed; bottom: 120px; right: 15px; background-color: #25D366; color: white !important;
+                padding: 12px 18px; border-radius: 50px; font-size: 16px; font-weight: bold; text-decoration: none !important;
+                z-index: 9999999; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4);
+                cursor: grab; border: 2px solid white; user-select: none; touch-action: none;
             }
             #oura-wa-btn:active { cursor: grabbing; }
             
@@ -287,7 +364,6 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     """
     st_components.html(pwa_js, height=0, width=0)
 
-# 🚀 आउट ऑफ स्टॉक फीचर के लिए "In_Stock" कॉलम जोड़ा गया 🚀
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
 @st.cache_data(ttl=180)
@@ -349,16 +425,11 @@ if "cat" in st.query_params:
 else:
     st.session_state.selected_category = None
 
-if 'admin_logged_in' not in st.session_state:
-    st.session_state.admin_logged_in = False
-if 'seller_logged_in' not in st.session_state:
-    st.session_state.seller_logged_in = None
-if 'show_login' not in st.session_state:
-    st.session_state.show_login = False
-if 'share_msg' not in st.session_state:
-    st.session_state.share_msg = None
-if 'share_img_path' not in st.session_state:
-    st.session_state.share_img_path = None
+if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
+if 'seller_logged_in' not in st.session_state: st.session_state.seller_logged_in = None
+if 'show_login' not in st.session_state: st.session_state.show_login = False
+if 'share_msg' not in st.session_state: st.session_state.share_msg = None
+if 'share_img_path' not in st.session_state: st.session_state.share_img_path = None
 
 if st.session_state.seller_logged_in:
     seller_name = st.session_state.seller_logged_in
@@ -369,10 +440,8 @@ if st.session_state.seller_logged_in:
         st.rerun()
 
 if current_config.get("has_banner", False) and current_config.get("banner_url"):
-    try:
-        st.image(current_config["banner_url"], use_container_width=True)
-    except:
-        st.title("🛍️ Oura Wholesale")
+    try: st.image(current_config["banner_url"], use_container_width=True)
+    except: st.title("🛍️ Oura Wholesale")
 else:
     st.title("🛍️ Oura Wholesale")
 
@@ -405,19 +474,15 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
         if login_type == "मालिक / एडमिन (Admin)":
             password = st.text_input("एडमिन पासवर्ड डालें", type="password")
             if st.button("लॉगिन करें"):
-                try:
-                    correct_password = st.secrets["ADMIN_PASSWORD"]
-                except:
-                    st.error("⚠️ सेटिंग्स में ADMIN_PASSWORD नहीं मिला!")
-                    correct_password = None
+                try: correct_password = st.secrets["ADMIN_PASSWORD"]
+                except: correct_password = None
                     
                 if correct_password and password == correct_password:
                     st.session_state.admin_logged_in = True
                     st.session_state.seller_logged_in = None
                     st.session_state.show_login = False
                     st.rerun()
-                else:
-                    st.error("❌ गलत पासवर्ड!")
+                else: st.error("❌ गलत पासवर्ड!")
         else:
             seller_token = st.text_input("अपना सेलर टोकन (Token) डालें", type="password")
             if st.button("लॉगिन करें"):
@@ -427,8 +492,7 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                     st.session_state.admin_logged_in = False
                     st.session_state.show_login = False
                     st.rerun()
-                else:
-                    st.error("❌ गलत टोकन! कृपया एडमिन से संपर्क करें।")
+                else: st.error("❌ गलत टोकन! कृपया एडमिन से संपर्क करें।")
     st.markdown("---")
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
@@ -464,7 +528,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     new_w_price = st.number_input("होलसेल / बॉक्स रेट (प्रति पीस)", min_value=1)
                     new_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"])
                 
-                # 🚀 नया स्टॉक ऑप्शन 🚀
                 new_in_stock = st.checkbox("✅ उत्पाद अभी स्टॉक में उपलब्ध है?", value=True)
                 
                 if st.session_state.seller_logged_in:
@@ -482,8 +545,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
                 submit_btn = st.form_submit_button("उत्पाद सेव करें")
                 if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
-                    if len(uploaded_imgs) > 3:
-                        st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+                    if len(uploaded_imgs) > 3: st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
                     else:
                         with st.spinner("AI फोटो चेक कर रहा है और सेव कर रहा है..."):
                             has_violation = False
@@ -514,7 +576,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                     "ID": new_id, "Name": new_name, "Price": new_price, "Wholesale_Price": new_w_price,
                                     "Wholesale_Qty": new_w_qty, "Category": final_cat, "Image_Path": final_path_str,
                                     "Free_Delivery": is_free, "Seller_Name": seller_val,
-                                    "In_Stock": new_in_stock # 🚀 स्टॉक स्टेटस सेव कर रहे हैं 🚀
+                                    "In_Stock": new_in_stock
                                 }
                                 db.collection('products').document(str(new_id)).set(data)
                                 load_products.clear()
@@ -569,9 +631,12 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["logo_url"] = ""
                     save_config(current_config)
                     st.rerun()
+        
+        # 🚀 अपडेटेड सेटिंग्स टैब 🚀
         with tab_settings:
-            st.subheader("📱 संपर्क सेटिंग्स")
+            st.subheader("📱 संपर्क और बिज़नेस सेटिंग्स")
             new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
+            new_admin_gst = st.text_input("आपका GST नंबर (Oura)", value=current_config.get("admin_gst", ""))
             st.markdown("---")
             st.subheader("🚚 डिफॉल्ट डिलीवरी सेटिंग्स")
             show_free_delivery = st.checkbox("✅ बाय डिफ़ॉल्ट 'फ्री डिलीवरी' दिखाएं?", value=current_config.get("free_delivery_tag", True))
@@ -612,6 +677,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
             if st.button("⚙️ सभी सेटिंग्स सेव करें"):
                 current_config["admin_whatsapp"] = new_wa
+                current_config["admin_gst"] = new_admin_gst
                 current_config["free_delivery_tag"] = show_free_delivery
                 current_config["phonepe_upi"] = new_phonepe
                 current_config["paytm_upi"] = new_paytm
@@ -665,7 +731,6 @@ def show_product_card(row, idx, prefix):
         if pd.notna(val_fd) and str(val_fd).strip() != "":
             show_fd = str(val_fd).lower() in ['true', 'yes', '1']
             
-        # 🚀 स्टॉक स्टेटस चेक करें (डिफ़ॉल्ट True) 🚀
         is_in_stock = row.get("In_Stock", True)
         
         if w_qty > 1:
@@ -677,7 +742,6 @@ def show_product_card(row, idx, prefix):
             if show_fd: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(फ्री डिलीवरी)*")
             else: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
             
-        # 🚀 अगर स्टॉक में है, तभी कार्ट बटन दिखाएँ 🚀
         if is_in_stock:
             qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
             if st.button("🛒 कार्ट में डालें", key=f"b_{prefix_idx}"):
@@ -693,7 +757,6 @@ def show_product_card(row, idx, prefix):
                 save_cart_to_url()
                 st.success("कार्ट में जुड़ गया! 🛒")
         else:
-            # 🚀 अगर स्टॉक में नहीं है, तो लाल रंग में मैसेज दिखाएँ 🚀
             st.markdown("<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 आउट ऑफ स्टॉक</div>", unsafe_allow_html=True)
             
         show_edit_delete = False
@@ -714,7 +777,6 @@ def show_product_card(row, idx, prefix):
                         fd_index = 0 if show_fd else 1
                         e_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"], index=fd_index)
                     
-                    # 🚀 एडिट फॉर्म में स्टॉक अपडेट करने का ऑप्शन 🚀
                     e_in_stock = st.checkbox("✅ स्टॉक में उपलब्ध है?", value=is_in_stock)
 
                     e_seller_name = st.text_input("सेलर / ब्रांड का नाम", value=str(seller_val) if pd.notna(seller_val) else "") if st.session_state.admin_logged_in else st.session_state.seller_logged_in
@@ -743,7 +805,7 @@ def show_product_card(row, idx, prefix):
                                 "ID": target_id, "Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price,
                                 "Wholesale_Qty": e_w_qty, "Category": e_cat, "Image_Path": final_path_str,
                                 "Free_Delivery": e_is_free, "Seller_Name": str(e_seller_name).strip(),
-                                "In_Stock": e_in_stock # 🚀 अपडेट किया हुआ स्टॉक स्टेटस 🚀
+                                "In_Stock": e_in_stock
                             }
                             db.collection('products').document(target_id).set(data)
                             load_products.clear()
@@ -809,7 +871,6 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        # --- सारी कैटेगरीज बटन ---
         if st.button("🏠 सारी कैटेगरीज", key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params:
@@ -868,11 +929,11 @@ else:
 
 st.markdown("<br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
-st.header("🛒 आपकी बास्केट (कच्चा बिल)")
+st.header("🛒 आपकी बास्केट")
 
 if st.session_state.cart:
     total = 0
-    msg = "🧾 *Oura - Kaccha Bill* 🧾\n\n"
+    msg = "🧾 *Oura - Order Summary* 🧾\n\n"
     count = 1
     
     for k, item in list(st.session_state.cart.items()):
@@ -900,7 +961,7 @@ if st.session_state.cart:
     if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
     else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
         
-    st.subheader(f"कुल बिल: ₹{total}")
+    st.subheader(f"कुल माल: ₹{total}")
     
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
@@ -933,15 +994,49 @@ if st.session_state.cart:
     st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की custom ड्यूटी की कोई गारंटी नहीं।**")
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
+    # 🚀 नया चेकआउट और बिलिंग सेक्शन 🚀
     st.markdown("---")
-    st.markdown("### 📍 डिलीवरी की जानकारी")
-    cust_name = st.text_input("आपका नाम (Optional)")
-    cust_mobile = st.text_input("मोबाईल नंबर (Optional)")
-    cust_address = st.text_area("पूरा पता (Optional)")
+    st.markdown("### 📍 डिलीवरी और बिल की जानकारी")
     
-    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        cust_name = st.text_input("आपका नाम / दुकान का नाम")
+        cust_mobile = st.text_input("मोबाईल नंबर")
+        cust_address = st.text_area("पूरा पता (शहर, पिनकोड सहित)")
+    with col_d2:
+        gst_choice = st.selectbox("बिल का प्रकार चुनें:", 
+                                 ["बिना GST (Estimate)", "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
+        
+        gst_percent = 0
+        if "5%" in gst_choice: gst_percent = 5
+        elif "12%" in gst_choice: gst_percent = 12
+        elif "18%" in gst_choice: gst_percent = 18
+        elif "28%" in gst_choice: gst_percent = 28
+        
+        cust_gst = ""
+        # अगर ग्राहक ने पक्का बिल चुना है
+        if gst_percent > 0:
+            st.info("💡 **बिना GST नंबर वाले ग्राहक भी टैक्स देकर पक्का बिल ले सकते हैं।**")
+            cust_gst = st.text_input("ग्राहक का GST नंबर (अगर है तो डालें, नहीं तो खाली छोड़ दें)")
+    
+    if st.session_state.cart:
+        pdf_bytes = generate_pdf_bill(st.session_state.cart, cust_name, cust_mobile, cust_address, cust_gst, gst_percent, current_config)
+        
+        pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
+        
+        st.download_button(
+            label="📄 प्रोफेशनल PDF बिल डाउनलोड करें",
+            data=pdf_bytes,
+            file_name=pdf_file_name,
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True
+        )
 
-    wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
+    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n📄 *बिल:* {gst_choice}\n"
+    if cust_gst: final_msg += f"🏢 *ग्राहक GST:* {cust_gst}\n"
+
+    wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
     st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
     
     if st.button("🗑️ बास्केट खाली करें"):
@@ -985,4 +1080,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-st_components.html(drag_js_code, height=0, width=0) 
+st_components.html(drag_js_code, height=0, width=0)
