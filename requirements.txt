@@ -4,3 +4,4 @@ requests
 Pillow
 pytesseract
 firebase-admin
+fpdf
