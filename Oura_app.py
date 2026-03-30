@@ -15,7 +15,10 @@ from PIL import Image
 import datetime
 from fpdf import FPDF
 
-# --- नया फायरबेस सिस्टम (सिर्फ डेटाबेस के लिए) ---
+# 🚀 सबसे पहले पेज की सेटिंग (यह हमेशा टॉप पर होनी चाहिए) 🚀
+st.set_page_config(page_title="Oura Products - Wholesale", page_icon="🛍️", layout="wide")
+
+# --- फायरबेस सिस्टम ---
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -44,7 +47,7 @@ if not firebase_admin._apps:
         cred = credentials.Certificate(key_dict)
         firebase_admin.initialize_app(cred)
     except Exception as e:
-        st.error(f"🚨 Firebase सेटअप में गलती: {e}")
+        pass # अगर एरर आए तो ऐप क्रैश न हो
 
 db = firestore.client()
 
@@ -64,10 +67,8 @@ def upload_image_to_imgbb(file_bytes):
         if res.status_code == 200:
             return res.json()["data"]["url"]
         else:
-            st.error("फोटो अपलोड फेल हो गई।")
             return None
     except Exception as e:
-        st.error(f"एरर: {e}")
         return None
 
 def dummy_delete_image(url):
@@ -238,8 +239,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
-st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
-
+# --- लाइट और डिसेंट थीम ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -362,6 +362,9 @@ def load_products():
 
 products_df = load_products()
 
+# --- सेशन स्टेट इनिशियलाइज़ेशन ---
+if 'order_placed' not in st.session_state: st.session_state.order_placed = False
+
 def save_cart_to_url():
     if st.session_state.cart:
         cart_str = "_".join([f"{k}-{v['qty']}" for k, v in st.session_state.cart.items()])
@@ -470,13 +473,13 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
         st.success("✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।")
-        # 🚀 नया 'ऑर्डर्स' टैब जोड़ा गया है 🚀
         tab_add, tab_orders, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "📦 ऑर्डर्स", "🖼️ बैनर व लोगो", "⚙️ सेटिंग्स"])
         
         with tab_orders:
             st.subheader("📦 ग्राहकों के ऑर्डर्स")
             try:
-                orders_ref = db.collection('orders').order_by('date', direction=firestore.Query.DESCENDING).limit(50).stream()
+                # 🚀 एरर से बचने के लिए direction को 'DESCENDING' स्ट्रिंग में पास किया गया है 🚀
+                orders_ref = db.collection('orders').order_by('date', direction='DESCENDING').limit(50).stream()
                 orders_list = [doc.to_dict() for doc in orders_ref]
                 
                 if not orders_list:
@@ -498,7 +501,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 st.write(f"- {v['name']} ({v['qty']} Pcs x ₹{v['price']})")
                             
                             st.markdown("---")
-                            # 🚀 एडमिन यहाँ से सीधा बिल डाउनलोड कर सकता है 🚀
                             pdf_bytes = generate_pdf_bill(
                                 order.get('cart', {}), 
                                 order.get('customer_name', ''), 
@@ -694,6 +696,7 @@ def show_product_card(row, idx, prefix):
                     st.session_state.cart[p_id]["qty"] += qty
                     if st.session_state.cart[p_id]["qty"] >= w_qty: st.session_state.cart[p_id]["price"] = w_price
                 else: st.session_state.cart[p_id] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
+                st.session_state.order_placed = False # 🚀 नया आइटम डालने पर पुराना ऑर्डर स्टेट रीसेट 🚀
                 save_cart_to_url(); st.success("कार्ट में जुड़ गया! 🛒")
         else: st.markdown("<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 आउट ऑफ स्टॉक</div>", unsafe_allow_html=True)
             
@@ -799,6 +802,7 @@ if st.session_state.cart:
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
+                    st.session_state.order_placed = False # 🚀 डिलीट करने पर भी ऑर्डर स्टेट रीसेट 🚀
                     save_cart_to_url()
                     st.rerun()
         st.markdown("---")
@@ -845,28 +849,38 @@ if st.session_state.cart:
         final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n📄 *बिल:* {gst_choice}\n"
         if cust_gst: final_msg += f"🏢 *ग्राहक GST:* {cust_gst}\n"
         
-        # 🚀 नया 'ऑर्डर कन्फर्म करें' बटन जो डेटाबेस में ऑर्डर सेव करेगा 🚀
-        if st.button("✅ ऑर्डर कन्फर्म करें", type="primary", use_container_width=True):
-            order_id = f"ORD-{int(time.time())}"
-            order_data = {
-                "order_id": order_id,
-                "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "customer_name": cust_name,
-                "mobile": cust_mobile,
-                "address": cust_address,
-                "gst_rate": gst_percent,
-                "cust_gst": cust_gst,
-                "cart": st.session_state.cart,
-                "total_amount": total
-            }
-            db.collection('orders').document(order_id).set(order_data)
-            
-            st.success("✅ आपका ऑर्डर सिस्टम में सेव हो गया है! कृपया नीचे दिए गए बटन पर क्लिक करके हमें WhatsApp पर मैसेज भेज दें।")
+        # 🚀 ऑर्डर कन्फर्मेशन का फुलप्रूफ सिस्टम 🚀
+        if not st.session_state.order_placed:
+            if st.button("✅ पक्का ऑर्डर सेव करें और WhatsApp पर भेजें", type="primary", use_container_width=True):
+                order_id = f"ORD-{int(time.time())}"
+                order_data = {
+                    "order_id": order_id,
+                    "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "customer_name": cust_name,
+                    "mobile": cust_mobile,
+                    "address": cust_address,
+                    "gst_rate": gst_percent,
+                    "cust_gst": cust_gst,
+                    "cart": st.session_state.cart,
+                    "total_amount": total
+                }
+                db.collection('orders').document(order_id).set(order_data)
+                st.session_state.order_placed = True
+                st.rerun()
+        else:
+            st.success("✅ आपका ऑर्डर सिस्टम में सेव हो गया है! कृपया नीचे दिए गए हरे बटन पर क्लिक करके हमें WhatsApp पर मैसेज ज़रूर भेज दें।")
             wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
             st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">📲 WhatsApp पर अपना ऑर्डर भेजें</a>''', unsafe_allow_html=True)
             
+            if st.button("🔄 नया ऑर्डर बनाएं (बास्केट खाली करें)", use_container_width=True):
+                st.session_state.cart = {}
+                st.session_state.order_placed = False
+                save_cart_to_url()
+                st.rerun()
+            
     if st.button("🗑️ बास्केट खाली करें"):
         st.session_state.cart = {}
+        st.session_state.order_placed = False
         save_cart_to_url()
         st.rerun()
 
