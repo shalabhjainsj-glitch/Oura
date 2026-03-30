@@ -99,7 +99,7 @@ def load_config():
     except: pass
     return {
         "admin_whatsapp": "919891587437", 
-        "admin_gst": "", # 🚀 Oura का GST नंबर सेव करने के लिए
+        "admin_gst": "", # 🚀 Oura Products का GST नंबर सेव करने के लिए
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
         "banner_url": "", "logo_url": ""
@@ -112,7 +112,7 @@ current_config = load_config()
 if "sellers" not in current_config:
     current_config["sellers"] = {}
 
-# 🚀 PDF जनरेट करने का नया फंक्शन 🚀
+# 🚀 PDF जनरेट करने का नया फंक्शन (Oura Products नाम के साथ) 🚀
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, config):
     pdf = FPDF()
     pdf.add_page()
@@ -120,7 +120,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     # --- हैडर (कंपनी का नाम और एड्रेस) ---
     pdf.set_font("Arial", 'B', 20)
     pdf.set_text_color(43, 108, 176) # नीला रंग
-    pdf.cell(0, 10, "OURA WHOLESALE", ln=True, align='C')
+    pdf.cell(0, 10, "OURA PRODUCTS", ln=True, align='C') # 🚀 नाम अपडेट किया गया
     
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(100, 100, 100)
@@ -240,7 +240,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(0, 5, "2. We are not responsible for any transit/courier damages.", ln=True)
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 5, "For OURA WHOLESALE", ln=True, align='R')
+    pdf.cell(0, 5, "For OURA PRODUCTS", ln=True, align='R') # 🚀 नाम अपडेट किया गया
     pdf.set_font("Arial", '', 10)
     pdf.cell(0, 5, "(Authorized Signatory)", ln=True, align='R')
     
@@ -249,7 +249,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
-st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
+st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
 # --- लाइट और डिसेंट थीम ---
 hide_streamlit_style = """
@@ -441,9 +441,9 @@ if st.session_state.seller_logged_in:
 
 if current_config.get("has_banner", False) and current_config.get("banner_url"):
     try: st.image(current_config["banner_url"], use_container_width=True)
-    except: st.title("🛍️ Oura Wholesale")
+    except: st.title("🛍️ Oura Products - Wholesale")
 else:
-    st.title("🛍️ Oura Wholesale")
+    st.title("🛍️ Oura Products - Wholesale")
 
 multi_color_marquee = """
 <div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
@@ -636,7 +636,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
         with tab_settings:
             st.subheader("📱 संपर्क और बिज़नेस सेटिंग्स")
             new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
-            new_admin_gst = st.text_input("आपका GST नंबर (Oura)", value=current_config.get("admin_gst", ""))
+            new_admin_gst = st.text_input("आपका GST नंबर (Oura Products)", value=current_config.get("admin_gst", ""))
             st.markdown("---")
             st.subheader("🚚 डिफॉल्ट डिलीवरी सेटिंग्स")
             show_free_delivery = st.checkbox("✅ बाय डिफ़ॉल्ट 'फ्री डिलीवरी' दिखाएं?", value=current_config.get("free_delivery_tag", True))
@@ -972,7 +972,7 @@ if st.session_state.cart:
     if available_upis:
         st.markdown("### 💳 सुरक्षित online पेमेंट")
         for name, data in available_upis.items():
-            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
+            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR" # 🚀 UPI का नाम भी Oura Products कर दिया 🚀
             st.markdown(f'''<a href="{qr_data}" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
             msg += f"\n💳 *{name} UPI:* {data['id']}"
         
@@ -980,7 +980,7 @@ if st.session_state.cart:
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
-                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Wholesale&am={total}&cu=INR"
+                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR" # 🚀 QR में भी नाम अपडेट 🚀
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
@@ -994,7 +994,6 @@ if st.session_state.cart:
     st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की custom ड्यूटी की कोई गारंटी नहीं।**")
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
-    # 🚀 नया चेकआउट और बिलिंग सेक्शन 🚀
     st.markdown("---")
     st.markdown("### 📍 डिलीवरी और बिल की जानकारी")
     
@@ -1014,7 +1013,6 @@ if st.session_state.cart:
         elif "28%" in gst_choice: gst_percent = 28
         
         cust_gst = ""
-        # अगर ग्राहक ने पक्का बिल चुना है
         if gst_percent > 0:
             st.info("💡 **बिना GST नंबर वाले ग्राहक भी टैक्स देकर पक्का बिल ले सकते हैं।**")
             cust_gst = st.text_input("ग्राहक का GST नंबर (अगर है तो डालें, नहीं तो खाली छोड़ दें)")
