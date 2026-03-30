@@ -113,7 +113,7 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# --- लाइट और ब्राइट मल्टी-कलर थीम ---
+# --- लाइट और डिसेंट थीम (स्पीड के लिए ऑप्टिमाइज़्ड) ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -121,59 +121,53 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* लाइट और ब्राइट मल्टी-कलर ऐप बैकग्राउंड */
+            /* सोबर और लाइट बैकग्राउंड */
             .stApp {
-                background: linear-gradient(135deg, #ffffff 0%, #e0f7fa 50%, #fce4ec 100%);
+                background-color: #f4f6f9;
             }
 
-            /* सभी बटन्स को ब्राइट मल्टी-कलर और 3D लुक देना */
+            /* बटन्स को प्रोफेशनल और लाइट लुक देना (एनिमेशन हटा दिया गया है ताकि ऐप फ़ास्ट चले) */
             div.stButton > button {
-                background: linear-gradient(45deg, #00c6ff, #0072ff, #bc4e9c, #f80759);
-                background-size: 300% 300%;
-                animation: multi-gradient 4s ease infinite;
+                background-color: #2b6cb0;
                 color: white !important;
                 border: none !important;
-                border-radius: 12px !important;
-                font-weight: 800 !important;
-                box-shadow: 0 4px 10px rgba(0, 198, 255, 0.4) !important;
-                transition: transform 0.2s, box-shadow 0.2s;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+                transition: background-color 0.2s;
                 padding: 10px !important;
-                min-height: 55px;
-            }
-            @keyframes multi-gradient {
-                0% { background-position: 0% 50%; }
-                50% { background-position: 100% 50%; }
-                100% { background-position: 0% 50%; }
+                min-height: 50px;
             }
             div.stButton > button:hover {
-                transform: scale(1.05);
-                box-shadow: 0 6px 15px rgba(188, 78, 156, 0.6) !important;
+                background-color: #2c5282;
             }
             div.stButton > button:active {
-                transform: scale(0.95);
+                transform: scale(0.98);
             }
 
-            /* प्रोडक्ट बॉक्स को सफेद, कलरफुल बॉर्डर और शेडो देना */
+            /* प्रोडक्ट बॉक्स को सिंपल और क्लीन शेडो देना */
             div[data-testid="stContainer"] {
                 background-color: #ffffff;
-                border-radius: 15px !important;
-                border: 2px solid #b3e5fc !important;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+                border-radius: 10px !important;
+                border: 1px solid #e2e8f0 !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
                 padding: 15px;
-                transition: all 0.3s;
+                transition: box-shadow 0.2s;
             }
             div[data-testid="stContainer"]:hover {
-                box-shadow: 0 10px 25px rgba(188, 78, 156, 0.2);
-                border-color: #bc4e9c !important;
-                transform: translateY(-2px);
+                box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+                border-color: #cbd5e0 !important;
             }
 
-            /* एक्सपैंडर (Drop-downs) को कलरफुल बनाना */
+            /* एक्सपैंडर (Drop-downs) */
             div[data-testid="stExpander"] {
-                background: linear-gradient(to right, #ffffff, #f0f8ff);
-                border-radius: 12px;
-                border-left: 6px solid #00c6ff !important;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                background-color: #ffffff;
+                border-radius: 8px;
+                border-left: 4px solid #2b6cb0 !important;
+                border-top: 1px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
+                border-bottom: 1px solid #e2e8f0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             }
 
             /* स्मार्ट CSS - मोबाइल पर कैटेगरी को 4-इन-ए-लाइन करने का जादू */
@@ -235,16 +229,12 @@ hide_streamlit_style = """
                 width: 100%;
                 height: 300px;
                 object-fit: contain;
-                background-color: #f8f9fa;
+                background-color: #ffffff;
                 border-radius: 8px;
-                border: 1px solid #eee;
+                border: 1px solid #e2e8f0;
             }
 
-            @keyframes glowing {
-              0% { box-shadow: 0 0 5px #25D366; }
-              50% { box-shadow: 0 0 20px #25D366, 0 0 30px #25D366; transform: scale(1.05); }
-              100% { box-shadow: 0 0 5px #25D366; }
-            }
+            /* WhatsApp बटन का ग्लो कम किया गया ताकि फ़ोन हैंग न हो */
             #oura-wa-btn {
                 position: fixed;
                 bottom: 120px;
@@ -260,7 +250,7 @@ hide_streamlit_style = """
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                animation: glowing 2s infinite;
+                box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4);
                 cursor: grab;
                 border: 2px solid white;
                 user-select: none;
@@ -299,7 +289,8 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
 
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name"]
 
-@st.cache_data(ttl=5)
+# स्पीड बढ़ाने के लिए ttl को 5 से बढ़ाकर 180 (3 मिनट) कर दिया गया है
+@st.cache_data(ttl=180)
 def load_products():
     try:
         docs = db.collection('products').stream()
@@ -391,9 +382,10 @@ if current_config.get("has_banner", False) and current_config.get("banner_url"):
 else:
     st.title("🛍️ Oura Wholesale")
 
+# मारकी (स्क्रॉलिंग टेक्स्ट) का डार्क बैकग्राउंड हटाकर सोबर बनाया गया है
 multi_color_marquee = """
-<div style="background: linear-gradient(90deg, #00c6ff, #0072ff, #bc4e9c, #f80759); padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
-    <marquee behavior="scroll" direction="left" scrollamount="7" style="color: white; font-size: 16px; font-weight: bold; font-family: sans-serif; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">
+<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
+    <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
         🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀
     </marquee>
 </div>
@@ -813,23 +805,10 @@ else:
                 del st.query_params["cat"]  # सिर्फ कैटेगरी हटा रहे हैं, कार्ट सुरक्षित रहेगा
             st.rerun()
             
+        # स्पीड के लिए सारी कैटेगरीज बटन का भारी एनिमेशन हटा दिया गया है और सॉलिड कलर दिया है
         float_js = """
         <script>
         const parentDoc = window.parent.document;
-        
-        if (!parentDoc.getElementById('glowing-home-style')) {
-            const style = parentDoc.createElement('style');
-            style.id = 'glowing-home-style';
-            style.innerHTML = `
-            @keyframes glowing-home {
-                0% { box-shadow: 0 0 5px #00c6ff; }
-                50% { box-shadow: 0 0 20px #bc4e9c, 0 0 30px #f80759; transform: scale(1.05); }
-                100% { box-shadow: 0 0 5px #00c6ff; }
-            }
-            `;
-            parentDoc.head.appendChild(style);
-        }
-
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && btn.innerText.includes('सारी कैटेगरीज')) {
@@ -837,15 +816,16 @@ else:
                 btn.style.bottom = '120px';
                 btn.style.left = '15px';
                 btn.style.zIndex = '999999';
-                btn.style.background = 'linear-gradient(45deg, #f80759, #bc4e9c, #0072ff)';
+                btn.style.background = '#2b6cb0'; 
                 btn.style.color = 'white';
                 btn.style.padding = '12px 18px';
                 btn.style.borderRadius = '50px';
                 btn.style.border = '2px solid white';
                 btn.style.fontWeight = 'bold';
-                btn.style.animation = 'glowing-home 2s infinite';
+                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
                 btn.style.minHeight = 'auto'; 
                 btn.style.width = 'auto';
+                btn.style.animation = 'none';
             }
         });
         </script>
@@ -940,7 +920,7 @@ if st.session_state.cart:
 
     st.markdown("---")
     st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
-    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की कोई गारंटी नहीं।**")
+    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की custom ड्यूटी की कोई गारंटी नहीं।**")
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
     st.markdown("---")
@@ -952,7 +932,7 @@ if st.session_state.cart:
     final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n"
 
     wa_link = f"https://wa.me/{current_config['admin_whatsapp']}?text={urllib.parse.quote(final_msg)}"
-    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: linear-gradient(135deg, #25D366, #128C7E); color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
+    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
     
     if st.button("🗑️ बास्केट खाली करें"):
         st.session_state.cart = {}
@@ -972,7 +952,7 @@ if (btn && !btn.dataset.draggable) {
     const onStart = (e) => {
         if(e.type === 'mousedown' || e.type === 'touchstart') {
             isDragging = true; startY = e.touches ? e.touches[0].clientY : e.clientY;
-            startTop = btn.offsetTop; btn.style.animation = 'none'; btn.style.transition = 'none';
+            startTop = btn.offsetTop; btn.style.transition = 'none';
         }
     };
     const onMove = (e) => {
@@ -984,7 +964,7 @@ if (btn && !btn.dataset.draggable) {
         if (newTop > parentDoc.documentElement.clientHeight - 80) newTop = parentDoc.documentElement.clientHeight - 80;
         btn.style.top = newTop + 'px'; btn.style.bottom = 'auto'; 
     };
-    const onEnd = () => { isDragging = false; btn.style.animation = 'glowing 2s infinite'; };
+    const onEnd = () => { isDragging = false; };
     btn.addEventListener('touchstart', onStart, {passive: false});
     parentDoc.addEventListener('touchmove', onMove, {passive: false});
     parentDoc.addEventListener('touchend', onEnd);
@@ -995,4 +975,4 @@ if (btn && !btn.dataset.draggable) {
 }
 </script>
 """
-st_components.html(drag_js_code, height=0, width=0)
+st_components.html(drag_js_code, height=0, width=0) 
