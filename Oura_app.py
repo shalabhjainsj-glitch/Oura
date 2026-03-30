@@ -126,7 +126,7 @@ hide_streamlit_style = """
                 background-color: #f4f6f9;
             }
 
-            /* बटन्स को प्रोफेशनल और लाइट लुक देना (एनिमेशन हटा दिया गया है ताकि ऐप फ़ास्ट चले) */
+            /* बटन्स को प्रोफेशनल और लाइट लुक देना */
             div.stButton > button {
                 background-color: #2b6cb0;
                 color: white !important;
@@ -287,9 +287,9 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     """
     st_components.html(pwa_js, height=0, width=0)
 
-expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name"]
+# 🚀 आउट ऑफ स्टॉक फीचर के लिए "In_Stock" कॉलम जोड़ा गया 🚀
+expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
-# स्पीड बढ़ाने के लिए ttl को 5 से बढ़ाकर 180 (3 मिनट) कर दिया गया है
 @st.cache_data(ttl=180)
 def load_products():
     try:
@@ -302,18 +302,14 @@ def load_products():
 
 products_df = load_products()
 
-# --- नया स्मार्ट URL कार्ट ट्रैकिंग सिस्टम (Cart Persistence) ---
 def save_cart_to_url():
-    """यह फंक्शन कार्ट को चुपचाप URL में सेव करता है ताकि रिफ्रेश होने पर गायब न हो"""
     if st.session_state.cart:
-        # कार्ट के प्रोडक्ट्स की ID और Quantity को जोड़कर एक छोटा कोड बनाते हैं
         cart_str = "_".join([f"{k}-{v['qty']}" for k, v in st.session_state.cart.items()])
         st.query_params["cart"] = cart_str
     else:
         if "cart" in st.query_params:
             del st.query_params["cart"]
 
-# अगर ऐप पहली बार खुला है या रिफ्रेश हुआ है, तो URL से बास्केट वापस निकालें
 if 'cart_loaded' not in st.session_state:
     st.session_state.cart = {}
     if "cart" in st.query_params and not products_df.empty:
@@ -327,7 +323,6 @@ if 'cart_loaded' not in st.session_state:
                     match = products_df[products_df['ID'].astype(str) == p_id]
                     if not match.empty:
                         row = match.iloc[0]
-                        # प्राइस की कैलकुलेशन दोबारा करना
                         w_qty = int(float(row.get('Wholesale_Qty', 1)))
                         retail_price = row.get('Price', 0)
                         w_price = int(float(row.get('Wholesale_Price', retail_price)))
@@ -348,7 +343,6 @@ if 'cart_loaded' not in st.session_state:
                 except Exception as e:
                     pass
     st.session_state.cart_loaded = True
-# -------------------------------------------------------------
 
 if "cat" in st.query_params:
     st.session_state.selected_category = st.query_params["cat"]
@@ -382,7 +376,6 @@ if current_config.get("has_banner", False) and current_config.get("banner_url"):
 else:
     st.title("🛍️ Oura Wholesale")
 
-# मारकी (स्क्रॉलिंग टेक्स्ट) का डार्क बैकग्राउंड हटाकर सोबर बनाया गया है
 multi_color_marquee = """
 <div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
     <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
@@ -470,6 +463,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
                     new_w_price = st.number_input("होलसेल / बॉक्स रेट (प्रति पीस)", min_value=1)
                     new_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"])
+                
+                # 🚀 नया स्टॉक ऑप्शन 🚀
+                new_in_stock = st.checkbox("✅ उत्पाद अभी स्टॉक में उपलब्ध है?", value=True)
+                
                 if st.session_state.seller_logged_in:
                     st.info(f"🏪 आपका ब्रांड/सेलर नाम: **{st.session_state.seller_logged_in}**")
                     new_seller_name = st.session_state.seller_logged_in
@@ -516,7 +513,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 data = {
                                     "ID": new_id, "Name": new_name, "Price": new_price, "Wholesale_Price": new_w_price,
                                     "Wholesale_Qty": new_w_qty, "Category": final_cat, "Image_Path": final_path_str,
-                                    "Free_Delivery": is_free, "Seller_Name": seller_val
+                                    "Free_Delivery": is_free, "Seller_Name": seller_val,
+                                    "In_Stock": new_in_stock # 🚀 स्टॉक स्टेटस सेव कर रहे हैं 🚀
                                 }
                                 db.collection('products').document(str(new_id)).set(data)
                                 load_products.clear()
@@ -666,6 +664,10 @@ def show_product_card(row, idx, prefix):
         val_fd = row.get("Free_Delivery")
         if pd.notna(val_fd) and str(val_fd).strip() != "":
             show_fd = str(val_fd).lower() in ['true', 'yes', '1']
+            
+        # 🚀 स्टॉक स्टेटस चेक करें (डिफ़ॉल्ट True) 🚀
+        is_in_stock = row.get("In_Stock", True)
+        
         if w_qty > 1:
             if show_fd:
                 st.markdown(f"🛵 **सिंगल पीस (फ्री डिलीवरी):** ₹{retail_price} <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस, <span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
@@ -675,20 +677,24 @@ def show_product_card(row, idx, prefix):
             if show_fd: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(फ्री डिलीवरी)*")
             else: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
             
-        qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
-        
-        if st.button("🛒 कार्ट में डालें", key=f"b_{prefix_idx}"):
-            final_price = w_price if qty >= w_qty else retail_price
-            
-            if p_id in st.session_state.cart:
-                st.session_state.cart[p_id]["qty"] += qty
-                if st.session_state.cart[p_id]["qty"] >= w_qty:
-                    st.session_state.cart[p_id]["price"] = w_price
-            else:
-                st.session_state.cart[p_id] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
-            
-            save_cart_to_url() # <--- यह कार्ट को सुरक्षित करेगा
-            st.success("कार्ट में जुड़ गया! 🛒")
+        # 🚀 अगर स्टॉक में है, तभी कार्ट बटन दिखाएँ 🚀
+        if is_in_stock:
+            qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
+            if st.button("🛒 कार्ट में डालें", key=f"b_{prefix_idx}"):
+                final_price = w_price if qty >= w_qty else retail_price
+                
+                if p_id in st.session_state.cart:
+                    st.session_state.cart[p_id]["qty"] += qty
+                    if st.session_state.cart[p_id]["qty"] >= w_qty:
+                        st.session_state.cart[p_id]["price"] = w_price
+                else:
+                    st.session_state.cart[p_id] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
+                
+                save_cart_to_url()
+                st.success("कार्ट में जुड़ गया! 🛒")
+        else:
+            # 🚀 अगर स्टॉक में नहीं है, तो लाल रंग में मैसेज दिखाएँ 🚀
+            st.markdown("<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 आउट ऑफ स्टॉक</div>", unsafe_allow_html=True)
             
         show_edit_delete = False
         if st.session_state.admin_logged_in: show_edit_delete = True
@@ -696,7 +702,7 @@ def show_product_card(row, idx, prefix):
             
         if show_edit_delete:
             st.markdown("---")
-            with st.expander("✏️ रेट, फोटो बदलें या डिलीट करें (Edit)"):
+            with st.expander("✏️ रेट, स्टॉक या फोटो बदलें (Edit)"):
                 with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
@@ -707,6 +713,10 @@ def show_product_card(row, idx, prefix):
                         e_w_price = st.number_input("होलसेल (बॉक्स रेट)", value=w_price)
                         fd_index = 0 if show_fd else 1
                         e_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"], index=fd_index)
+                    
+                    # 🚀 एडिट फॉर्म में स्टॉक अपडेट करने का ऑप्शन 🚀
+                    e_in_stock = st.checkbox("✅ स्टॉक में उपलब्ध है?", value=is_in_stock)
+
                     e_seller_name = st.text_input("सेलर / ब्रांड का नाम", value=str(seller_val) if pd.notna(seller_val) else "") if st.session_state.admin_logged_in else st.session_state.seller_logged_in
                     existing_cats_edit = products_df['Category'].dropna().unique().tolist()
                     current_cat = str(row.get("Category", ""))
@@ -732,7 +742,8 @@ def show_product_card(row, idx, prefix):
                             data = {
                                 "ID": target_id, "Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price,
                                 "Wholesale_Qty": e_w_qty, "Category": e_cat, "Image_Path": final_path_str,
-                                "Free_Delivery": e_is_free, "Seller_Name": str(e_seller_name).strip()
+                                "Free_Delivery": e_is_free, "Seller_Name": str(e_seller_name).strip(),
+                                "In_Stock": e_in_stock # 🚀 अपडेट किया हुआ स्टॉक स्टेटस 🚀
                             }
                             db.collection('products').document(target_id).set(data)
                             load_products.clear()
@@ -802,10 +813,9 @@ else:
         if st.button("🏠 सारी कैटेगरीज", key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params:
-                del st.query_params["cat"]  # सिर्फ कैटेगरी हटा रहे हैं, कार्ट सुरक्षित रहेगा
+                del st.query_params["cat"]
             st.rerun()
             
-        # स्पीड के लिए सारी कैटेगरीज बटन का भारी एनिमेशन हटा दिया गया है और सॉलिड कलर दिया है
         float_js = """
         <script>
         const parentDoc = window.parent.document;
@@ -879,7 +889,7 @@ if st.session_state.cart:
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
-                    save_cart_to_url() # <--- डिलीट करने पर भी URL अपडेट
+                    save_cart_to_url()
                     st.rerun()
         st.markdown("---")
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
@@ -936,7 +946,7 @@ if st.session_state.cart:
     
     if st.button("🗑️ बास्केट खाली करें"):
         st.session_state.cart = {}
-        save_cart_to_url() # <--- बास्केट खाली करने पर भी URL क्लीन
+        save_cart_to_url()
         st.rerun()
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
