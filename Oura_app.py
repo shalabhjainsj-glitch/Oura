@@ -322,13 +322,31 @@ hide_streamlit_style = """
                 box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             }
 
+            /* 🚀 Oura Categories Grid Fix 🚀 */
+            div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                gap: 10px;
+            }
+            div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="column"] {
+                min-width: calc(50% - 10px) !important; 
+                flex: 1 1 calc(50% - 10px) !important;
+                margin-bottom: 5px;
+            }
+            @media (min-width: 600px) {
+                div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="column"] {
+                    min-width: calc(25% - 10px) !important; 
+                    flex: 1 1 calc(25% - 10px) !important;
+                }
+            }
+
             @media (max-width: 600px) {
                 div[data-testid="stHorizontalBlock"] { display: flex !important; flex-wrap: wrap !important; }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) > div[data-testid="column"] {
+                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(.custom-cat-grid)) > div[data-testid="column"] {
                     min-width: 23% !important; max-width: 25% !important; flex: 1 1 23% !important;
                     padding: 0 2px !important; margin-bottom: 5px;
                 }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)) div.stButton > button {
+                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(.custom-cat-grid)) div.stButton > button {
                     font-size: 11px !important; padding: 5px !important; min-height: 60px !important;
                     word-wrap: break-word !important; white-space: normal !important;
                 }
@@ -880,16 +898,20 @@ else:
         if len(valid_categories) == 0: 
             st.write("अभी कोई कैटेगरी नहीं है।")
         else:
-            for i in range(0, len(valid_categories), 4):
-                cols = st.columns(4)
-                for j in range(4):
-                    if i + j < len(valid_categories):
-                        cat = valid_categories[i + j]
-                        with cols[j]:
-                            if st.button(cat, key=f"cat_btn_{i+j}", use_container_width=True):
-                                st.session_state.selected_category = cat
-                                st.query_params["cat"] = cat
-                                st.rerun()
+            cat_container = st.container()
+            with cat_container:
+                st.markdown('<div class="custom-cat-grid"></div>', unsafe_allow_html=True)
+                for i in range(0, len(valid_categories), 4):
+                    cols = st.columns(4)
+                    for j in range(4):
+                        if i + j < len(valid_categories):
+                            cat = valid_categories[i + j]
+                            with cols[j]:
+                                if st.button(cat, key=f"cat_btn_{i+j}", use_container_width=True):
+                                    st.session_state.selected_category = cat
+                                    st.query_params["cat"] = cat
+                                    save_cart_to_url()
+                                    st.rerun()
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
@@ -898,6 +920,7 @@ else:
             st.session_state.selected_category = None
             if "cat" in st.query_params:
                 del st.query_params["cat"]
+            save_cart_to_url()
             st.rerun()
             
         float_js = """
