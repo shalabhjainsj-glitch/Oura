@@ -408,7 +408,8 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
 
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
-@st.cache_data(ttl=180)
+# 🚀 1. यहाँ Caching Time को 180 से बढ़ाकर 3600 (1 घंटा) कर दिया गया है ताकि ऐप बार-बार डेटा लोड न करे 🚀
+@st.cache_data(ttl=3600)
 def load_products():
     try:
         docs = db.collection('products').stream()
@@ -1100,7 +1101,7 @@ if st.session_state.cart:
     wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
     st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
     
-    if st.button("🗑️ बास्केट खाली करें"):
+    if st.button("🗑️ बास्केट খালি करें"):
         st.session_state.cart = {}
         save_cart_to_url()
         st.rerun()
