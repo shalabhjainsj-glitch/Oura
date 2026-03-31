@@ -112,8 +112,8 @@ current_config = load_config()
 if "sellers" not in current_config:
     current_config["sellers"] = {}
 
-# 🚀 PDF जनरेट करने का अपडेटेड फंक्शन (Shipping & GST Bifurcation) 🚀
-def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, config):
+# 🚀 PDF जनरेट करने का अपडेटेड फंक्शन (Shipping, GST & Last Balance) 🚀
+def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config):
     pdf = FPDF()
     pdf.add_page()
     
@@ -252,6 +252,13 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
             pdf.ln()
         
     grand_total = taxable_amount + gst_amt
+
+    # 🚀 पिछला बकाया जोड़ना (Last Balance) 🚀
+    if last_balance > 0:
+        pdf.cell(160, 10, "Add: Previous Balance (Pichla Bakaya)", border=1, align='R')
+        pdf.cell(30, 10, f"{last_balance:.2f}", border=1, align='R')
+        pdf.ln()
+        grand_total += last_balance
     
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(220, 255, 220) # हल्का हरा
@@ -1065,6 +1072,8 @@ if st.session_state.cart:
             cust_gst = st.text_input("ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")
             
         shipping_cost = st.number_input("🚚 कोरियर / पैकिंग चार्ज (₹)", min_value=0, value=0, step=50)
+        # 🚀 यहाँ नया 'पिछला बकाया' इनपुट जोड़ा गया है 🚀
+        last_balance = st.number_input("💵 पिछला बकाया (Last Balance / ₹)", min_value=0.0, value=0.0, step=10.0)
 
     # 🚀 इनपुट वैलिडेशन चेक (नंबर 6) 🚀
     is_valid = True
@@ -1082,7 +1091,8 @@ if st.session_state.cart:
 
     if is_valid:
         if st.session_state.cart:
-            pdf_bytes = generate_pdf_bill(st.session_state.cart, cust_name, cust_mobile, cust_address, cust_gst, gst_percent, shipping_cost, current_config)
+            # 🚀 यहाँ फ़ंक्शन में last_balance पास किया गया है 🚀
+            pdf_bytes = generate_pdf_bill(st.session_state.cart, cust_name, cust_mobile, cust_address, cust_gst, gst_percent, shipping_cost, last_balance, current_config)
             
             pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
             
@@ -1095,7 +1105,12 @@ if st.session_state.cart:
                 use_container_width=True
             )
 
-    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n🚚 *शिपिंग चार्ज:* ₹{shipping_cost}\n📄 *बिल:* {gst_choice}\n"
+    # 🚀 WhatsApp मैसेज में पिछला बकाया जोड़ा गया 🚀
+    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n🚚 *शिपिंग चार्ज:* ₹{shipping_cost}\n"
+    if last_balance > 0:
+        final_msg += f"💵 *पिछला बकाया (Last Balance):* ₹{last_balance}\n"
+    final_msg += f"📄 *बिल:* {gst_choice}\n"
+    
     if cust_gst: final_msg += f"🏢 *ग्राहक GST:* {cust_gst}\n"
 
     wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
