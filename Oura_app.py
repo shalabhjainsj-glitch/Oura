@@ -15,7 +15,7 @@ from PIL import Image
 import datetime
 from fpdf import FPDF
 
-# --- नया फायरबेस सिस्टम (सिर्फ डेटाबेस के लिए) ---
+# --- फायरबेस सिस्टम ---
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -99,7 +99,7 @@ def load_config():
     except: pass
     return {
         "admin_whatsapp": "919891587437", 
-        "admin_gst": "", # 🚀 Oura Products का GST नंबर सेव करने के लिए
+        "admin_gst": "", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
         "banner_url": "", "logo_url": ""
@@ -112,24 +112,23 @@ current_config = load_config()
 if "sellers" not in current_config:
     current_config["sellers"] = {}
 
-# 🚀 PDF जनरेट करने का नया फंक्शन (Oura Products नाम के साथ) 🚀
-def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, config):
+# 🚀 PDF जनरेट करने का अपडेटेड फंक्शन (Shipping & GST Bifurcation) 🚀
+def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, config):
     pdf = FPDF()
     pdf.add_page()
     
     # --- हैडर (कंपनी का नाम और एड्रेस) ---
     pdf.set_font("Arial", 'B', 20)
     pdf.set_text_color(43, 108, 176) # नीला रंग
-    pdf.cell(0, 10, "OURA PRODUCTS", ln=True, align='C') # 🚀 नाम अपडेट किया गया
+    pdf.cell(0, 10, "OURA PRODUCTS", ln=True, align='C') 
     
     pdf.set_font("Arial", '', 10)
     pdf.set_text_color(100, 100, 100)
     admin_phone = config.get("admin_whatsapp", "9891587437")
-    admin_gst_number = config.get("admin_gst", "")
+    admin_gst_number = config.get("admin_gst", "").strip().upper()
     
     pdf.cell(0, 6, f"Delhi, India | Ph: +91 {admin_phone}", ln=True, align='C')
     
-    # अगर पक्का बिल है और एडमिन ने सेटिंग में GST डाला है
     if gst_rate > 0 and admin_gst_number:
         pdf.set_font("Arial", 'B', 10)
         pdf.cell(0, 6, f"GSTIN: {admin_gst_number}", ln=True, align='C')
@@ -172,19 +171,18 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         pdf.cell(20, 6, "")
         pdf.multi_cell(100, 6, f"Address: {cust_address}")
         
-    # पक्के बिल के लिए GST लॉजिक (B2B और B2C दोनों के लिए)
     if gst_rate > 0:
         pdf.set_font("Arial", 'B', 10)
         pdf.cell(20, 6, "")
         if cust_gst and cust_gst.strip():
-            pdf.cell(100, 6, f"GSTIN: {cust_gst.strip()}", ln=True)
+            pdf.cell(100, 6, f"GSTIN: {cust_gst.strip().upper()}", ln=True)
         else:
             pdf.cell(100, 6, "GSTIN: Unregistered Consumer", ln=True)
         
     pdf.ln(10)
     
     # --- टेबल का हैडर ---
-    pdf.set_fill_color(230, 240, 255) # हल्का नीला बैकग्राउंड
+    pdf.set_fill_color(230, 240, 255) 
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(15, 10, "S.No", border=1, align='C', fill=True)
     pdf.cell(90, 10, "Item Description", border=1, align='L', fill=True)
@@ -218,14 +216,42 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(30, 10, f"{subtotal:.2f}", border=1, align='R')
     pdf.ln()
     
-    gst_amt = 0
-    if gst_rate > 0:
-        gst_amt = (subtotal * gst_rate) / 100
-        pdf.cell(160, 10, f"Add: GST @ {gst_rate}%", border=1, align='R')
-        pdf.cell(30, 10, f"{gst_amt:.2f}", border=1, align='R')
+    taxable_amount = subtotal
+    
+    # 🚀 शिपिंग चार्ज जोड़ना 🚀
+    if shipping_charge > 0:
+        pdf.cell(160, 10, "Add: Shipping / Courier Charges", border=1, align='R')
+        pdf.cell(30, 10, f"{shipping_charge:.2f}", border=1, align='R')
         pdf.ln()
+        taxable_amount += shipping_charge # GST शिपिंग के बाद वाले अमाउंट पर लगेगा
+    
+    gst_amt = 0
+    # 🚀 GST का विभाजन (CGST/SGST vs IGST) 🚀
+    if gst_rate > 0:
+        admin_state = admin_gst_number[:2] if len(admin_gst_number) >= 2 else "07" # डिफ़ॉल्ट 07 (दिल्ली)
+        cust_state = cust_gst[:2] if cust_gst and len(cust_gst) >= 2 else admin_state
         
-    grand_total = subtotal + gst_amt
+        if admin_state != cust_state:
+            # IGST (दूसरे राज्य के लिए)
+            gst_amt = (taxable_amount * gst_rate) / 100
+            pdf.cell(160, 10, f"Add: IGST @ {gst_rate}%", border=1, align='R')
+            pdf.cell(30, 10, f"{gst_amt:.2f}", border=1, align='R')
+            pdf.ln()
+        else:
+            # CGST & SGST (अपने राज्य के लिए)
+            half_rate = gst_rate / 2
+            cgst_amt = (taxable_amount * half_rate) / 100
+            sgst_amt = cgst_amt
+            gst_amt = cgst_amt + sgst_amt
+            
+            pdf.cell(160, 10, f"Add: CGST @ {half_rate}%", border=1, align='R')
+            pdf.cell(30, 10, f"{cgst_amt:.2f}", border=1, align='R')
+            pdf.ln()
+            pdf.cell(160, 10, f"Add: SGST @ {half_rate}%", border=1, align='R')
+            pdf.cell(30, 10, f"{sgst_amt:.2f}", border=1, align='R')
+            pdf.ln()
+        
+    grand_total = taxable_amount + gst_amt
     
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(220, 255, 220) # हल्का हरा
@@ -240,18 +266,16 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(0, 5, "2. We are not responsible for any transit/courier damages.", ln=True)
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 5, "For OURA PRODUCTS", ln=True, align='R') # 🚀 नाम अपडेट किया गया
+    pdf.cell(0, 5, "For OURA PRODUCTS", ln=True, align='R') 
     pdf.set_font("Arial", '', 10)
     pdf.cell(0, 5, "(Authorized Signatory)", ln=True, align='R')
     
     return pdf.output(dest='S').encode('latin1')
 
-
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# --- लाइट और डिसेंट थीम ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -632,7 +656,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     save_config(current_config)
                     st.rerun()
         
-        # 🚀 अपडेटेड सेटिंग्स टैब 🚀
         with tab_settings:
             st.subheader("📱 संपर्क और बिज़नेस सेटिंग्स")
             new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
@@ -958,8 +981,8 @@ if st.session_state.cart:
         count += 1
     
     show_fd = current_config.get("free_delivery_tag", True)
-    if show_fd: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
-    else: msg += f"\n💰 *कुल बिल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
+    if show_fd: msg += f"\n💰 *कुल माल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
+    else: msg += f"\n💰 *कुल माल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
         
     st.subheader(f"कुल माल: ₹{total}")
     
@@ -972,7 +995,7 @@ if st.session_state.cart:
     if available_upis:
         st.markdown("### 💳 सुरक्षित online पेमेंट")
         for name, data in available_upis.items():
-            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR" # 🚀 UPI का नाम भी Oura Products कर दिया 🚀
+            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR" 
             st.markdown(f'''<a href="{qr_data}" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
             msg += f"\n💳 *{name} UPI:* {data['id']}"
         
@@ -980,7 +1003,7 @@ if st.session_state.cart:
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
-                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR" # 🚀 QR में भी नाम अपडेट 🚀
+                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR"
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
@@ -1000,7 +1023,7 @@ if st.session_state.cart:
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         cust_name = st.text_input("आपका नाम / दुकान का नाम")
-        cust_mobile = st.text_input("मोबाईल नंबर")
+        cust_mobile = st.text_input("मोबाईल नंबर (10 अंक)")
         cust_address = st.text_area("पूरा पता (शहर, पिनकोड सहित)")
     with col_d2:
         gst_choice = st.selectbox("बिल का प्रकार चुनें:", 
@@ -1015,23 +1038,40 @@ if st.session_state.cart:
         cust_gst = ""
         if gst_percent > 0:
             st.info("💡 **बिना GST नंबर वाले ग्राहक भी टैक्स देकर पक्का बिल ले सकते हैं।**")
-            cust_gst = st.text_input("ग्राहक का GST नंबर (अगर है तो डालें, नहीं तो खाली छोड़ दें)")
-    
-    if st.session_state.cart:
-        pdf_bytes = generate_pdf_bill(st.session_state.cart, cust_name, cust_mobile, cust_address, cust_gst, gst_percent, current_config)
-        
-        pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
-        
-        st.download_button(
-            label="📄 प्रोफेशनल PDF बिल डाउनलोड करें",
-            data=pdf_bytes,
-            file_name=pdf_file_name,
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True
-        )
+            cust_gst = st.text_input("ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")
+            
+        shipping_cost = st.number_input("🚚 कोरियर / पैकिंग चार्ज (₹)", min_value=0, value=0, step=50)
 
-    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n📄 *बिल:* {gst_choice}\n"
+    # 🚀 इनपुट वैलिडेशन चेक (नंबर 6) 🚀
+    is_valid = True
+    if cust_mobile:
+        cust_mobile = cust_mobile.strip()
+        if not cust_mobile.isdigit() or len(cust_mobile) != 10:
+            st.warning("⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।")
+            is_valid = False
+            
+    if cust_gst:
+        cust_gst = cust_gst.strip().upper()
+        if len(cust_gst) != 15 or not cust_gst.isalnum():
+            st.warning("⚠️ कृपया सही 15 अक्षरों का GST नंबर डालें।")
+            is_valid = False
+
+    if is_valid:
+        if st.session_state.cart:
+            pdf_bytes = generate_pdf_bill(st.session_state.cart, cust_name, cust_mobile, cust_address, cust_gst, gst_percent, shipping_cost, current_config)
+            
+            pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
+            
+            st.download_button(
+                label="📄 प्रोफेशनल PDF बिल डाउनलोड करें",
+                data=pdf_bytes,
+                file_name=pdf_file_name,
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
+
+    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n🚚 *शिपिंग चार्ज:* ₹{shipping_cost}\n📄 *बिल:* {gst_choice}\n"
     if cust_gst: final_msg += f"🏢 *ग्राहक GST:* {cust_gst}\n"
 
     wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
