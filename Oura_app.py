@@ -771,6 +771,21 @@ def show_product_card(row, idx, prefix):
             
         if show_edit_delete:
             st.markdown("---")
+            
+            # --- 🚀 NEW SMART SHARE FEATURE FOR ADMIN/SELLER 🚀 ---
+            share_text = f"⚡ *Oura Products* ⚡\n\n🎁 *Product:* {row.get('Name')}\n"
+            share_text += f"🛵 *Retail Rate:* ₹{retail_price}\n"
+            if w_qty > 1:
+                share_text += f"📦 *Wholesale Rate:* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
+            if img_link_for_wa:
+                share_text += f"\n📷 *Photo:* {img_link_for_wa}\n"
+            
+            cat_url = urllib.parse.quote(str(row.get('Category', '')))
+            share_text += f"\n🛒 *Book Now:*\nhttps://ouraindia.streamlit.app/?cat={cat_url}"
+            
+            encoded_share_text = urllib.parse.quote(share_text)
+            st.markdown(f'''<a href="https://wa.me/?text={encoded_share_text}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:8px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📢 {t("Share this Product", "इस प्रोडक्ट को शेयर करें")}</a>''', unsafe_allow_html=True)
+
             with st.expander(t("✏️ Edit Rate, Stock or Photo", "✏️ रेट, स्टॉक या फोटो बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("Name", value=str(row.get("Name", "")))
@@ -919,7 +934,6 @@ if st.session_state.cart:
     st.markdown("---")
     st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
-    # 🚀 SPEED FIX: यहाँ फॉर्म (Form) लगा दिया गया है ताकि टाइप करते वक्त ऐप स्लो न हो 🚀
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
@@ -940,7 +954,6 @@ if st.session_state.cart:
             shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0, value=0, step=50)
             last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0)
 
-        # जब तक यह बटन नहीं दबेगा, तब तक PDF नहीं बनेगा
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & WhatsApp Link", "✅ बिल और WhatsApp लिंक तैयार करें"))
 
     if submit_billing:
@@ -951,13 +964,11 @@ if st.session_state.cart:
 
         if is_valid:
             if st.session_state.cart:
-                # सीधे ओरिजिनल फंक्शन से PDF बनाएंगे
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
                     cust_gst, gst_percent, shipping_cost, last_balance, current_config
                 )
                 
-                # जनरेट हुए PDF और मैसेज को सेव कर रहे हैं
                 st.session_state.ready_pdf = pdf_bytes
                 st.session_state.ready_filename = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
                 
@@ -968,7 +979,6 @@ if st.session_state.cart:
                 
                 st.session_state.ready_msg = final_msg
 
-    # 🚀 डाउनलोड और WhatsApp बटन यहाँ दिखेंगे 🚀
     if 'ready_pdf' in st.session_state and 'ready_msg' in st.session_state:
         st.success(t("✅ Bill is ready! Download PDF or send to WhatsApp below:", "✅ आपका बिल तैयार है! नीचे से PDF डाउनलोड करें या WhatsApp पर भेजें:"))
         
