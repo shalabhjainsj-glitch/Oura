@@ -772,19 +772,37 @@ def show_product_card(row, idx, prefix):
         if show_edit_delete:
             st.markdown("---")
             
-            # --- 🚀 NEW SMART SHARE FEATURE FOR ADMIN/SELLER 🚀 ---
-            share_text = f"⚡ *Oura Products* ⚡\n\n🎁 *Product:* {row.get('Name')}\n"
-            share_text += f"🛵 *Retail Rate:* ₹{retail_price}\n"
-            if w_qty > 1:
-                share_text += f"📦 *Wholesale Rate:* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
-            if img_link_for_wa:
-                share_text += f"\n📷 *Photo:* {img_link_for_wa}\n"
+            # --- 🚀 WhatsApp स्मार्ट शेयर ---
+            share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
+            share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
+            share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
+            share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
             
             cat_url = urllib.parse.quote(str(row.get('Category', '')))
-            share_text += f"\n🛒 *Book Now:*\nhttps://ouraindia.streamlit.app/?cat={cat_url}"
+            app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
+            share_text += f"\n🛒 *{t('Book Order:', 'ऑर्डर बुक करें:')}* {app_link}\n"
+            
+            if img_link_for_wa:
+                share_text += f"\n📷 *{t('Product Photo:', 'प्रोडक्ट फोटो:')}* {img_link_for_wa}"
             
             encoded_share_text = urllib.parse.quote(share_text)
-            st.markdown(f'''<a href="https://wa.me/?text={encoded_share_text}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:8px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📢 {t("Share this Product", "इस प्रोडक्ट को शेयर करें")}</a>''', unsafe_allow_html=True)
+            st.markdown(f'''<a href="https://wa.me/?text={encoded_share_text}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:8px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📢 {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}</a>''', unsafe_allow_html=True)
+
+            # --- 📘 FACEBOOK के लिए स्पेशल पोस्ट मेकर 📘 ---
+            with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
+                fb_text = f"🔥 OURA PRODUCTS - {row.get('Name')} 🔥\n\n"
+                fb_text += f"📦 {t('Wholesale Rate:', 'होलसेल रेट:')} ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
+                fb_text += f"🛵 {t('Single Piece Rate:', 'सिंगल पीस रेट:')} ₹{retail_price}\n"
+                fb_text += f"🏭 {t('Direct from Manufacturer:', 'सीधा मैन्युफैक्चरर से:')} Delhi (Oura Products)\n\n"
+                fb_text += f"👇 {t('Check rates and order online now:', 'अभी रेट चेक करें और ऑनलाइन ऑर्डर करें:')}\n{app_link}\n\n"
+                fb_text += f"#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
+                
+                st.info(t("💡 **Tip:** Copy the text below and paste it on Facebook.", "💡 **टिप:** नीचे दिए गए टेक्स्ट को Copy करें और Facebook पर Paste कर दें।"))
+                st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text, height=200, key=f"fb_txt_{prefix_idx}")
+                
+                if img_link_for_wa:
+                    st.markdown(f"**[📥 {t('Download Photo Here', 'फोटो यहाँ से डाउनलोड करें')}]({img_link_for_wa})** *({t('Click link, long press photo and select Download Image', 'लिंक पर क्लिक करें, फोटो खुलने पर उंगली दबाए रखें और Download Image चुनें')})*", unsafe_allow_html=True)
+
 
             with st.expander(t("✏️ Edit Rate, Stock or Photo", "✏️ रेट, स्टॉक या फोटो बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
