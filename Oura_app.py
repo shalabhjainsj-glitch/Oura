@@ -279,6 +279,11 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     
     return pdf.output(dest='S').encode('latin1')
 
+# 🚀 स्पीड बढ़ाने के लिए PDF को Cache करने का नया फंक्शन 🚀
+@st.cache_data(show_spinner=False)
+def get_cached_pdf_bytes(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config):
+    return generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config)
+
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
@@ -1045,7 +1050,7 @@ if st.session_state.cart:
 
     st.markdown("---")
     st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
-    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी नहीं।\n3. **इम्पोर्टेड आइटम की custom ड्यूटी की कोई गारंटी नहीं।**")
+    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी পণ্ডিত।\n3. **इम्पोर्टेड आइटम की custom ड्यूटी की कोई गारंटी नहीं।**")
     msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
 
     st.markdown("---")
@@ -1091,8 +1096,11 @@ if st.session_state.cart:
 
     if is_valid:
         if st.session_state.cart:
-            # 🚀 यहाँ फ़ंक्शन में last_balance पास किया गया है 🚀
-            pdf_bytes = generate_pdf_bill(st.session_state.cart, cust_name, cust_mobile, cust_address, cust_gst, gst_percent, shipping_cost, last_balance, current_config)
+            # 🚀 फास्ट कैशिंग के साथ PDF बनाना 🚀
+            pdf_bytes = get_cached_pdf_bytes(
+                st.session_state.cart, cust_name, cust_mobile, cust_address, 
+                cust_gst, gst_percent, shipping_cost, last_balance, current_config
+            )
             
             pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
             
