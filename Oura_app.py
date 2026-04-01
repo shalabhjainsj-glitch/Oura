@@ -112,14 +112,12 @@ current_config = load_config()
 if "sellers" not in current_config:
     current_config["sellers"] = {}
 
-# 🚀 PDF जनरेट करने का अपडेटेड फंक्शन (Shipping, GST & Last Balance) 🚀
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config):
     pdf = FPDF()
     pdf.add_page()
     
-    # --- हैडर (कंपनी का नाम और एड्रेस) ---
     pdf.set_font("Arial", 'B', 20)
-    pdf.set_text_color(43, 108, 176) # नीला रंग
+    pdf.set_text_color(43, 108, 176)
     pdf.cell(0, 10, "OURA PRODUCTS", ln=True, align='C') 
     
     pdf.set_font("Arial", '', 10)
@@ -134,8 +132,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         pdf.cell(0, 6, f"GSTIN: {admin_gst_number}", ln=True, align='C')
         
     pdf.ln(5)
-    
-    # --- इनवॉइस की जानकारी ---
     pdf.set_draw_color(200, 200, 200)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
@@ -146,7 +142,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(0, 8, title, ln=True, align='C')
     pdf.ln(5)
     
-    # --- ग्राहक की जानकारी ---
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(20, 6, "Billed To:")
     pdf.set_font("Arial", '', 10)
@@ -181,7 +176,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
     pdf.ln(10)
     
-    # --- टेबल का हैडर ---
     pdf.set_fill_color(230, 240, 255) 
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(15, 10, "S.No", border=1, align='C', fill=True)
@@ -191,7 +185,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(30, 10, "Amount", border=1, align='C', fill=True)
     pdf.ln()
     
-    # --- टेबल का डेटा ---
     pdf.set_font("Arial", '', 10)
     subtotal = 0
     idx = 1
@@ -210,7 +203,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         pdf.ln()
         idx += 1
         
-    # --- टोटल्स (Totals) ---
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(160, 10, "Subtotal", border=1, align='R')
     pdf.cell(30, 10, f"{subtotal:.2f}", border=1, align='R')
@@ -218,27 +210,23 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     
     taxable_amount = subtotal
     
-    # 🚀 शिपिंग चार्ज जोड़ना 🚀
     if shipping_charge > 0:
         pdf.cell(160, 10, "Add: Shipping / Courier Charges", border=1, align='R')
         pdf.cell(30, 10, f"{shipping_charge:.2f}", border=1, align='R')
         pdf.ln()
-        taxable_amount += shipping_charge # GST शिपिंग के बाद वाले अमाउंट पर लगेगा
+        taxable_amount += shipping_charge 
     
     gst_amt = 0
-    # 🚀 GST का विभाजन (CGST/SGST vs IGST) 🚀
     if gst_rate > 0:
-        admin_state = admin_gst_number[:2] if len(admin_gst_number) >= 2 else "07" # डिफ़ॉल्ट 07 (दिल्ली)
+        admin_state = admin_gst_number[:2] if len(admin_gst_number) >= 2 else "07" 
         cust_state = cust_gst[:2] if cust_gst and len(cust_gst) >= 2 else admin_state
         
         if admin_state != cust_state:
-            # IGST (दूसरे राज्य के लिए)
             gst_amt = (taxable_amount * gst_rate) / 100
             pdf.cell(160, 10, f"Add: IGST @ {gst_rate}%", border=1, align='R')
             pdf.cell(30, 10, f"{gst_amt:.2f}", border=1, align='R')
             pdf.ln()
         else:
-            # CGST & SGST (अपने राज्य के लिए)
             half_rate = gst_rate / 2
             cgst_amt = (taxable_amount * half_rate) / 100
             sgst_amt = cgst_amt
@@ -253,7 +241,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
     grand_total = taxable_amount + gst_amt
 
-    # 🚀 पिछला बकाया जोड़ना (Last Balance) 🚀
     if last_balance > 0:
         pdf.cell(160, 10, "Add: Previous Balance (Pichla Bakaya)", border=1, align='R')
         pdf.cell(30, 10, f"{last_balance:.2f}", border=1, align='R')
@@ -261,12 +248,11 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         grand_total += last_balance
     
     pdf.set_font("Arial", 'B', 12)
-    pdf.set_fill_color(220, 255, 220) # हल्का हरा
+    pdf.set_fill_color(220, 255, 220) 
     pdf.cell(160, 12, "GRAND TOTAL (Rs)", border=1, align='R', fill=True)
     pdf.cell(30, 12, f"{grand_total:.2f}", border=1, align='R', fill=True)
     pdf.ln(20)
     
-    # --- फुटर (Footer) ---
     pdf.set_font("Arial", 'I', 9)
     pdf.cell(0, 5, "Terms & Conditions:", ln=True)
     pdf.cell(0, 5, "1. Goods once sold will not be taken back without valid manufacturing defect.", ln=True)
@@ -279,7 +265,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     
     return pdf.output(dest='S').encode('latin1')
 
-# 🚀 स्पीड बढ़ाने के लिए PDF को Cache करने का नया फंक्शन 🚀
 @st.cache_data(show_spinner=False)
 def get_cached_pdf_bytes(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config):
     return generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config)
@@ -418,9 +403,15 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     """
     st_components.html(pwa_js, height=0, width=0)
 
+# 🚀 LANGUAGE TOGGLE SYSTEM 🚀
+if 'lang' not in st.session_state:
+    st.session_state.lang = 'hi'
+
+def t(en_text, hi_text):
+    return en_text if st.session_state.lang == 'en' else hi_text
+
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
-# 🚀 1. यहाँ Caching Time को 180 से बढ़ाकर 3600 (1 घंटा) कर दिया गया है ताकि ऐप बार-बार डेटा लोड न करे 🚀
 @st.cache_data(ttl=3600)
 def load_products():
     try:
@@ -491,44 +482,53 @@ if st.session_state.seller_logged_in:
     valid_sellers = current_config.get("sellers", {}).values()
     if seller_name not in valid_sellers:
         st.session_state.seller_logged_in = None
-        st.error("⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!")
+        st.error(t("⚠️ Your seller token has been blocked or deleted by Admin!", "⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!"))
         st.rerun()
 
-if current_config.get("has_banner", False) and current_config.get("banner_url"):
-    try: st.image(current_config["banner_url"], use_container_width=True)
-    except: st.title("🛍️ Oura Products - Wholesale")
-else:
-    st.title("🛍️ Oura Products - Wholesale")
+# --- HEADER SECTION ---
+col_logo, col_lang, col_login = st.columns([6, 2, 2])
+with col_logo:
+    if current_config.get("has_banner", False) and current_config.get("banner_url"):
+        try: st.image(current_config["banner_url"], use_container_width=True)
+        except: st.title("🛍️ Oura Products - Wholesale")
+    else:
+        st.title("🛍️ Oura Products - Wholesale")
 
-multi_color_marquee = """
-<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
-    <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
-        🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀
-    </marquee>
-</div>
-"""
-st.markdown(multi_color_marquee, unsafe_allow_html=True)
+with col_lang:
+    if st.button("🌐 English / हिंदी", key="lang_btn"):
+        st.session_state.lang = 'en' if st.session_state.lang == 'hi' else 'hi'
+        st.rerun()
 
-col1, col2 = st.columns([8, 2])
-with col2:
+with col_login:
     if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
-        if st.button("🔒 एडमिन / सेलर लॉगिन"):
+        if st.button(t("🔒 Login", "🔒 एडमिन / सेलर लॉगिन")):
             st.session_state.show_login = not st.session_state.show_login
     else:
-        if st.button("🚪 लॉगआउट"):
+        if st.button(t("🚪 Logout", "🚪 लॉगआउट")):
             st.session_state.admin_logged_in = False
             st.session_state.seller_logged_in = None
             st.session_state.show_login = False
             st.rerun()
 
+hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
+en_marquee = "🏭 Are you a manufacturer or wholesaler? Let's take your business to new heights with Oura! 🚀"
+multi_color_marquee = f"""
+<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
+    <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
+        {t(en_marquee, hi_marquee)}
+    </marquee>
+</div>
+"""
+st.markdown(multi_color_marquee, unsafe_allow_html=True)
+
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
-        st.subheader("दुकान में लॉगिन करें")
-        login_type = st.radio("लॉगिन का प्रकार चुनें:", ["सेलर (Seller)", "मालिक / एडमिन (Admin)"], horizontal=True)
+        st.subheader(t("Store Login", "दुकान में लॉगिन करें"))
+        login_type = st.radio(t("Select Login Type:", "लॉगिन का प्रकार चुनें:"), [t("Seller", "सेलर (Seller)"), t("Admin", "मालिक / एडमिन (Admin)")], horizontal=True)
         
-        if login_type == "मालिक / एडमिन (Admin)":
-            password = st.text_input("एडमिन पासवर्ड डालें", type="password")
-            if st.button("लॉगिन करें"):
+        if login_type == t("Admin", "मालिक / एडमिन (Admin)"):
+            password = st.text_input(t("Enter Admin Password", "एडमिन पासवर्ड डालें"), type="password")
+            if st.button(t("Login", "लॉगिन करें")):
                 try: correct_password = st.secrets["ADMIN_PASSWORD"]
                 except: correct_password = None
                     
@@ -537,37 +537,36 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                     st.session_state.seller_logged_in = None
                     st.session_state.show_login = False
                     st.rerun()
-                else: st.error("❌ गलत पासवर्ड!")
+                else: st.error(t("❌ Incorrect Password!", "❌ गलत पासवर्ड!"))
         else:
-            seller_token = st.text_input("अपना सेलर टोकन (Token) डालें", type="password")
-            if st.button("लॉगिन करें"):
+            seller_token = st.text_input(t("Enter Seller Token", "अपना सेलर टोकन (Token) डालें"), type="password")
+            if st.button(t("Login", "लॉगिन करें")):
                 sellers_dict = current_config.get("sellers", {})
                 if seller_token in sellers_dict:
                     st.session_state.seller_logged_in = sellers_dict[seller_token]
                     st.session_state.admin_logged_in = False
                     st.session_state.show_login = False
                     st.rerun()
-                else: st.error("❌ गलत टोकन! कृपया एडमिन से संपर्क करें।")
+                else: st.error(t("❌ Invalid Token! Contact Admin.", "❌ गलत टोकन! कृपया एडमिन से संपर्क करें।"))
     st.markdown("---")
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
-        st.success("✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।")
-        tab_add, tab_banner, tab_settings = st.tabs(["➕ नया उत्पाद", "🖼️ बैनर व लोगो", "⚙️ सेटिंग्स"])
+        st.success(t("✅ Logged in as Admin. You have full control.", "✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।"))
+        tab_add, tab_banner, tab_settings = st.tabs([t("➕ Add Product", "➕ नया उत्पाद"), t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), t("⚙️ Settings", "⚙️ सेटिंग्स")])
     else:
-        st.success(f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)")
-        tab_add, = st.tabs(["➕ नया उत्पाद"])
+        st.success(t(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)", f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)"))
+        tab_add, = st.tabs([t("➕ Add Product", "➕ नया उत्पाद")])
     
     with tab_add:
         if st.session_state.share_msg:
-            st.success("✅ शानदार! आपका नया उत्पाद Oura पर लाइव है।")
+            st.success(t("✅ Great! Your new product is live on Oura.", "✅ शानदार! आपका नया उत्पाद Oura पर लाइव है।"))
             if st.session_state.share_img_path:
                 st.image(st.session_state.share_img_path, width=200)
-                st.info("💡 **टिप:** इस फोटो को WhatsApp पर भेजने के लिए, फोटो पर उंगली दबाए रखें और **'Copy Image'** चुनें, फिर WhatsApp में Paste कर दें।")
             encoded_share = urllib.parse.quote(st.session_state.share_msg)
             wa_share_link = f"https://wa.me/?text={encoded_share}"
-            st.markdown(f'''<a href="{wa_share_link}" target="_blank" style="display:inline-block; background-color:#25D366; color:white; padding:12px 25px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; margin-bottom:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📢 WhatsApp पर शेयर करें</a>''', unsafe_allow_html=True)
-            if st.button("➕ एक और नया उत्पाद जोड़ें"):
+            st.markdown(f'''<a href="{wa_share_link}" target="_blank" style="display:inline-block; background-color:#25D366; color:white; padding:12px 25px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; margin-bottom:15px;">📢 {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}</a>''', unsafe_allow_html=True)
+            if st.button(t("➕ Add Another Product", "➕ एक और नया उत्पाद जोड़ें")):
                 st.session_state.share_msg = None
                 st.session_state.share_img_path = None
                 st.rerun()
@@ -575,161 +574,110 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with st.form("add_product", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    new_id = st.text_input("ID (यूनिक रखें)")
-                    new_name = st.text_input("नाम")
-                    new_price = st.number_input("सिंगल पीस रेट", min_value=1)
+                    new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
+                    new_name = st.text_input(t("Product Name", "नाम"))
+                    new_price = st.number_input(t("Single Piece Rate", "सिंगल पीस रेट"), min_value=1)
                 with col_b:
-                    new_w_qty = st.number_input("होलसेल कम से कम पीस", min_value=1, value=10)
-                    new_w_price = st.number_input("होलसेल / बॉक्स रेट (प्रति पीस)", min_value=1)
-                    new_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"])
+                    new_w_qty = st.number_input(t("Min Wholesale Qty", "होलसेल कम से कम पीस"), min_value=1, value=10)
+                    new_w_price = st.number_input(t("Wholesale Rate (Per Piece)", "होलसेल / बॉक्स रेट (प्रति पीस)"), min_value=1)
+                    new_free_delivery = st.selectbox(t("Single Piece Delivery", "सिंगल पीस डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")])
                 
-                new_in_stock = st.checkbox("✅ उत्पाद अभी स्टॉक में उपलब्ध है?", value=True)
+                new_in_stock = st.checkbox(t("✅ Product is currently in stock?", "✅ उत्पाद अभी स्टॉक में उपलब्ध है?"), value=True)
                 
                 if st.session_state.seller_logged_in:
-                    st.info(f"🏪 आपका ब्रांड/सेलर नाम: **{st.session_state.seller_logged_in}**")
+                    st.info(f"🏪 {t('Your Brand/Seller Name', 'आपका ब्रांड/सेलर नाम')}: **{st.session_state.seller_logged_in}**")
                     new_seller_name = st.session_state.seller_logged_in
                 else:
-                    new_seller_name = st.text_input("सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ नहीं दिखेगा)")
+                    new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ नहीं दिखेगा)"))
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-                cat_options = ["नयी केटेगरी बनाएं..."] + existing_cats
-                selected_cat = st.selectbox("केटेगरी चुनें", cat_options)
-                if selected_cat == "नयी केटेगरी बनाएं...":
-                    final_cat = st.text_input("नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)")
+                cat_options = [t("Create New Category...", "नयी केटेगरी बनाएं...")] + existing_cats
+                selected_cat = st.selectbox(t("Select Category", "केटेगरी चुनें"), cat_options)
+                if selected_cat == t("Create New Category...", "नयी केटेगरी बनाएं..."):
+                    final_cat = st.text_input(t("Enter New Category Name (Emojis allowed 👕👟)", "नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)"))
                 else:
                     final_cat = selected_cat
-                uploaded_imgs = st.file_uploader("फोटो अपलोड करें (अधिकतम 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
-                submit_btn = st.form_submit_button("उत्पाद सेव करें")
+                uploaded_imgs = st.file_uploader(t("Upload Photos (Max 3)", "फोटो अपलोड करें (अधिकतम 3)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
+                submit_btn = st.form_submit_button(t("Save Product", "उत्पाद सेव करें"))
                 if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
-                    if len(uploaded_imgs) > 3: st.error("⚠️ कृपया अधिकतम 3 फोटो ही चुनें।")
+                    if len(uploaded_imgs) > 3: st.error(t("⚠️ Please select max 3 photos.", "⚠️ कृपया अधिकतम 3 फोटो ही चुनें।"))
                     else:
-                        with st.spinner("AI फोटो चेक कर रहा है और सेव कर रहा है..."):
+                        with st.spinner("Saving..."):
                             has_violation = False
-                            violation_type = ""
-                            violation_img_name = ""
                             image_paths = []
                             for img in uploaded_imgs:
                                 compressed_bytes, pil_img = compress_image(img.getvalue())
-                                try:
-                                    if pil_img:
-                                        text_in_image = pytesseract.image_to_string(pil_img).lower()
-                                        clean_text = re.sub(r'[\s\-\(\)\+]+', '', text_in_image)
-                                        if re.search(r'\d{10}', clean_text):
-                                            has_violation = True; violation_type = "मोबाईल नंबर"; violation_img_name = img.name; break
-                                        if re.search(r'(https?://|www\.)[^\s]+', text_in_image) or re.search(r'\b[a-z0-9\-]+\.(com|in|org|net|co|store|shop)\b', text_in_image):
-                                            has_violation = True; violation_type = "वेबसाइट लिंक"; violation_img_name = img.name; break
-                                except Exception as e: pass 
-                                if not has_violation:
-                                    img_url = upload_image_to_imgbb(compressed_bytes)
-                                    if img_url: image_paths.append(img_url)
-                            if has_violation:
-                                st.error(f"🚨 **अपलोड फेल:** फोटो ('{violation_img_name}') में **{violation_type}** मिला है! Oura की पॉलिसी के अनुसार ऐसी फोटो नहीं डाल सकते।")
-                            else:
-                                final_path_str = "|".join(image_paths)
-                                is_free = True if new_free_delivery == "फ्री डिलीवरी" else False
-                                seller_val = new_seller_name.strip() if new_seller_name else ""
-                                data = {
-                                    "ID": new_id, "Name": new_name, "Price": new_price, "Wholesale_Price": new_w_price,
-                                    "Wholesale_Qty": new_w_qty, "Category": final_cat, "Image_Path": final_path_str,
-                                    "Free_Delivery": is_free, "Seller_Name": seller_val,
-                                    "In_Stock": new_in_stock
-                                }
-                                db.collection('products').document(str(new_id)).set(data)
-                                load_products.clear()
-                                st.session_state.share_msg = f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\n🎁 *उत्पाद:* {new_name}\n"
-                                if seller_val: st.session_state.share_msg += f"🏪 *ब्रांड/सेलर:* {seller_val}\n"
-                                st.session_state.share_msg += "\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\nhttps://ouraindia.streamlit.app/"
-                                st.session_state.share_img_path = image_paths[0] if image_paths else None
-                                st.rerun()
+                                img_url = upload_image_to_imgbb(compressed_bytes)
+                                if img_url: image_paths.append(img_url)
+                            
+                            final_path_str = "|".join(image_paths)
+                            is_free = True if new_free_delivery in ["फ्री डिलीवरी", "Free Delivery"] else False
+                            seller_val = new_seller_name.strip() if new_seller_name else ""
+                            data = {
+                                "ID": new_id, "Name": new_name, "Price": new_price, "Wholesale_Price": new_w_price,
+                                "Wholesale_Qty": new_w_qty, "Category": final_cat, "Image_Path": final_path_str,
+                                "Free_Delivery": is_free, "Seller_Name": seller_val,
+                                "In_Stock": new_in_stock
+                            }
+                            db.collection('products').document(str(new_id)).set(data)
+                            load_products.clear()
+                            st.session_state.share_msg = f"⚡ *Market's hottest item on Oura!* ⚡\n\n🎁 *Product:* {new_name}\n" if st.session_state.lang == 'en' else f"⚡ *मार्केट का सबसे हॉट आइटम अब Oura पर!* ⚡\n\n🎁 *उत्पाद:* {new_name}\n"
+                            if seller_val: st.session_state.share_msg += f"🏪 *Brand:* {seller_val}\n"
+                            st.session_state.share_msg += "\n👇 *Check rates & book now:*\nhttps://ouraindia.streamlit.app/" if st.session_state.lang == 'en' else "\n👇 *तुरंत रेट देखें और अपना माल बुक करें:*\nhttps://ouraindia.streamlit.app/"
+                            st.session_state.share_img_path = image_paths[0] if image_paths else None
+                            st.rerun()
 
     if st.session_state.admin_logged_in:
         with tab_banner:
-            st.subheader("🖼️ ऐप का बैनर (Top Banner)")
-            new_banner = st.file_uploader("नया बैनर चुनें", type=["jpg", "png", "jpeg"], key="banner_upload")
-            if st.button("बैनर सेव करें") and new_banner:
-                with st.spinner("बैनर सेव हो रहा है..."):
-                    dummy_delete_image(current_config.get("banner_url", ""))
-                    compressed_bytes, _ = compress_image(new_banner.getvalue())
-                    b_url = upload_image_to_imgbb(compressed_bytes)
-                    if b_url:
-                        current_config["has_banner"] = True
-                        current_config["banner_url"] = b_url
-                        save_config(current_config)
-                        st.success("✅ बैनर लग गया!")
-                        time.sleep(1)
-                        st.rerun()
+            st.subheader("🖼️ Top Banner")
+            new_banner = st.file_uploader("Choose Banner", type=["jpg", "png", "jpeg"], key="banner_upload")
+            if st.button("Save Banner") and new_banner:
+                compressed_bytes, _ = compress_image(new_banner.getvalue())
+                b_url = upload_image_to_imgbb(compressed_bytes)
+                if b_url:
+                    current_config["has_banner"] = True
+                    current_config["banner_url"] = b_url
+                    save_config(current_config)
+                    st.rerun()
             if current_config.get("has_banner", False):
-                if st.button("❌ बैनर हटाएं"):
-                    dummy_delete_image(current_config.get("banner_url", ""))
+                if st.button("❌ Remove Banner"):
                     current_config["has_banner"] = False
                     current_config["banner_url"] = ""
                     save_config(current_config)
                     st.rerun()
             st.markdown("---")
-            st.subheader("📱 ऐप का लोगो (App Icon)")
-            new_logo = st.file_uploader("नया लोगो चुनें (Square)", type=["jpg", "png", "jpeg"], key="logo_upload")
-            if st.button("लोगो सेव करें") and new_logo:
-                with st.spinner("लोगो सेव हो रहा है..."):
-                    dummy_delete_image(current_config.get("logo_url", ""))
-                    compressed_bytes, _ = compress_image(new_logo.getvalue())
-                    l_url = upload_image_to_imgbb(compressed_bytes)
-                    if l_url:
-                        current_config["has_logo"] = True
-                        current_config["logo_url"] = l_url
-                        save_config(current_config)
-                        st.success("✅ आपका लोगो सेट हो गया!")
-                        time.sleep(1)
-                        st.rerun()
+            st.subheader("📱 App Logo")
+            new_logo = st.file_uploader("Choose Logo", type=["jpg", "png", "jpeg"], key="logo_upload")
+            if st.button("Save Logo") and new_logo:
+                compressed_bytes, _ = compress_image(new_logo.getvalue())
+                l_url = upload_image_to_imgbb(compressed_bytes)
+                if l_url:
+                    current_config["has_logo"] = True
+                    current_config["logo_url"] = l_url
+                    save_config(current_config)
+                    st.rerun()
             if current_config.get("has_logo", False):
-                if st.button("❌ लोगो हटाएं"):
-                    dummy_delete_image(current_config.get("logo_url", ""))
+                if st.button("❌ Remove Logo"):
                     current_config["has_logo"] = False
                     current_config["logo_url"] = ""
                     save_config(current_config)
                     st.rerun()
         
         with tab_settings:
-            st.subheader("📱 संपर्क और बिज़नेस सेटिंग्स")
-            new_wa = st.text_input("WhatsApp नंबर", value=current_config.get("admin_whatsapp", "919891587437"))
-            new_admin_gst = st.text_input("आपका GST नंबर (Oura Products)", value=current_config.get("admin_gst", ""))
+            st.subheader("📱 Business Settings")
+            new_wa = st.text_input("WhatsApp Number", value=current_config.get("admin_whatsapp", "919891587437"))
+            new_admin_gst = st.text_input("Admin GST Number", value=current_config.get("admin_gst", ""))
+            show_free_delivery = st.checkbox("✅ Show 'Free Delivery' tag by default?", value=current_config.get("free_delivery_tag", True))
+            
             st.markdown("---")
-            st.subheader("🚚 डिफॉल्ट डिलीवरी सेटिंग्स")
-            show_free_delivery = st.checkbox("✅ बाय डिफ़ॉल्ट 'फ्री डिलीवरी' दिखाएं?", value=current_config.get("free_delivery_tag", True))
-            st.markdown("---")
-            st.subheader("👥 सेलर पार्टनर (Seller Management)")
-            col_s1, col_s2 = st.columns([3, 1])
-            with col_s1: new_seller_brand = st.text_input("नये सेलर / ब्रांड का नाम")
-            with col_s2:
-                st.write("")
-                st.write("")
-                if st.button("➕ नया टोकन बनाएं"):
-                    if new_seller_brand:
-                        new_token = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                        current_config["sellers"][new_token] = new_seller_brand.strip()
-                        save_config(current_config)
-                        st.success(f"टोकन बन गया: {new_token}")
-                        time.sleep(1)
-                        st.rerun()
-                    else: st.error("नाम डालें")
-            if current_config.get("sellers"):
-                st.write("**मौजूदा सेलर्स:**")
-                for tkn, s_name in list(current_config["sellers"].items()):
-                    col_list1, col_list2 = st.columns([8, 2])
-                    with col_list1: st.write(f"🏪 **{s_name}** (टोकन: `{tkn}`)")
-                    with col_list2:
-                        if st.button("❌ हटाएं", key=f"del_seller_{tkn}"):
-                            del current_config["sellers"][tkn]
-                            save_config(current_config)
-                            st.rerun()
-            st.markdown("---")
-            st.subheader("💳 मल्टी UPI सेटिंग्स")
+            st.subheader("💳 UPI Settings")
             col_u1, col_u2 = st.columns(2)
             with col_u1:
                 new_phonepe = st.text_input("PhonePe UPI ID", value=current_config.get("phonepe_upi", ""))
                 new_paytm = st.text_input("Paytm UPI ID", value=current_config.get("paytm_upi", ""))
             with col_u2:
-                new_gpay = st.text_input("Google Pay (GPay) UPI ID", value=current_config.get("gpay_upi", ""))
+                new_gpay = st.text_input("GPay UPI ID", value=current_config.get("gpay_upi", ""))
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
-            if st.button("⚙️ सभी सेटिंग्स सेव करें"):
+            if st.button("⚙️ Save All Settings"):
                 current_config["admin_whatsapp"] = new_wa
                 current_config["admin_gst"] = new_admin_gst
                 current_config["free_delivery_tag"] = show_free_delivery
@@ -738,13 +686,13 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 current_config["gpay_upi"] = new_gpay
                 current_config["bhim_upi"] = new_bhim
                 save_config(current_config)
-                st.success("✅ सेटिंग्स सेव हो गईं!")
+                st.success("✅ Saved!")
                 time.sleep(1)
                 st.rerun()
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)", "")
+search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
 def show_swipe_gallery(path_str):
     if not path_str: return []
@@ -756,7 +704,7 @@ def show_swipe_gallery(path_str):
             src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
         html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
     html_code += '</div>'
-    html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">ज़ूम करने के लिए फोटो पर क्लिक करें 🔍</div>'
+    html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">{t("Click photo to zoom 🔍", "ज़ूम करने के लिए फोटो पर क्लिक करें 🔍")}</div>'
     st.markdown(html_code, unsafe_allow_html=True)
     return paths
 
@@ -773,7 +721,7 @@ def show_product_card(row, idx, prefix):
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
         if pd.notna(seller_val) and str(seller_val).strip() != "":
-            st.markdown(f"🏪 **सेलर / ब्रांड:** <span style='color:#E65100; font-weight:bold;'>{str(seller_val).strip()}</span>", unsafe_allow_html=True)
+            st.markdown(f"{t('🏪 Brand:', '🏪 सेलर / ब्रांड:')} <span style='color:#E65100; font-weight:bold;'>{str(seller_val).strip()}</span>", unsafe_allow_html=True)
         try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
         except: w_qty = 1
         try: retail_price = row.get('Price', 0)
@@ -787,31 +735,35 @@ def show_product_card(row, idx, prefix):
             
         is_in_stock = row.get("In_Stock", True)
         
+        t_sp_fd = t("🛵 **Single Piece (Free Delivery):**", "🛵 **सिंगल पीस (फ्री डिलीवरी):**")
+        t_sp_ex = t("🛵 **Single Piece Rate:**", "🛵 **सिंगल पीस रेट:**")
+        t_ws = t("📦 **Wholesale (Box Rate):**", "📦 **होलसेल (बॉक्स रेट):**")
+        t_min = t(f"Min {w_qty} pieces", f"कम से कम {w_qty} पीस")
+        t_ex = t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")
+
         if w_qty > 1:
             if show_fd:
-                st.markdown(f"🛵 **सिंगल पीस (फ्री डिलीवरी):** ₹{retail_price} <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस, <span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
+                st.markdown(f"{t_sp_fd} ₹{retail_price} <br> {t_ws} ₹{w_price} *({t_min}, <span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)*", unsafe_allow_html=True)
             else:
-                st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)* <br> 📦 **होलसेल (बॉक्स रेट):** ₹{w_price} *(कम से कम {w_qty} पीस, <span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
+                st.markdown(f"{t_sp_ex} ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)* <br> {t_ws} ₹{w_price} *({t_min}, <span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)*", unsafe_allow_html=True)
         else:
-            if show_fd: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(फ्री डिलीवरी)*")
-            else: st.markdown(f"🛵 **सिंगल पीस रेट:** ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>कोरियर चार्ज एक्स्ट्रा</span>)*", unsafe_allow_html=True)
+            if show_fd: st.markdown(f"{t_sp_ex} ₹{retail_price} *({t('Free Delivery','फ्री डिलीवरी')})*")
+            else: st.markdown(f"{t_sp_ex} ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)*", unsafe_allow_html=True)
             
         if is_in_stock:
-            qty = st.number_input("मात्रा (पीस)", min_value=1, value=1, key=f"q_{prefix_idx}")
-            if st.button("🛒 कार्ट में डालें", key=f"b_{prefix_idx}"):
+            qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस)"), min_value=1, value=1, key=f"q_{prefix_idx}")
+            if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
                 final_price = w_price if qty >= w_qty else retail_price
-                
                 if p_id in st.session_state.cart:
                     st.session_state.cart[p_id]["qty"] += qty
                     if st.session_state.cart[p_id]["qty"] >= w_qty:
                         st.session_state.cart[p_id]["price"] = w_price
                 else:
                     st.session_state.cart[p_id] = {"name": row.get('Name', 'Item'), "price": final_price, "qty": qty, "img_link": img_link_for_wa}
-                
                 save_cart_to_url()
-                st.success("कार्ट में जुड़ गया! 🛒")
+                st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
         else:
-            st.markdown("<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 आउट ऑफ स्टॉक</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
         show_edit_delete = False
         if st.session_state.admin_logged_in: show_edit_delete = True
@@ -819,97 +771,41 @@ def show_product_card(row, idx, prefix):
             
         if show_edit_delete:
             st.markdown("---")
-            with st.expander("✏️ रेट, स्टॉक या फोटो बदलें (Edit)"):
+            with st.expander(t("✏️ Edit Rate, Stock or Photo", "✏️ रेट, स्टॉक या फोटो बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
-                    e_name = st.text_input("नया नाम", value=str(row.get("Name", "")))
+                    e_name = st.text_input("Name", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
                     with col_x:
-                        e_price = st.number_input("सिंगल पीस रेट", value=retail_price)
-                        e_w_qty = st.number_input("होलसेल मात्रा", value=w_qty)
+                        e_price = st.number_input("Retail Price", value=retail_price)
+                        e_w_qty = st.number_input("Wholesale Qty", value=w_qty)
                     with col_y:
-                        e_w_price = st.number_input("होलसेल (बॉक्स रेट)", value=w_price)
-                        fd_index = 0 if show_fd else 1
-                        e_free_delivery = st.selectbox("सिंगल पीस डिलीवरी", ["फ्री डिलीवरी", "कोरियर चार्ज एक्स्ट्रा"], index=fd_index)
-                    
-                    e_in_stock = st.checkbox("✅ स्टॉक में उपलब्ध है?", value=is_in_stock)
-
-                    e_seller_name = st.text_input("सेलर / ब्रांड का नाम", value=str(seller_val) if pd.notna(seller_val) else "") if st.session_state.admin_logged_in else st.session_state.seller_logged_in
-                    existing_cats_edit = products_df['Category'].dropna().unique().tolist()
-                    current_cat = str(row.get("Category", ""))
-                    if current_cat not in existing_cats_edit: existing_cats_edit.insert(0, current_cat)
-                    e_cat = st.selectbox("केटेगरी", existing_cats_edit, index=existing_cats_edit.index(current_cat))
-                    e_uploaded_imgs = st.file_uploader("नई फोटो (Optional, max 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"edit_imgs_{prefix_idx}")
-                    update_btn = st.form_submit_button("✅ अपडेट करें")
+                        e_w_price = st.number_input("Wholesale Price", value=w_price)
+                        e_in_stock = st.checkbox("In Stock", value=is_in_stock)
+                    update_btn = st.form_submit_button("✅ Update")
                 if update_btn:
-                    if e_uploaded_imgs and len(e_uploaded_imgs) > 3: st.error("⚠️ अधिकतम 3 फोटो ही चुनें।")
-                    else:
-                        with st.spinner("अपडेट हो रहा है..."):
-                            target_id = str(row['ID'])
-                            final_path_str = str(row.get("Image_Path", ""))
-                            if e_uploaded_imgs:
-                                dummy_delete_image(final_path_str)
-                                new_image_paths = []
-                                for img in e_uploaded_imgs:
-                                    compressed_bytes, _ = compress_image(img.getvalue())
-                                    img_url = upload_image_to_imgbb(compressed_bytes)
-                                    if img_url: new_image_paths.append(img_url)
-                                final_path_str = "|".join(new_image_paths)
-                            e_is_free = True if e_free_delivery == "फ्री डिलीवरी" else False
-                            data = {
-                                "ID": target_id, "Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price,
-                                "Wholesale_Qty": e_w_qty, "Category": e_cat, "Image_Path": final_path_str,
-                                "Free_Delivery": e_is_free, "Seller_Name": str(e_seller_name).strip(),
-                                "In_Stock": e_in_stock
-                            }
-                            db.collection('products').document(target_id).set(data)
-                            load_products.clear()
-                            st.success("✅ अपडेट हो गया!")
-                            time.sleep(1)
-                            st.rerun()
-                if st.button("❌ पक्का डिलीट करें", key=f"del_{prefix_idx}"):
-                    with st.spinner("डिलीट हो रहा है..."):
-                        target_id = str(row['ID'])
-                        dummy_delete_image(image_path_str) 
-                        db.collection('products').document(target_id).delete()
-                        load_products.clear()
-                        st.success("डिलीट हो गया!")
-                        time.sleep(1)
-                        st.rerun()
-
-if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
-    st.markdown("---")
-    with st.expander("💼 Oura पर अपना माल बेचें (Become a Seller)"):
-        st.info("क्या आप भी मैन्युफैक्चरर या होलसेलर हैं? Oura प्लैटफॉर्म पर जुड़ें और अपने उत्पादों को हज़ारों ग्राहकों तक पहुँचाएं।")
-        s_name = st.text_input("आपकी दुकान / कंपनी का नाम")
-        s_items = st.text_input("आप क्या माल बेचते हैं?")
-        s_city = st.text_input("शहर")
-        if st.button("पार्टनरशिप के लिए संपर्क करें"):
-            if s_name and s_items:
-                s_msg = f"💼 *Oura Seller Partnership*\n\nनमस्ते, मैं Oura पर अपना माल बेचना चाहता हूँ।\n\n🏪 *दुकान:* {s_name}\n📦 *माल:* {s_items}\n📍 *शहर:* {s_city}\n\nकृपया मुझे सेलर बनने की जानकारी दें।"
-                encoded_s_msg = urllib.parse.quote(s_msg)
-                wa_seller_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={encoded_s_msg}"
-                st.markdown(f'<a href="{wa_seller_link}" target="_blank" style="background: linear-gradient(135deg, #FF9800, #F57C00); color: white !important; padding: 10px 15px; border-radius: 8px; text-decoration: none !important; font-weight: bold; display: inline-block; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">✅ WhatsApp पर अपनी डिटेल भेजें</a>', unsafe_allow_html=True)
-            else:
-                st.error("कृपया अपनी दुकान का नाम और माल की जानकारी ज़रूर भरें।")
+                    target_id = str(row['ID'])
+                    db.collection('products').document(target_id).update({"Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price, "Wholesale_Qty": e_w_qty, "In_Stock": e_in_stock})
+                    load_products.clear()
+                    st.rerun()
 
 if products_df.empty:
-    st.info("जल्द ही नए उत्पाद आएंगे!")
+    st.info(t("New products coming soon!", "जल्द ही नए उत्पाद आएंगे!"))
 else:
     if search_query:
-        st.subheader(f"'{search_query}' के सर्च रिजल्ट:")
+        st.subheader(t(f"Search results for '{search_query}':", f"'{search_query}' के सर्च रिजल्ट:"))
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        if filtered_df.empty: st.warning("इस नाम से कोई उत्पाद नहीं मिला।")
+        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader("🛍️ कैटेगरीज")
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
-            st.write("अभी कोई कैटेगरी नहीं है।")
+            st.write(t("No categories yet.", "अभी कोई कैटेगरी नहीं है।"))
         else:
             cat_container = st.container()
             with cat_container:
@@ -929,7 +825,7 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        if st.button("🏠 सारी कैटेगरीज", key="float_back_btn"):
+        if st.button(t("🏠 All Categories", "🏠 सारी कैटेगरीज"), key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params:
                 del st.query_params["cat"]
@@ -941,7 +837,7 @@ else:
         const parentDoc = window.parent.document;
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
-            if (btn.innerText && btn.innerText.includes('सारी कैटेगरीज')) {
+            if (btn.innerText && (btn.innerText.includes('सारी कैटेगरीज') || btn.innerText.includes('All Categories'))) {
                 btn.style.position = 'fixed';
                 btn.style.bottom = '120px';
                 btn.style.left = '15px';
@@ -961,26 +857,9 @@ else:
         </script>
         """
         st_components.html(float_js, height=0, width=0)
-        
-        if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
-            with st.expander(f"✏️ इस कैटेगरी का नाम/आइकॉन बदलें"):
-                new_cat_name = st.text_input("नया नाम या इमोजी डालें:", value=st.session_state.selected_category)
-                if st.button("✅ सेव करें", key="rename_cat_btn"):
-                    if new_cat_name and new_cat_name != st.session_state.selected_category:
-                        with st.spinner("नाम बदला जा रहा है..."):
-                            old_cat = st.session_state.selected_category
-                            docs = db.collection('products').where('Category', '==', old_cat).stream()
-                            for doc in docs:
-                                db.collection('products').document(doc.id).update({'Category': new_cat_name})
-                            load_products.clear()
-                            st.session_state.selected_category = new_cat_name
-                            st.query_params["cat"] = new_cat_name
-                            st.success("✅ नाम बदल गया!")
-                            time.sleep(1)
-                            st.rerun()
 
         cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
-        if cat_products.empty: st.write("इस कैटेगरी में अभी कोई उत्पाद नहीं है।")
+        if cat_products.empty: st.write(t("No products in this category yet.", "इस कैटेगरी में अभी कोई उत्पाद नहीं है।"))
         else:
             cols = st.columns(3)
             for idx, row in cat_products.reset_index().iterrows():
@@ -988,7 +867,7 @@ else:
 
 st.markdown("<br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
-st.header("🛒 आपकी बास्केट")
+st.header(t("🛒 Your Basket", "🛒 आपकी बास्केट"))
 
 if st.session_state.cart:
     total = 0
@@ -1005,7 +884,7 @@ if st.session_state.cart:
         with col_details:
             st.write(f"✔️ **{item['name']}**")
             c1, c2 = st.columns([7, 3])
-            with c1: st.write(f"मात्रा: {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
+            with c1: st.write(f"{t('Qty:', 'मात्रा:')} {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
@@ -1013,14 +892,9 @@ if st.session_state.cart:
                     st.rerun()
         st.markdown("---")
         msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
-        if item.get('img_link'): msg += f"👉 फोटो देखें: {item['img_link']}\n"
         count += 1
     
-    show_fd = current_config.get("free_delivery_tag", True)
-    if show_fd: msg += f"\n💰 *कुल माल:* ₹{total}\n⚠️ *होलसेल (बॉक्स) ऑर्डर पर कोरियर/ट्रांसपोर्ट चार्ज एक्स्ट्रा लगेगा। सिंगल पीस पर डिलीवरी फ्री है।*\n"
-    else: msg += f"\n💰 *कुल माल:* ₹{total}\n⚠️ *ट्रांसपोर्ट, पैकिंग और कोरियर चार्ज एक्स्ट्रा लगेगा।*\n"
-        
-    st.subheader(f"कुल माल: ₹{total}")
+    st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total}")
     
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
@@ -1029,13 +903,8 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown("### 💳 सुरक्षित online पेमेंट")
-        for name, data in available_upis.items():
-            qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR" 
-            st.markdown(f'''<a href="{qr_data}" style="display:block; text-align:center; background:{data['color']}; color:white !important; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; margin-bottom:10px;">{data['icon']} {name} से ₹{total} पे करें</a>''', unsafe_allow_html=True)
-            msg += f"\n💳 *{name} UPI:* {data['id']}"
-        
-        with st.expander("स्कैन करके पेमेंट करें (QR Code)"):
+        st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
+        with st.expander(t("Pay by Scanning (QR Code)", "स्कैन करके पेमेंट करें (QR Code)")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
@@ -1044,26 +913,20 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    st.markdown("### 🤝 100% ग्राहक संतुष्टि (Customer Trust)")
-    st.success("✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी। आप बिल्कुल बेफिक्र होकर ऑर्डर करें!")
-    msg += "\n\n🤝 *भरोसा:* आपके माल की पैकिंग की लाइव वीडियो और फोटो डिस्पैच से पहले आपको WhatsApp पर भेजी जाएगी。\n"
+    st.markdown(f"### 🤝 {t('100% Customer Satisfaction', '100% ग्राहक संतुष्टि (Customer Trust)')}")
+    st.success(t("✅ **Live Packing Proof:** Video & photo of your package will be sent to WhatsApp before dispatch.", "✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी।"))
 
     st.markdown("---")
-    st.markdown("### 📜 रिफंड और रिटर्न पॉलिसी")
-    st.warning("⚠️ **ध्यान दें:**\n1. रिफंड या वापसी सिर्फ **'खराब उत्पाद' (Manufacturing Defect)** पर होगी।\n2. ट्रांसपोर्ट में **'माल टूटने' (Transit Damage)** की कोई जिम्मेदारी পণ্ডিত।\n3. **इम्पोर्टेड आइटम की custom ड्यूटी की कोई गारंटी नहीं।**")
-    msg += "\n📜 *पॉलिसी:*\n- रिफंड सिर्फ 'खराब उत्पाद' पर मिलेगा।\n- ट्रांसपोर्ट में 'माल टूटने' पर कोई रिफंड नहीं।\n- इम्पोर्टेड आइटम की कोई गारंटी नहीं।"
-
-    st.markdown("---")
-    st.markdown("### 📍 डिलीवरी और बिल की जानकारी")
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     col_d1, col_d2 = st.columns(2)
     with col_d1:
-        cust_name = st.text_input("आपका नाम / दुकान का नाम")
-        cust_mobile = st.text_input("मोबाईल नंबर (10 अंक)")
-        cust_address = st.text_area("पूरा पता (शहर, पिनकोड सहित)")
+        cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
+        cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)"))
+        cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
     with col_d2:
-        gst_choice = st.selectbox("बिल का प्रकार चुनें:", 
-                                 ["बिना GST (Estimate)", "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
+        gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
+                                 [t("Without GST (Estimate)", "बिना GST (Estimate)"), "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
         
         gst_percent = 0
         if "5%" in gst_choice: gst_percent = 5
@@ -1071,41 +934,26 @@ if st.session_state.cart:
         elif "18%" in gst_choice: gst_percent = 18
         elif "28%" in gst_choice: gst_percent = 28
         
-        cust_gst = ""
-        if gst_percent > 0:
-            st.info("💡 **बिना GST नंबर वाले ग्राहक भी टैक्स देकर पक्का बिल ले सकते हैं।**")
-            cust_gst = st.text_input("ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")
-            
-        shipping_cost = st.number_input("🚚 कोरियर / पैकिंग चार्ज (₹)", min_value=0, value=0, step=50)
-        # 🚀 यहाँ नया 'पिछला बकाया' इनपुट जोड़ा गया है 🚀
-        last_balance = st.number_input("💵 पिछला बकाया (Last Balance / ₹)", min_value=0.0, value=0.0, step=10.0)
+        cust_gst = st.text_input(t("Customer GST Number (15 chars)", "ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")) if gst_percent > 0 else ""
+        shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0, value=0, step=50)
+        last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0)
 
-    # 🚀 इनपुट वैलिडेशन चेक (नंबर 6) 🚀
     is_valid = True
-    if cust_mobile:
-        cust_mobile = cust_mobile.strip()
-        if not cust_mobile.isdigit() or len(cust_mobile) != 10:
-            st.warning("⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।")
-            is_valid = False
-            
-    if cust_gst:
-        cust_gst = cust_gst.strip().upper()
-        if len(cust_gst) != 15 or not cust_gst.isalnum():
-            st.warning("⚠️ कृपया सही 15 अक्षरों का GST नंबर डालें।")
-            is_valid = False
+    if cust_mobile and (not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10):
+        st.warning(t("⚠️ Enter valid 10 digit mobile.", "⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।"))
+        is_valid = False
 
     if is_valid:
         if st.session_state.cart:
-            # 🚀 फास्ट कैशिंग के साथ PDF बनाना 🚀
             pdf_bytes = get_cached_pdf_bytes(
-                st.session_state.cart, cust_name, cust_mobile, cust_address, 
+                str(st.session_state.cart), cust_name, cust_mobile, cust_address, 
                 cust_gst, gst_percent, shipping_cost, last_balance, current_config
             )
             
             pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
             
             st.download_button(
-                label="📄 प्रोफेशनल PDF बिल डाउनलोड करें",
+                label=t("📄 Download Professional PDF Bill", "📄 प्रोफेशनल PDF बिल डाउनलोड करें"),
                 data=pdf_bytes,
                 file_name=pdf_file_name,
                 mime="application/pdf",
@@ -1113,18 +961,14 @@ if st.session_state.cart:
                 use_container_width=True
             )
 
-    # 🚀 WhatsApp मैसेज में पिछला बकाया जोड़ा गया 🚀
-    final_msg = msg + f"\n\n📍 *डिलीवरी की जानकारी:*\n👤 नाम: {cust_name if cust_name else 'WhatsApp पर बताएंगे'}\n📞 मोबाईल: {cust_mobile if cust_mobile else 'WhatsApp पर बताएंगे'}\n🏠 पता: {cust_address if cust_address else 'WhatsApp पर बताएंगे'}\n🚚 *शिपिंग चार्ज:* ₹{shipping_cost}\n"
-    if last_balance > 0:
-        final_msg += f"💵 *पिछला बकाया (Last Balance):* ₹{last_balance}\n"
-    final_msg += f"📄 *बिल:* {gst_choice}\n"
+    final_msg = msg + f"\n\n📍 *Details:*\n👤 Name: {cust_name}\n📞 Mob: {cust_mobile}\n🏠 Add: {cust_address}\n🚚 *Shipping:* ₹{shipping_cost}\n"
+    if last_balance > 0: final_msg += f"💵 *Last Balance:* ₹{last_balance}\n"
+    final_msg += f"📄 *Bill:* {gst_choice}\n"
     
-    if cust_gst: final_msg += f"🏢 *ग्राहक GST:* {cust_gst}\n"
-
     wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
-    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ सीधा WhatsApp पर ऑर्डर भेजें</a>''', unsafe_allow_html=True)
+    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">{t("✅ Send Order directly on WhatsApp", "✅ सीधा WhatsApp पर ऑर्डर भेजें")}</a>''', unsafe_allow_html=True)
     
-    if st.button("🗑️ बास्केट খালি करें"):
+    if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
         save_cart_to_url()
         st.rerun()
