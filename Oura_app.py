@@ -919,57 +919,75 @@ if st.session_state.cart:
     st.markdown("---")
     st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
-    col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
-        cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)"))
-        cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
-    with col_d2:
-        gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
-                                 [t("Without GST (Estimate)", "बिना GST (Estimate)"), "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
-        
-        gst_percent = 0
-        if "5%" in gst_choice: gst_percent = 5
-        elif "12%" in gst_choice: gst_percent = 12
-        elif "18%" in gst_choice: gst_percent = 18
-        elif "28%" in gst_choice: gst_percent = 28
-        
-        cust_gst = st.text_input(t("Customer GST Number (15 chars)", "ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")) if gst_percent > 0 else ""
-        shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0, value=0, step=50)
-        last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0)
-
-    is_valid = True
-    if cust_mobile and (not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10):
-        st.warning(t("⚠️ Enter valid 10 digit mobile.", "⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।"))
-        is_valid = False
-
-    if is_valid:
-        if st.session_state.cart:
-            pdf_bytes = get_cached_pdf_bytes(
-                str(st.session_state.cart), cust_name, cust_mobile, cust_address, 
-                cust_gst, gst_percent, shipping_cost, last_balance, current_config
-            )
+    # 🚀 SPEED FIX: यहाँ फॉर्म (Form) लगा दिया गया है ताकि टाइप करते वक्त ऐप स्लो न हो 🚀
+    with st.form("billing_form"):
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
+            cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)"))
+            cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
+        with col_d2:
+            gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
+                                     [t("Without GST (Estimate)", "बिना GST (Estimate)"), "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
             
-            pdf_file_name = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
+            gst_percent = 0
+            if "5%" in gst_choice: gst_percent = 5
+            elif "12%" in gst_choice: gst_percent = 12
+            elif "18%" in gst_choice: gst_percent = 18
+            elif "28%" in gst_choice: gst_percent = 28
             
-            st.download_button(
-                label=t("📄 Download Professional PDF Bill", "📄 प्रोफेशनल PDF बिल डाउनलोड करें"),
-                data=pdf_bytes,
-                file_name=pdf_file_name,
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True
-            )
+            cust_gst = st.text_input(t("Customer GST Number (15 chars)", "ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")) if gst_percent > 0 else ""
+            shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0, value=0, step=50)
+            last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0)
 
-    final_msg = msg + f"\n\n📍 *Details:*\n👤 Name: {cust_name}\n📞 Mob: {cust_mobile}\n🏠 Add: {cust_address}\n🚚 *Shipping:* ₹{shipping_cost}\n"
-    if last_balance > 0: final_msg += f"💵 *Last Balance:* ₹{last_balance}\n"
-    final_msg += f"📄 *Bill:* {gst_choice}\n"
-    
-    wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(final_msg)}"
-    st.markdown(f'''<br><a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">{t("✅ Send Order directly on WhatsApp", "✅ सीधा WhatsApp पर ऑर्डर भेजें")}</a>''', unsafe_allow_html=True)
-    
+        # जब तक यह बटन नहीं दबेगा, तब तक PDF नहीं बनेगा
+        submit_billing = st.form_submit_button(t("✅ Prepare Bill & WhatsApp Link", "✅ बिल और WhatsApp लिंक तैयार करें"))
+
+    if submit_billing:
+        is_valid = True
+        if cust_mobile and (not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10):
+            st.warning(t("⚠️ Enter valid 10 digit mobile.", "⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।"))
+            is_valid = False
+
+        if is_valid:
+            if st.session_state.cart:
+                # सीधे ओरिजिनल फंक्शन से PDF बनाएंगे
+                pdf_bytes = generate_pdf_bill(
+                    st.session_state.cart, cust_name, cust_mobile, cust_address, 
+                    cust_gst, gst_percent, shipping_cost, last_balance, current_config
+                )
+                
+                # जनरेट हुए PDF और मैसेज को सेव कर रहे हैं
+                st.session_state.ready_pdf = pdf_bytes
+                st.session_state.ready_filename = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
+                
+                final_msg = msg + f"\n\n📍 *Details:*\n👤 Name: {cust_name}\n📞 Mob: {cust_mobile}\n🏠 Add: {cust_address}\n🚚 *Shipping:* ₹{shipping_cost}\n"
+                if last_balance > 0: final_msg += f"💵 *Last Balance:* ₹{last_balance}\n"
+                final_msg += f"📄 *Bill:* {gst_choice}\n"
+                if cust_gst: final_msg += f"🏢 *Customer GST:* {cust_gst}\n"
+                
+                st.session_state.ready_msg = final_msg
+
+    # 🚀 डाउनलोड और WhatsApp बटन यहाँ दिखेंगे 🚀
+    if 'ready_pdf' in st.session_state and 'ready_msg' in st.session_state:
+        st.success(t("✅ Bill is ready! Download PDF or send to WhatsApp below:", "✅ आपका बिल तैयार है! नीचे से PDF डाउनलोड करें या WhatsApp पर भेजें:"))
+        
+        st.download_button(
+            label=t("📄 Download Professional PDF Bill", "📄 प्रोफेशनल PDF बिल डाउनलोड करें"),
+            data=st.session_state.ready_pdf,
+            file_name=st.session_state.ready_filename,
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True
+        )
+
+        wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(st.session_state.ready_msg)}"
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">{t("✅ Send Order directly on WhatsApp", "✅ सीधा WhatsApp पर ऑर्डर भेजें")}</a>''', unsafe_allow_html=True)
+
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
+        if 'ready_pdf' in st.session_state: del st.session_state.ready_pdf
+        if 'ready_msg' in st.session_state: del st.session_state.ready_msg
         save_cart_to_url()
         st.rerun()
 
