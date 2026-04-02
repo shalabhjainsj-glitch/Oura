@@ -70,9 +70,6 @@ def upload_image_to_imgbb(file_bytes):
         st.error(f"एरर: {e}")
         return None
 
-def dummy_delete_image(url):
-    pass
-
 def compress_image(image_bytes):
     try:
         pil_img = Image.open(io.BytesIO(image_bytes))
@@ -319,7 +316,6 @@ hide_streamlit_style = """
                 box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             }
 
-            /* 🚀 Oura Categories Grid Fix 🚀 */
             div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="stHorizontalBlock"] {
                 display: flex !important;
                 flex-wrap: wrap !important;
@@ -364,7 +360,7 @@ hide_streamlit_style = """
             }
             .swipe-gallery::-webkit-scrollbar { display: none; }
             .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
-            .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}
 
             #oura-wa-btn {
                 position: fixed; bottom: 120px; right: 15px; background-color: #25D366; color: white !important;
@@ -403,7 +399,6 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     """
     st_components.html(pwa_js, height=0, width=0)
 
-# 🚀 LANGUAGE TOGGLE SYSTEM 🚀
 if 'lang' not in st.session_state:
     st.session_state.lang = 'hi'
 
@@ -694,15 +689,16 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
-def show_swipe_gallery(path_str):
+def show_swipe_gallery(path_str, is_in_stock=True):
     if not path_str: return []
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
     if not paths: return []
     html_code = '<div class="swipe-gallery">'
+    img_style = "" if is_in_stock else "filter: grayscale(100%) opacity(60%);"
     for src in paths:
         if not src.startswith("http"):
             src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
-        html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" loading="lazy" alt="Product Image"></a>'
+        html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" style="{img_style}" loading="lazy" alt="Product Image"></a>'
     html_code += '</div>'
     html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">{t("Click photo to zoom 🔍", "ज़ूम करने के लिए फोटो पर क्लिक करें 🔍")}</div>'
     st.markdown(html_code, unsafe_allow_html=True)
@@ -713,11 +709,13 @@ def show_product_card(row, idx, prefix):
     p_id = str(row.get('ID', prefix_idx)) 
 
     with st.container(border=True):
+        is_in_stock = row.get("In_Stock", True)
         image_path_str = str(row.get("Image_Path", ""))
-        all_paths = show_swipe_gallery(image_path_str)
+        all_paths = show_swipe_gallery(image_path_str, is_in_stock)
         img_link_for_wa = all_paths[0] if all_paths else ""
         if img_link_for_wa and not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
+        
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
         if pd.notna(seller_val) and str(seller_val).strip() != "":
@@ -733,8 +731,6 @@ def show_product_card(row, idx, prefix):
         if pd.notna(val_fd) and str(val_fd).strip() != "":
             show_fd = str(val_fd).lower() in ['true', 'yes', '1']
             
-        is_in_stock = row.get("In_Stock", True)
-        
         t_sp_fd = t("🛵 **Single Piece (Free Delivery):**", "🛵 **सिंगल पीस (फ्री डिलीवरी):**")
         t_sp_ex = t("🛵 **Single Piece Rate:**", "🛵 **सिंगल पीस रेट:**")
         t_ws = t("📦 **Wholesale (Box Rate):**", "📦 **होलसेल (बॉक्स रेट):**")
@@ -771,6 +767,17 @@ def show_product_card(row, idx, prefix):
             
         if show_edit_delete:
             st.markdown("---")
+
+            # --- 🚀 FAST OUT OF STOCK TOGGLE ---
+            col_t1, col_t2 = st.columns([7, 3])
+            with col_t1:
+                st.markdown(f"**{t('Manage Stock:', 'स्टॉक मैनेज करें:')}**")
+            with col_t2:
+                new_stock_status = st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"toggle_stock_{prefix_idx}")
+            if new_stock_status != is_in_stock:
+                db.collection('products').document(str(row['ID'])).update({"In_Stock": new_stock_status})
+                load_products.clear()
+                st.rerun()
             
             # --- 🚀 WhatsApp स्मार्ट शेयर ---
             share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
