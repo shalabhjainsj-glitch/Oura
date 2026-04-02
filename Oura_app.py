@@ -417,7 +417,7 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
-# --- 🚀 NEW FAST CALLBACKS FOR TOGGLES ---
+# --- 🚀 FAST CALLBACKS FOR TOGGLES (No Speed Loss) ---
 def toggle_stock_callback(doc_id, key):
     db.collection('products').document(doc_id).update({"In_Stock": st.session_state[key]})
     load_products.clear()
@@ -482,12 +482,14 @@ if 'show_login' not in st.session_state: st.session_state.show_login = False
 if 'share_msg' not in st.session_state: st.session_state.share_msg = None
 if 'share_img_path' not in st.session_state: st.session_state.share_img_path = None
 
+# --- 🚀 SELLER BLOCK CHECK (Admin closing account) ---
 if st.session_state.seller_logged_in:
     seller_name = st.session_state.seller_logged_in
     valid_sellers = current_config.get("sellers", {}).values()
     if seller_name not in valid_sellers:
         st.session_state.seller_logged_in = None
-        st.error(t("⚠️ Your seller token has been blocked or deleted by Admin!", "⚠️ आपका सेलर टोकन एडमिन द्वारा ब्लॉक या डिलीट कर दिया गया है!"))
+        st.error(t("⚠️ Your seller account has been closed by Admin!", "⚠️ आपका सेलर अकाउंट एडमिन द्वारा बंद कर दिया गया है!"))
+        time.sleep(2)
         st.rerun()
 
 # --- HEADER SECTION ---
@@ -678,12 +680,13 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     st.rerun()
         
         with tab_settings:
+            # --- 🚀 ADMIN CONTROL: BLOCK SELLER ---
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
             col_s1, col_s2 = st.columns(2)
             with col_s1:
-                new_s_name = st.text_input("New Seller Brand Name (नए सेलर का ब्रांड नाम)")
+                new_s_name = st.text_input("New Seller Brand Name (नए सेलर का नाम)")
             with col_s2:
-                new_s_token = st.text_input("Create Password/Token for Seller (टोकन बनाएं)")
+                new_s_token = st.text_input("Create Password/Token for Seller")
                 
             if st.button("➕ Add Seller (नया सेलर जोड़ें)"):
                 if new_s_name and new_s_token:
@@ -696,15 +699,17 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     st.warning("⚠️ Please fill both Brand Name and Token.")
             
             if current_config.get("sellers"):
-                st.markdown("**Current Sellers (मौजूदा सेलर्स):**")
+                st.markdown("**Current Active Sellers (मौजूदा सेलर्स):**")
                 for token, s_name in list(current_config["sellers"].items()):
                     col_sa, col_sb = st.columns([8, 2])
                     with col_sa: 
                         st.info(f"🏪 **{s_name}** (Token: `{token}`)")
                     with col_sb:
-                        if st.button("❌ Delete", key=f"del_sel_{token}"):
+                        if st.button("❌ Block / Delete", key=f"del_sel_{token}"):
                             del current_config["sellers"][token]
                             save_config(current_config)
+                            st.success(f"🚫 {s_name} का अकाउंट बंद कर दिया गया है!")
+                            time.sleep(1)
                             st.rerun()
 
             st.markdown("---")
@@ -822,13 +827,16 @@ def show_product_card(row, idx, prefix):
             with col_t1:
                 st.markdown(f"**{t('Stock:', 'स्टॉक:')}**")
             with col_t2:
-                # 🚀 Fast Callback Toggle
+                # 🚀 Fast Callback Toggle (Both Admin & Seller)
                 st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
             with col_t3:
                 st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
             with col_t4:
-                # 🚀 Fast Callback Toggle
-                st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
+                # 🚀 Fast Callback Toggle (Admin ONLY can change delivery)
+                if st.session_state.admin_logged_in:
+                    st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
+                else:
+                    st.markdown("🆓" if show_fd else "🚚")
             
             # --- 🚀 WhatsApp स्मार्ट शेयर ---
             share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
@@ -861,30 +869,57 @@ def show_product_card(row, idx, prefix):
                 if img_link_for_wa:
                     st.markdown(f"**[📥 {t('Download Photo Here', 'फोटो यहाँ से डाउनलोड करें')}]({img_link_for_wa})** *({t('Click link, long press photo and select Download Image', 'लिंक पर क्लिक करें, फोटो खुलने पर उंगली दबाए रखें और Download Image चुनें')})*", unsafe_allow_html=True)
 
-            with st.expander(t("✏️ Edit Rate, Stock or Photo", "✏️ रेट, स्टॉक या डिलीवरी बदलें (Edit)")):
+            # --- 🔒 SELLER RESTRICTIONS IN EDIT MENU ---
+            with st.expander(t("✏️ Edit Product (रेट, स्टॉक या फोटो बदलें)", "✏️ रेट, स्टॉक या फोटो बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
-                    e_name = st.text_input("Name", value=str(row.get("Name", "")))
+                    
+                    if st.session_state.admin_logged_in:
+                        e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")))
+                    else:
+                        st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True)
+                        e_name = str(row.get("Name", ""))
+                        
                     col_x, col_y = st.columns(2)
                     with col_x:
-                        e_price = st.number_input("Retail Price", value=retail_price)
-                        e_w_qty = st.number_input("Wholesale Qty", value=w_qty)
+                        e_price = st.number_input("Retail Price (सिंगल रेट)", value=retail_price)
+                        e_w_qty = st.number_input("Wholesale Qty (होलसेल पीस)", value=w_qty)
                     with col_y:
-                        e_w_price = st.number_input("Wholesale Price", value=w_price)
-                        e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
-                        
-                    e_in_stock = st.checkbox("In Stock", value=is_in_stock)
-                    update_btn = st.form_submit_button("✅ Update")
+                        e_w_price = st.number_input("Wholesale Price (होलसेल रेट)", value=w_price)
+                        if st.session_state.admin_logged_in:
+                            e_fd = st.selectbox(t("Delivery", "डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा चार्ज")], index=0 if show_fd else 1)
+                        else:
+                            st.selectbox(t("Delivery (Admin Only)", "डिलीवरी (सिर्फ एडमिन)"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा चार्ज")], index=0 if show_fd else 1, disabled=True)
+                            e_fd = "फ्री डिलीवरी" if show_fd else "एक्स्ट्रा चार्ज"
+                            
+                    e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
+                    
+                    update_btn = st.form_submit_button("✅ Update / सेव करें")
+                    
                 if update_btn:
                     target_id = str(row['ID'])
                     is_free_val = True if e_fd in ["फ्री डिलीवरी", "Free Delivery"] else False
-                    db.collection('products').document(target_id).update({
-                        "Name": e_name, 
+                    
+                    update_dict = {
                         "Price": e_price, 
                         "Wholesale_Price": e_w_price, 
-                        "Wholesale_Qty": e_w_qty, 
-                        "In_Stock": e_in_stock,
-                        "Free_Delivery": is_free_val
-                    })
+                        "Wholesale_Qty": e_w_qty
+                    }
+                    
+                    if st.session_state.admin_logged_in:
+                        update_dict["Name"] = e_name
+                        update_dict["Free_Delivery"] = is_free_val
+                        
+                    if e_imgs:
+                        with st.spinner("Uploading new photos..."):
+                            image_paths = []
+                            for img in e_imgs:
+                                compressed_bytes, _ = compress_image(img.getvalue())
+                                img_url = upload_image_to_imgbb(compressed_bytes)
+                                if img_url: image_paths.append(img_url)
+                            if image_paths:
+                                update_dict["Image_Path"] = "|".join(image_paths)
+                                
+                    db.collection('products').document(target_id).update(update_dict)
                     load_products.clear()
                     st.rerun()
 
