@@ -417,6 +417,16 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
+# --- 🚀 NEW FAST CALLBACKS FOR TOGGLES ---
+def toggle_stock_callback(doc_id, key):
+    db.collection('products').document(doc_id).update({"In_Stock": st.session_state[key]})
+    load_products.clear()
+
+def toggle_fd_callback(doc_id, key):
+    db.collection('products').document(doc_id).update({"Free_Delivery": st.session_state[key]})
+    load_products.clear()
+# -----------------------------------------
+
 products_df = load_products()
 
 def save_cart_to_url():
@@ -544,7 +554,6 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                     st.rerun()
                 else: st.error(t("❌ Invalid Token! Contact Admin.", "❌ गलत टोकन! कृपया एडमिन से संपर्क करें।"))
             
-            # --- 🚀 NEW SELLER TOKEN REQUEST BUTTON (Fast WhatsApp Integration) ---
             st.markdown("---")
             st.markdown(f"**{t('Dont have a Seller Token?', 'क्या आपके पास सेलर टोकन नहीं है?')}**")
             admin_wa = current_config.get("admin_whatsapp", "919891587437")
@@ -669,7 +678,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     st.rerun()
         
         with tab_settings:
-            # --- 🚀 NEW SELLER MANAGEMENT IN ADMIN SETTINGS ---
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
             col_s1, col_s2 = st.columns(2)
             with col_s1:
@@ -810,24 +818,17 @@ def show_product_card(row, idx, prefix):
         if show_edit_delete:
             st.markdown("---")
 
-            # --- 🚀 FAST OUT OF STOCK & DELIVERY TOGGLE ---
             col_t1, col_t2, col_t3, col_t4 = st.columns([3, 2, 4, 3])
             with col_t1:
                 st.markdown(f"**{t('Stock:', 'स्टॉक:')}**")
             with col_t2:
-                new_stock_status = st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}")
+                # 🚀 Fast Callback Toggle
+                st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
             with col_t3:
                 st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
             with col_t4:
-                new_fd_status = st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
-                
-            if new_stock_status != is_in_stock or new_fd_status != show_fd:
-                db.collection('products').document(str(row['ID'])).update({
-                    "In_Stock": new_stock_status,
-                    "Free_Delivery": new_fd_status
-                })
-                load_products.clear()
-                st.rerun()
+                # 🚀 Fast Callback Toggle
+                st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
             
             # --- 🚀 WhatsApp स्मार्ट शेयर ---
             share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
