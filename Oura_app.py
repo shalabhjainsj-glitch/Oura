@@ -417,15 +417,17 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
-# --- 🚀 FAST CALLBACKS FOR TOGGLES (No Speed Loss) ---
+# --- 🚀 FAST CALLBACKS FOR TOGGLES (ANTI-CRASH ON MOBILE) ---
 def toggle_stock_callback(doc_id, key):
-    db.collection('products').document(doc_id).update({"In_Stock": st.session_state[key]})
-    load_products.clear()
+    if key in st.session_state:
+        db.collection('products').document(doc_id).update({"In_Stock": st.session_state[key]})
+        load_products.clear()
 
 def toggle_fd_callback(doc_id, key):
-    db.collection('products').document(doc_id).update({"Free_Delivery": st.session_state[key]})
-    load_products.clear()
-# -----------------------------------------
+    if key in st.session_state:
+        db.collection('products').document(doc_id).update({"Free_Delivery": st.session_state[key]})
+        load_products.clear()
+# ------------------------------------------------------------
 
 products_df = load_products()
 
@@ -827,16 +829,13 @@ def show_product_card(row, idx, prefix):
             with col_t1:
                 st.markdown(f"**{t('Stock:', 'स्टॉक:')}**")
             with col_t2:
-                # 🚀 Fast Callback Toggle (Both Admin & Seller)
+                # 🚀 Fast Callback Toggle (Admin & Seller)
                 st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
             with col_t3:
                 st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
             with col_t4:
-                # 🚀 Fast Callback Toggle (Admin ONLY can change delivery)
-                if st.session_state.admin_logged_in:
-                    st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
-                else:
-                    st.markdown("🆓" if show_fd else "🚚")
+                # 🚀 Fast Callback Toggle (Admin & Seller both can change delivery now)
+                st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
             
             # --- 🚀 WhatsApp स्मार्ट शेयर ---
             share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
@@ -870,7 +869,7 @@ def show_product_card(row, idx, prefix):
                     st.markdown(f"**[📥 {t('Download Photo Here', 'फोटो यहाँ से डाउनलोड करें')}]({img_link_for_wa})** *({t('Click link, long press photo and select Download Image', 'लिंक पर क्लिक करें, फोटो खुलने पर उंगली दबाए रखें और Download Image चुनें')})*", unsafe_allow_html=True)
 
             # --- 🔒 SELLER RESTRICTIONS IN EDIT MENU ---
-            with st.expander(t("✏️ Edit Product (रेट, स्टॉक या फोटो बदलें)", "✏️ रेट, स्टॉक या फोटो बदलें (Edit)")):
+            with st.expander(t("✏️ Edit Product (रेट, स्टॉक या फोटो बदलें)", "✏️ रेट, स्टॉक या डिलीवरी बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     
                     if st.session_state.admin_logged_in:
@@ -885,11 +884,7 @@ def show_product_card(row, idx, prefix):
                         e_w_qty = st.number_input("Wholesale Qty (होलसेल पीस)", value=w_qty)
                     with col_y:
                         e_w_price = st.number_input("Wholesale Price (होलसेल रेट)", value=w_price)
-                        if st.session_state.admin_logged_in:
-                            e_fd = st.selectbox(t("Delivery", "डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा चार्ज")], index=0 if show_fd else 1)
-                        else:
-                            st.selectbox(t("Delivery (Admin Only)", "डिलीवरी (सिर्फ एडमिन)"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा चार्ज")], index=0 if show_fd else 1, disabled=True)
-                            e_fd = "फ्री डिलीवरी" if show_fd else "एक्स्ट्रा चार्ज"
+                        e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
                             
                     e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
                     
@@ -902,12 +897,12 @@ def show_product_card(row, idx, prefix):
                     update_dict = {
                         "Price": e_price, 
                         "Wholesale_Price": e_w_price, 
-                        "Wholesale_Qty": e_w_qty
+                        "Wholesale_Qty": e_w_qty,
+                        "Free_Delivery": is_free_val
                     }
                     
                     if st.session_state.admin_logged_in:
                         update_dict["Name"] = e_name
-                        update_dict["Free_Delivery"] = is_free_val
                         
                     if e_imgs:
                         with st.spinner("Uploading new photos..."):
