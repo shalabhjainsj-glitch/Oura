@@ -768,14 +768,22 @@ def show_product_card(row, idx, prefix):
         if show_edit_delete:
             st.markdown("---")
 
-            # --- 🚀 FAST OUT OF STOCK TOGGLE ---
-            col_t1, col_t2 = st.columns([7, 3])
+            # --- 🚀 FAST OUT OF STOCK & DELIVERY TOGGLE ---
+            col_t1, col_t2, col_t3, col_t4 = st.columns([3, 2, 4, 3])
             with col_t1:
-                st.markdown(f"**{t('Manage Stock:', 'स्टॉक मैनेज करें:')}**")
+                st.markdown(f"**{t('Stock:', 'स्टॉक:')}**")
             with col_t2:
-                new_stock_status = st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"toggle_stock_{prefix_idx}")
-            if new_stock_status != is_in_stock:
-                db.collection('products').document(str(row['ID'])).update({"In_Stock": new_stock_status})
+                new_stock_status = st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}")
+            with col_t3:
+                st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
+            with col_t4:
+                new_fd_status = st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
+                
+            if new_stock_status != is_in_stock or new_fd_status != show_fd:
+                db.collection('products').document(str(row['ID'])).update({
+                    "In_Stock": new_stock_status,
+                    "Free_Delivery": new_fd_status
+                })
                 load_products.clear()
                 st.rerun()
             
@@ -810,8 +818,7 @@ def show_product_card(row, idx, prefix):
                 if img_link_for_wa:
                     st.markdown(f"**[📥 {t('Download Photo Here', 'फोटो यहाँ से डाउनलोड करें')}]({img_link_for_wa})** *({t('Click link, long press photo and select Download Image', 'लिंक पर क्लिक करें, फोटो खुलने पर उंगली दबाए रखें और Download Image चुनें')})*", unsafe_allow_html=True)
 
-
-            with st.expander(t("✏️ Edit Rate, Stock or Photo", "✏️ रेट, स्टॉक या फोटो बदलें (Edit)")):
+            with st.expander(t("✏️ Edit Rate, Stock or Photo", "✏️ रेट, स्टॉक या डिलीवरी बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     e_name = st.text_input("Name", value=str(row.get("Name", "")))
                     col_x, col_y = st.columns(2)
@@ -820,11 +827,21 @@ def show_product_card(row, idx, prefix):
                         e_w_qty = st.number_input("Wholesale Qty", value=w_qty)
                     with col_y:
                         e_w_price = st.number_input("Wholesale Price", value=w_price)
-                        e_in_stock = st.checkbox("In Stock", value=is_in_stock)
+                        e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
+                        
+                    e_in_stock = st.checkbox("In Stock", value=is_in_stock)
                     update_btn = st.form_submit_button("✅ Update")
                 if update_btn:
                     target_id = str(row['ID'])
-                    db.collection('products').document(target_id).update({"Name": e_name, "Price": e_price, "Wholesale_Price": e_w_price, "Wholesale_Qty": e_w_qty, "In_Stock": e_in_stock})
+                    is_free_val = True if e_fd in ["फ्री डिलीवरी", "Free Delivery"] else False
+                    db.collection('products').document(target_id).update({
+                        "Name": e_name, 
+                        "Price": e_price, 
+                        "Wholesale_Price": e_w_price, 
+                        "Wholesale_Qty": e_w_qty, 
+                        "In_Stock": e_in_stock,
+                        "Free_Delivery": is_free_val
+                    })
                     load_products.clear()
                     st.rerun()
 
