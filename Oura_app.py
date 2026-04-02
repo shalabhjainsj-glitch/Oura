@@ -543,6 +543,17 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                     st.session_state.show_login = False
                     st.rerun()
                 else: st.error(t("❌ Invalid Token! Contact Admin.", "❌ गलत टोकन! कृपया एडमिन से संपर्क करें।"))
+            
+            # --- 🚀 NEW SELLER TOKEN REQUEST BUTTON (Fast WhatsApp Integration) ---
+            st.markdown("---")
+            st.markdown(f"**{t('Dont have a Seller Token?', 'क्या आपके पास सेलर टोकन नहीं है?')}**")
+            admin_wa = current_config.get("admin_whatsapp", "919891587437")
+            req_msg = t("Hello Admin, I want to become a seller on Oura Products. Please provide me a Seller Token.\n\nMy Brand Name is: \nMy Contact Number is: ", "नमस्ते एडमिन, मैं Oura Products पर एक सेलर बनना चाहता हूँ। कृपया मुझे एक सेलर टोकन (Password) प्रदान करें।\n\nमेरे ब्रांड का नाम है: \nमेरा संपर्क नंबर है: ")
+            encoded_req = urllib.parse.quote(req_msg)
+            wa_req_link = f"https://wa.me/{admin_wa}?text={encoded_req}"
+            
+            st.markdown(f'''<a href="{wa_req_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-top:5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📲 {t("Request Token via WhatsApp", "WhatsApp से टोकन मांगें")}</a>''', unsafe_allow_html=True)
+
     st.markdown("---")
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
@@ -658,6 +669,37 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     st.rerun()
         
         with tab_settings:
+            # --- 🚀 NEW SELLER MANAGEMENT IN ADMIN SETTINGS ---
+            st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
+            col_s1, col_s2 = st.columns(2)
+            with col_s1:
+                new_s_name = st.text_input("New Seller Brand Name (नए सेलर का ब्रांड नाम)")
+            with col_s2:
+                new_s_token = st.text_input("Create Password/Token for Seller (टोकन बनाएं)")
+                
+            if st.button("➕ Add Seller (नया सेलर जोड़ें)"):
+                if new_s_name and new_s_token:
+                    current_config["sellers"][new_s_token] = new_s_name
+                    save_config(current_config)
+                    st.success(f"✅ Added Seller: {new_s_name}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Please fill both Brand Name and Token.")
+            
+            if current_config.get("sellers"):
+                st.markdown("**Current Sellers (मौजूदा सेलर्स):**")
+                for token, s_name in list(current_config["sellers"].items()):
+                    col_sa, col_sb = st.columns([8, 2])
+                    with col_sa: 
+                        st.info(f"🏪 **{s_name}** (Token: `{token}`)")
+                    with col_sb:
+                        if st.button("❌ Delete", key=f"del_sel_{token}"):
+                            del current_config["sellers"][token]
+                            save_config(current_config)
+                            st.rerun()
+
+            st.markdown("---")
             st.subheader("📱 Business Settings")
             new_wa = st.text_input("WhatsApp Number", value=current_config.get("admin_whatsapp", "919891587437"))
             new_admin_gst = st.text_input("Admin GST Number", value=current_config.get("admin_gst", ""))
