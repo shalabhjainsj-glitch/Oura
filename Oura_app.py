@@ -918,13 +918,20 @@ def show_product_card(row, idx, prefix):
                     load_products.clear()
                     st.rerun()
 
+                # --- 🗑️ DELETE PRODUCT BUTTON (ADDITION) ---
+                st.markdown("---")
+                if st.button(t("🗑️ Delete Product", "🗑️ यह उत्पाद हमेशा के लिए हटाएं (Delete)"), key=f"del_p_{prefix_idx}"):
+                    db.collection('products').document(str(row['ID'])).delete()
+                    load_products.clear()
+                    st.rerun()
+
 if products_df.empty:
     st.info(t("New products coming soon!", "जल्द ही नए उत्पाद आएंगे!"))
 else:
     if search_query:
         st.subheader(t(f"Search results for '{search_query}':", f"'{search_query}' के सर्च रिजल्ट:"))
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
+        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद কাশী नहीं मिला।"))
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
