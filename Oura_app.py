@@ -818,26 +818,37 @@ def show_product_card(row, idx, prefix):
         else:
             st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
-        show_edit_delete = False
-        if st.session_state.admin_logged_in: show_edit_delete = True
-        elif st.session_state.seller_logged_in and st.session_state.seller_logged_in == str(seller_val).strip(): show_edit_delete = True
+        # --- PERMISSION LOGIC ---
+        can_edit = False
+        if st.session_state.admin_logged_in: 
+            can_edit = True
+        elif st.session_state.seller_logged_in and st.session_state.seller_logged_in == str(seller_val).strip(): 
+            can_edit = True
             
-        if show_edit_delete:
+        can_market = False
+        if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
+            can_market = True
+            
+        if can_edit or can_market:
             st.markdown("---")
 
+        # --- 🚀 TOGGLES (Only Owner or Admin) ---
+        if can_edit:
             col_t1, col_t2, col_t3, col_t4 = st.columns([3, 2, 4, 3])
             with col_t1:
                 st.markdown(f"**{t('Stock:', 'स्टॉक:')}**")
             with col_t2:
-                # 🚀 Fast Callback Toggle (Admin & Seller)
                 st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
             with col_t3:
                 st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
             with col_t4:
-                # 🚀 Fast Callback Toggle (Admin & Seller both can change delivery now)
                 st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
             
-            # --- 🚀 WhatsApp स्मार्ट शेयर ---
+        # --- 🚀 MARKETING TOOLS (All Logged in Sellers & Admins) ---
+        if can_market:
+            if can_edit: st.markdown("<br>", unsafe_allow_html=True) # Spacing
+            
+            # --- WhatsApp शेयर ---
             share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
             share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
             share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
@@ -853,7 +864,7 @@ def show_product_card(row, idx, prefix):
             encoded_share_text = urllib.parse.quote(share_text)
             st.markdown(f'''<a href="https://wa.me/?text={encoded_share_text}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:8px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📢 {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}</a>''', unsafe_allow_html=True)
 
-            # --- 📘 FACEBOOK के लिए स्पेशल पोस्ट मेकर 📘 ---
+            # --- Facebook पोस्ट मेकर ---
             with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
                 fb_text = f"🔥 OURA PRODUCTS - {row.get('Name')} 🔥\n\n"
                 fb_text += f"📦 {t('Wholesale Rate:', 'होलसेल रेट:')} ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
@@ -868,7 +879,8 @@ def show_product_card(row, idx, prefix):
                 if img_link_for_wa:
                     st.markdown(f"**[📥 {t('Download Photo Here', 'फोटो यहाँ से डाउनलोड करें')}]({img_link_for_wa})** *({t('Click link, long press photo and select Download Image', 'लिंक पर क्लिक करें, फोटो खुलने पर उंगली दबाए रखें और Download Image चुनें')})*", unsafe_allow_html=True)
 
-            # --- 🔒 SELLER RESTRICTIONS IN EDIT MENU ---
+        # --- 🔒 EDIT & DELETE (Only Owner or Admin) ---
+        if can_edit:
             with st.expander(t("✏️ Edit Product (रेट, स्टॉक या फोटो बदलें)", "✏️ रेट, स्टॉक या डिलीवरी बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     
@@ -918,12 +930,12 @@ def show_product_card(row, idx, prefix):
                     load_products.clear()
                     st.rerun()
 
-                # --- 🗑️ DELETE PRODUCT BUTTON (ADDITION) ---
-                st.markdown("---")
-                if st.button(t("🗑️ Delete Product", "🗑️ यह उत्पाद हमेशा के लिए हटाएं (Delete)"), key=f"del_p_{prefix_idx}"):
-                    db.collection('products').document(str(row['ID'])).delete()
-                    load_products.clear()
-                    st.rerun()
+            # --- 🗑️ DELETE PRODUCT BUTTON ---
+            st.markdown("---")
+            if st.button(t("🗑️ Delete Product", "🗑️ यह उत्पाद हमेशा के लिए हटाएं (Delete)"), key=f"del_p_{prefix_idx}"):
+                db.collection('products').document(str(row['ID'])).delete()
+                load_products.clear()
+                st.rerun()
 
 if products_df.empty:
     st.info(t("New products coming soon!", "जल्द ही नए उत्पाद आएंगे!"))
@@ -931,7 +943,7 @@ else:
     if search_query:
         st.subheader(t(f"Search results for '{search_query}':", f"'{search_query}' के सर्च रिजल्ट:"))
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद কাশী नहीं मिला।"))
+        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
