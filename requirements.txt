@@ -5,3 +5,5 @@ Pillow
 pytesseract
 firebase-admin
 fpdf
+fastapi
+uvicorn
