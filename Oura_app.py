@@ -454,7 +454,7 @@ if 'cart_loaded' not in st.session_state:
                         row = match.iloc[0]
                         w_qty = int(float(row.get('Wholesale_Qty', 1)))
                         retail_price = row.get('Price', 0)
-                        w_price = int(float(row.get('Wholesale_Price', retail_price)))
+                        w_price = float(row.get('Wholesale_Price', retail_price))
                         final_price = w_price if qty >= w_qty else retail_price
                         
                         image_path_str = str(row.get("Image_Path", ""))
@@ -595,10 +595,12 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_a:
                     new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
                     new_name = st.text_input(t("Product Name", "नाम"))
-                    new_price = st.number_input(t("Single Piece Rate", "सिंगल पीस रेट"), min_value=1)
+                    # ✅ यहाँ पैसों (Decimals) की सेटिंग जोड़ी है
+                    new_price = st.number_input(t("Single Piece Rate", "सिंगल पीस रेट"), min_value=0.0, value=0.0, step=0.50, format="%.2f")
                 with col_b:
                     new_w_qty = st.number_input(t("Min Wholesale Qty", "होलसेल कम से कम पीस"), min_value=1, value=10)
-                    new_w_price = st.number_input(t("Wholesale Rate (Per Piece)", "होलसेल / बॉक्स रेट (प्रति पीस)"), min_value=1)
+                    # ✅ यहाँ पैसों (Decimals) की सेटिंग जोड़ी है
+                    new_w_price = st.number_input(t("Wholesale Rate (Per Piece)", "होलसेल / बॉक्स रेट (प्रति पीस)"), min_value=0.0, value=0.0, step=0.50, format="%.2f")
                     new_free_delivery = st.selectbox(t("Single Piece Delivery", "सिंगल पीस डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")])
                 
                 new_in_stock = st.checkbox(t("✅ Product is currently in stock?", "✅ उत्पाद अभी स्टॉक में उपलब्ध है?"), value=True)
@@ -779,9 +781,9 @@ def show_product_card(row, idx, prefix):
             st.markdown(f"{t('🏪 Brand:', '🏪 सेलर / ब्रांड:')} <span style='color:#E65100; font-weight:bold;'>{str(seller_val).strip()}</span>", unsafe_allow_html=True)
         try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
         except: w_qty = 1
-        try: retail_price = row.get('Price', 0)
-        except: retail_price = 0
-        try: w_price = int(float(row.get('Wholesale_Price', retail_price)))
+        try: retail_price = float(row.get('Price', 0))
+        except: retail_price = 0.0
+        try: w_price = float(row.get('Wholesale_Price', retail_price))
         except: w_price = retail_price
         show_fd = current_config.get("free_delivery_tag", True)
         val_fd = row.get("Free_Delivery")
@@ -892,10 +894,12 @@ def show_product_card(row, idx, prefix):
                         
                     col_x, col_y = st.columns(2)
                     with col_x:
-                        e_price = st.number_input("Retail Price (सिंगल रेट)", value=retail_price)
+                        # ✅ यहाँ पैसों (Decimals) की सेटिंग जोड़ी है
+                        e_price = st.number_input("Retail Price (सिंगल रेट)", value=float(retail_price), format="%.2f", step=0.50)
                         e_w_qty = st.number_input("Wholesale Qty (होलसेल पीस)", value=w_qty)
                     with col_y:
-                        e_w_price = st.number_input("Wholesale Price (होलसेल रेट)", value=w_price)
+                        # ✅ यहाँ पैसों (Decimals) की सेटिंग जोड़ी है
+                        e_w_price = st.number_input("Wholesale Price (होलसेल रेट)", value=float(w_price), format="%.2f", step=0.50)
                         e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
                             
                     e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
@@ -943,7 +947,7 @@ else:
     if search_query:
         st.subheader(t(f"Search results for '{search_query}':", f"'{search_query}' के सर्च रिजल्ट:"))
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
+        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद मिला।"))
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
@@ -1033,17 +1037,17 @@ if st.session_state.cart:
         with col_details:
             st.write(f"✔️ **{item['name']}**")
             c1, c2 = st.columns([7, 3])
-            with c1: st.write(f"{t('Qty:', 'मात्रा:')} {item['qty']} x ₹{item['price']} = **₹{subtotal}**")
+            with c1: st.write(f"{t('Qty:', 'मात्रा:')} {item['qty']} x ₹{item['price']:.2f} = **₹{subtotal:.2f}**")
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
                     save_cart_to_url()
                     st.rerun()
         st.markdown("---")
-        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']}) = ₹{subtotal}\n"
+        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']:.2f}) = ₹{subtotal:.2f}\n"
         count += 1
     
-    st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total}")
+    st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total:.2f}")
     
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
@@ -1057,7 +1061,7 @@ if st.session_state.cart:
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
-                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total}&cu=INR"
+                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total:.2f}&cu=INR"
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
@@ -1085,8 +1089,10 @@ if st.session_state.cart:
             elif "28%" in gst_choice: gst_percent = 28
             
             cust_gst = st.text_input(t("Customer GST Number (15 chars)", "ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")) if gst_percent > 0 else ""
-            shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0, value=0, step=50)
-            last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0)
+            
+            # ✅ यहाँ पैसों (Decimals) की सेटिंग जोड़ी है
+            shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
+            last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & WhatsApp Link", "✅ बिल और WhatsApp लिंक तैयार करें"))
 
@@ -1106,8 +1112,8 @@ if st.session_state.cart:
                 st.session_state.ready_pdf = pdf_bytes
                 st.session_state.ready_filename = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
                 
-                final_msg = msg + f"\n\n📍 *Details:*\n👤 Name: {cust_name}\n📞 Mob: {cust_mobile}\n🏠 Add: {cust_address}\n🚚 *Shipping:* ₹{shipping_cost}\n"
-                if last_balance > 0: final_msg += f"💵 *Last Balance:* ₹{last_balance}\n"
+                final_msg = msg + f"\n\n📍 *Details:*\n👤 Name: {cust_name}\n📞 Mob: {cust_mobile}\n🏠 Add: {cust_address}\n🚚 *Shipping:* ₹{shipping_cost:.2f}\n"
+                if last_balance > 0: final_msg += f"💵 *Last Balance:* ₹{last_balance:.2f}\n"
                 final_msg += f"📄 *Bill:* {gst_choice}\n"
                 if cust_gst: final_msg += f"🏢 *Customer GST:* {cust_gst}\n"
                 
