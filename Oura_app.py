@@ -701,20 +701,20 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 new_s_token = st.text_input("Create Password/Token")
                 
             if st.button("➕ Add Seller (नया सेलर जोड़ें)"):
-                if new_s_name and new_s_token and new_s_phone:
+                if new_s_name and new_s_token:
                     current_config["sellers"][new_s_token] = {"name": new_s_name, "phone": new_s_phone}
                     save_config(current_config)
                     st.success(f"✅ Added Seller: {new_s_name}")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.warning("⚠️ Please fill Brand Name, WhatsApp Number and Token.")
+                    st.warning("⚠️ Please fill Brand Name and Token.")
             
             if current_config.get("sellers"):
                 st.markdown("**Current Active Sellers (मौजूदा सेलर्स):**")
                 for token, s_data in list(current_config["sellers"].items()):
                     s_name = s_data["name"] if isinstance(s_data, dict) else s_data
-                    s_phone = s_data["phone"] if isinstance(s_data, dict) else "N/A"
+                    s_phone = s_data.get("phone", "N/A") if isinstance(s_data, dict) else "N/A"
                     
                     col_sa, col_sb = st.columns([8, 2])
                     with col_sa: 
@@ -1023,9 +1023,9 @@ st.header(t("🛒 Your Basket", "🛒 आपकी बास्केट"))
 
 if st.session_state.cart:
     total = 0
-    msg = "🧾 *Oura - Order Summary* 🧾\n\n"
     count = 1
     
+    # ✅ बास्केट के आइटम दिखाना
     for k, item in list(st.session_state.cart.items()):
         subtotal = item['price'] * item['qty']
         total += subtotal
@@ -1043,7 +1043,6 @@ if st.session_state.cart:
                     save_cart_to_url()
                     st.rerun()
         st.markdown("---")
-        msg += f"{count}. {item['name']} ({item['qty']} x ₹{item['price']:.2f}) = ₹{subtotal:.2f}\n"
         count += 1
     
     st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total:.2f}")
@@ -1091,7 +1090,7 @@ if st.session_state.cart:
             shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
             last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
-        submit_billing = st.form_submit_button(t("✅ Prepare Bill & WhatsApp Link", "✅ बिल और WhatsApp लिंक तैयार करें"))
+        submit_billing = st.form_submit_button(t("✅ Prepare Bill", "✅ बिल तैयार करें"))
 
     if submit_billing:
         is_valid = True
@@ -1109,32 +1108,37 @@ if st.session_state.cart:
                 st.session_state.ready_pdf = pdf_bytes
                 st.session_state.ready_filename = f"Oura_Invoice_{cust_name.replace(' ', '_') if cust_name else 'Bill'}.pdf"
                 
-                # 2. एडमिन के लिए पूरा बिल मैसेज
-                final_msg = msg + f"\n\n📍 *Details:*\n👤 Name: {cust_name}\n📞 Mob: {cust_mobile}\n🏠 Add: {cust_address}\n🚚 *Shipping:* ₹{shipping_cost:.2f}\n"
-                if last_balance > 0: final_msg += f"💵 *Last Balance:* ₹{last_balance:.2f}\n"
-                final_msg += f"📄 *Bill:* {gst_choice}\n"
-                if cust_gst: final_msg += f"🏢 *Customer GST:* {cust_gst}\n"
-                st.session_state.ready_msg = final_msg
-
-                # ✅ 3. हर सेलर के लिए अलग-अलग छँटाई (Auto-Sorting)
-                seller_phones = {}
-                for v in current_config.get("sellers", {}).values():
-                    if isinstance(v, dict) and v.get("phone"):
-                        seller_phones[v["name"]] = v["phone"]
-
-                seller_messages = {}
+                # ✅ 2. एडमिन के लिए सेलर के हिसाब से अलग-अलग मैसेज तैयार करना (Auto-Sorting)
+                seller_items = {}
                 for k, item in st.session_state.cart.items():
-                    s_name = item.get("seller", "")
-                    if s_name and s_name in seller_phones:
-                        if s_name not in seller_messages:
-                            seller_messages[s_name] = f"📦 *New Order on Oura*\n\n👤 *Customer:* {cust_name}\n📞 *Mob:* {cust_mobile}\n🏠 *Addr:* {cust_address}\n\n*Items to dispatch:*\n"
-                        seller_messages[s_name] += f"- {item['name']} (Qty: {item['qty']})\n"
+                    s_name = item.get("seller", "").strip()
+                    if not s_name: s_name = "Oura/General"
+                    if s_name not in seller_items: seller_items[s_name] = []
+                    seller_items[s_name].append(item)
+                
+                st.session_state.admin_wa_links = []
+                for s_name, items in seller_items.items():
+                    # हर सेलर के लिए एडमिन को भेजा जाने वाला मैसेज
+                    msg = f"🧾 *Order Details for: {s_name}*\n\n"
+                    msg += f"👤 *Customer:* {cust_name}\n📞 *Mob:* {cust_mobile}\n🏠 *Addr:* {cust_address}\n"
+                    if shipping_cost > 0: msg += f"🚚 *Shipping:* ₹{shipping_cost:.2f}\n"
+                    if last_balance > 0: msg += f"💵 *Last Bal:* ₹{last_balance:.2f}\n"
+                    msg += f"📄 *Bill Type:* {gst_choice}\n"
+                    if cust_gst: msg += f"🏢 *GST:* {cust_gst}\n"
+                    
+                    msg += f"\n*📦 Items to Dispatch:*\n"
+                    s_subtotal = 0
+                    for i in items:
+                        msg += f"✔️ {i['name']} (Qty: {i['qty']} x ₹{i['price']:.2f})\n"
+                        s_subtotal += (i['qty'] * i['price'])
+                    msg += f"\n*Seller Total:* ₹{s_subtotal:.2f}"
+                    
+                    st.session_state.admin_wa_links.append({
+                        "seller": s_name,
+                        "msg": msg
+                    })
 
-                st.session_state.seller_msgs = {}
-                for s_name, s_msg in seller_messages.items():
-                    st.session_state.seller_msgs[s_name] = {"phone": seller_phones[s_name], "msg": s_msg}
-
-    if 'ready_pdf' in st.session_state and 'ready_msg' in st.session_state:
+    if 'ready_pdf' in st.session_state and 'admin_wa_links' in st.session_state:
         st.success(t("✅ Bill is ready! Download PDF or send to WhatsApp below:", "✅ आपका बिल तैयार है! नीचे से PDF डाउनलोड करें या WhatsApp पर भेजें:"))
         
         st.download_button(
@@ -1146,28 +1150,30 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown("### 🚀 Send Orders via WhatsApp")
+        st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         
-        # ✅ एडमिन का बटन (पहला स्टेप)
-        wa_link = f"https://wa.me/{current_config.get('admin_whatsapp', '')}?text={urllib.parse.quote(st.session_state.ready_msg)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ 1. Send Full Order to Admin</a>''', unsafe_allow_html=True)
-
-        # ✅ सेलर्स के बटन (दूसरा स्टेप - जितने सेलर होंगे, उतने बटन अपने आप आ जाएंगे)
-        if hasattr(st.session_state, 'seller_msgs') and st.session_state.seller_msgs:
-            idx = 2
-            for s_name, data in st.session_state.seller_msgs.items():
-                s_wa_link = f"https://wa.me/{data['phone']}?text={urllib.parse.quote(data['msg'])}"
-                st.markdown(f'''<a href="{s_wa_link}" target="_blank" style="display:block; text-align:center; background: #128C7E; color:white; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">📲 {idx}. Send Order to Seller: {s_name}</a>''', unsafe_allow_html=True)
-                idx += 1
+        # ✅ कस्टमर को दिखने वाले बटन (बिना Admin नाम के, सीधे एडमिन के नंबर पर जाएंगे)
+        admin_num = current_config.get("admin_whatsapp", "919891587437")
+        
+        if len(st.session_state.admin_wa_links) == 1:
+            # अगर सिर्फ एक ही सेलर का माल है
+            data = st.session_state.admin_wa_links[0]
+            wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(data['msg'])}"
+            st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t('Send Bill', 'बिल भेजो')}</a>''', unsafe_allow_html=True)
+        else:
+            # अगर एक से ज़्यादा सेलर का माल है
+            for idx, data in enumerate(st.session_state.admin_wa_links):
+                wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(data['msg'])}"
+                st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:12px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {idx+1}. {t('Send Bill', 'बिल भेजो')} (Brand: {data['seller']})</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
         if 'ready_pdf' in st.session_state: del st.session_state.ready_pdf
-        if 'ready_msg' in st.session_state: del st.session_state.ready_msg
-        if 'seller_msgs' in st.session_state: del st.session_state.seller_msgs
+        if 'admin_wa_links' in st.session_state: del st.session_state.admin_wa_links
         save_cart_to_url()
         st.rerun()
 
+# ✅ फ्लोटिंग बटन में से नंबर हटाकर सिर्फ 💬 WhatsApp कर दिया गया है
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 st.markdown(f'''<a id="oura-wa-btn" href="https://wa.me/{admin_wa_number}" target="_blank" title="WhatsApp Us">💬 WhatsApp</a>''', unsafe_allow_html=True)
 
