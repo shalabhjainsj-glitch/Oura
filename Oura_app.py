@@ -576,10 +576,19 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 
     st.markdown("---")
 
+# ==========================================
+# ADMIN & SELLER DASHBOARD SECTION (WITH LEDGER TAB)
+# ==========================================
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
         st.success(t("✅ Logged in as Admin. You have full control.", "✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।"))
-        tab_add, tab_banner, tab_settings = st.tabs([t("➕ Add Product", "➕ नया उत्पाद"), t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), t("⚙️ Settings", "⚙️ सेटिंग्स")])
+        # 👉 यहाँ नया "Ledger / खाता" टैब जोड़ा गया है
+        tab_add, tab_banner, tab_settings, tab_ledger = st.tabs([
+            t("➕ Add Product", "➕ नया उत्पाद"), 
+            t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
+            t("⚙️ Settings", "⚙️ सेटिंग्स"),
+            t("📒 Ledger", "📒 खाता / लेजर")
+        ])
     else:
         st.success(t(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)", f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)"))
         tab_add, = st.tabs([t("➕ Add Product", "➕ नया उत्पाद")])
@@ -752,6 +761,92 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.success("✅ Saved!")
                 time.sleep(1)
                 st.rerun()
+
+        # 👉 यहाँ से शुरू होता है नया लेजर / खाता सिस्टम
+        with tab_ledger:
+            st.subheader("📒 पार्टियों का खाता (Ledger System)")
+            
+            SAVE_FOLDER = "billing_records"
+            if not os.path.exists(SAVE_FOLDER):
+                os.makedirs(SAVE_FOLDER)
+            
+            ledger_menu = st.radio("ऑप्शन चुनें:", ["📝 नया बिल / पेमेंट एंट्री", "📂 खाते देखें और मैनेज करें (Save/Delete)"], horizontal=True)
+            st.markdown("---")
+            
+            if ledger_menu == "📝 नया बिल / पेमेंट एंट्री":
+                with st.form("billing_entry_form", clear_on_submit=True):
+                    col_l1, col_l2 = st.columns(2)
+                    with col_l1:
+                        ledger_customer = st.text_input("पार्टी का नाम (Customer Name)*").strip().upper()
+                        ledger_amount = st.number_input("अमाउंट (₹)*", min_value=0.0, step=100.0)
+                    with col_l2:
+                        ledger_status = st.selectbox("कैटेगरी चुनें", ["Bill (मार्केट से लेना है)", "Payment/Advance (पार्टी से आ गया)"])
+                        ledger_note = st.text_input("विवरण / रिमार्क (जैसे: 12-inch Speakers etc.)")
+                        
+                    ledger_date = st.date_input("तारीख", datetime.datetime.today())
+                    
+                    save_ledger_btn = st.form_submit_button("एंट्री सेव करें 💾")
+                    
+                    if save_ledger_btn:
+                        if ledger_customer == "":
+                            st.error("⚠️ कृपया पार्टी का नाम जरूर लिखें!")
+                        elif ledger_amount == 0:
+                            st.error("⚠️ कृपया अमाउंट भरें!")
+                        else:
+                            filename = f"{SAVE_FOLDER}/{ledger_customer}_ledger.csv"
+                            new_entry = pd.DataFrame([{
+                                "Date": ledger_date.strftime("%Y-%m-%d"), 
+                                "Type": "Bill" if "Bill" in ledger_status else "Advance", 
+                                "Amount": ledger_amount, 
+                                "Note": ledger_note
+                            }])
+                            
+                            if os.path.exists(filename):
+                                existing_df = pd.read_csv(filename)
+                                updated_df = pd.concat([existing_df, new_entry], ignore_index=True)
+                            else:
+                                updated_df = new_entry
+                            
+                            updated_df.to_csv(filename, index=False)
+                            st.success(f"✅ {ledger_customer} के खाते में ₹ {ledger_amount} की एंट्री सफलतापूर्वक सेव हो गई!")
+            
+            elif ledger_menu == "📂 खाते देखें और मैनेज करें (Save/Delete)":
+                ledger_files = [f for f in os.listdir(SAVE_FOLDER) if f.endswith('.csv')]
+                if ledger_files:
+                    for file in ledger_files:
+                        cust_name_file = file.replace("_ledger.csv", "")
+                        with st.expander(f"👤 {cust_name_file} का खाता"):
+                            file_path = f"{SAVE_FOLDER}/{file}"
+                            df_ledger = pd.read_csv(file_path)
+                            
+                            total_bill = df_ledger[df_ledger["Type"] == "Bill"]["Amount"].sum()
+                            total_advance = df_ledger[df_ledger["Type"] == "Advance"]["Amount"].sum()
+                            net_balance = total_bill - total_advance
+                            
+                            lc1, lc2, lc3 = st.columns(3)
+                            lc1.metric("कुल बिल (लेना है)", f"₹ {total_bill:,.2f}")
+                            lc2.metric("कुल जमा (आ गया)", f"₹ {total_advance:,.2f}")
+                            
+                            if net_balance > 0:
+                                lc3.metric("🔴 बकाया (Balance)", f"₹ {net_balance:,.2f}")
+                            elif net_balance < 0:
+                                lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
+                            else:
+                                lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
+
+                            st.dataframe(df_ledger, use_container_width=True)
+                            
+                            col_b1, col_b2 = st.columns([1, 4])
+                            with col_b1:
+                                csv_data = df_ledger.to_csv(index=False).encode('utf-8')
+                                st.download_button(label="📥 फाइल डाउनलोड", data=csv_data, file_name=file, mime="text/csv", key=f"dl_{file}")
+                            with col_b2:
+                                if st.button("🗑️ फाइल डिलीट करें", key=f"del_{file}"):
+                                    os.remove(file_path)
+                                    st.warning(f"🚨 {cust_name_file} की फाइल डिलीट कर दी गई है।")
+                                    st.rerun()
+                else:
+                    st.info("ℹ️ अभी तक किसी पार्टी का खाता नहीं बना है।")
 
     st.markdown("---")
 
