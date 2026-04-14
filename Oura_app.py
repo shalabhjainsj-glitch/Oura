@@ -123,8 +123,8 @@ else:
     if migrated:
         save_config(current_config)
 
-# 🌟 PDF फंक्शन में 'invoice_date' का नया फीचर जोड़ा गया
-def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config, invoice_date):
+# 🌟 PDF फंक्शन: इसमें amount_paid (जमा राशि) का फीचर जुड़ गया है
+def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date):
     pdf = FPDF()
     pdf.add_page()
     
@@ -163,7 +163,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(30, 6, "Invoice Date: ")
     pdf.set_font("Arial", '', 10)
-    # यहाँ कस्टम तारीख प्रिंट होगी
     pdf.cell(40, 6, str(invoice_date), ln=True)
     
     pdf.cell(20, 6, "")
@@ -264,8 +263,25 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.set_fill_color(220, 255, 220) 
     pdf.cell(160, 12, "GRAND TOTAL (Rs)", border=1, align='R', fill=True)
     pdf.cell(30, 12, f"{grand_total:.2f}", border=1, align='R', fill=True)
-    pdf.ln(20)
-    
+    pdf.ln()
+
+    # --- 🌟 नया फीचर: अगर कस्टमर ने अभी पैसे दिए हैं ---
+    if amount_paid > 0:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(160, 10, "Less: Amount Paid Now (Advance/Cash)", border=1, align='R')
+        pdf.cell(30, 10, f"{amount_paid:.2f}", border=1, align='R')
+        pdf.ln()
+        
+        balance_due = grand_total - amount_paid
+        pdf.set_font("Arial", 'B', 12)
+        pdf.set_fill_color(255, 200, 200) # हल्का लाल रंग बकाया के लिए
+        pdf.cell(160, 12, "NET BALANCE DUE (Rs)", border=1, align='R', fill=True)
+        pdf.cell(30, 12, f"{balance_due:.2f}", border=1, align='R', fill=True)
+        pdf.ln()
+    else:
+        pdf.ln(5)
+
+    pdf.ln(10)
     pdf.set_font("Arial", 'I', 9)
     pdf.cell(0, 5, "Terms & Conditions:", ln=True)
     pdf.cell(0, 5, "1. Goods once sold will not be taken back without valid manufacturing defect.", ln=True)
@@ -277,6 +293,10 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(0, 5, "(Authorized Signatory)", ln=True, align='R')
     
     return pdf.output(dest='S').encode('latin1')
+
+@st.cache_data(show_spinner=False)
+def get_cached_pdf_bytes(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date):
+    return generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date)
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
@@ -625,7 +645,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     st.info(f"🏪 {t('Your Brand/Seller Name', 'आपका ब्रांड/सेलर नाम')}: **{st.session_state.seller_logged_in}**")
                     new_seller_name = st.session_state.seller_logged_in
                 else:
-                    new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ नहीं दिखेगा)"))
+                    new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ ব্যথা नहीं दिखेगा)"))
                 
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
                 cat_options = [t("Create New Category...", "नयी केटेगरी बनाएं...")] + existing_cats
@@ -763,7 +783,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
 
         # ==========================================
-        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब (UPGRADED)
+        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब
         # ==========================================
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Ledger System)")
@@ -823,7 +843,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             elif net_balance < 0: lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
                             else: lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
 
-                            # --- LIVE EXCEL-LIKE EDITOR ---
                             edited_df = st.data_editor(df_ledger, num_rows="dynamic", use_container_width=True, key=f"ed_{file}")
                             
                             col_b1, col_b2, col_b3 = st.columns([2, 1, 1])
@@ -984,7 +1003,7 @@ def show_product_card(row, idx, prefix):
                         e_w_qty = st.number_input("Wholesale Qty (होलसेल पीस)", value=w_qty)
                     with col_y:
                         e_w_price = st.number_input("Wholesale Price (होलसेल रेट)", value=float(w_price), format="%.2f", step=0.50)
-                        e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
+                        e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री Delivery"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
                             
                     e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
                     update_btn = st.form_submit_button("✅ Update / सेव करें")
@@ -1151,9 +1170,7 @@ if st.session_state.cart:
             cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
-            # 🌟 बिल की तारीख चुनने का नया ऑप्शन 
             bill_date = st.date_input(t("Invoice Date", "बिल की तारीख"), datetime.date.today())
-            
             gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
                                      [t("Without GST (Estimate)", "बिना GST (Estimate)"), "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
             
@@ -1166,6 +1183,9 @@ if st.session_state.cart:
             cust_gst = st.text_input(t("Customer GST Number (15 chars)", "ग्राहक का GST नंबर (अगर है तो 15 अक्षर डालें)")) if gst_percent > 0 else ""
             shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
             last_balance = st.number_input(t("💵 Previous Balance (Last Balance / ₹)", "💵 पिछला बकाया (Last Balance / ₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
+            
+            # 🌟 नया फीचर 1: कैश जमा करने का बॉक्स
+            amount_paid = st.number_input(t("💸 Amount Paid Now (अभी कितने पैसे दिए / ₹)", "💸 अभी कितने पैसे जमा किए (Cash/Online)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill", "✅ बिल तैयार करें"))
 
@@ -1177,10 +1197,10 @@ if st.session_state.cart:
 
         if is_valid:
             if st.session_state.cart:
-                # 1. PDF जनरेट करना (इसमें अब कस्टम तारीख 'bill_date' भी जाएगी)
+                # 1. PDF जनरेट करना
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
-                    cust_gst, gst_percent, shipping_cost, last_balance, current_config, bill_date
+                    cust_gst, gst_percent, shipping_cost, last_balance, amount_paid, current_config, bill_date
                 )
                 
                 safe_name = cust_name.replace(' ', '_') if cust_name else 'Cash'
@@ -1188,12 +1208,12 @@ if st.session_state.cart:
                 st.session_state.ready_filename = f"OURA_Bill_{safe_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
 
-                # --- 🌟 नया फीचर 1: PDF सेव करना ---
+                # PDF सेव करना
                 pdf_path = f"{INVOICE_FOLDER}/{st.session_state.ready_filename}"
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
 
-                # --- 🌟 नया फीचर 2: लेजर में फुल डिटेल और चुनी हुई तारीख सेव करना ---
+                # --- 🌟 नया फीचर 2: लेजर (खाते) की एकदम सटीक एंट्री ---
                 item_details_list = []
                 taxable_amount = 0
                 for k, item in st.session_state.cart.items():
@@ -1202,21 +1222,39 @@ if st.session_state.cart:
                 
                 taxable_amount += shipping_cost
                 gst_amt = (taxable_amount * gst_percent) / 100
-                final_ledger_amount = taxable_amount + gst_amt + last_balance
+                
+                # यहाँ 'last_balance' नहीं जोड़ा गया है ताकि खाता डबल न हो
+                current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
                 if cust_name:
                     ledger_filename = f"{SAVE_FOLDER}/{cust_name.strip().upper()}_ledger.csv"
-                    new_entry = pd.DataFrame([{
-                        "Date": bill_date.strftime("%Y-%m-%d"), # 🌟 चुनी हुई तारीख
+                    entries = []
+                    
+                    # एंट्री 1: जो नया माल बिका है
+                    entries.append({
+                        "Date": bill_date.strftime("%Y-%m-%d"),
                         "Type": "Bill", 
-                        "Amount": final_ledger_amount, 
+                        "Amount": current_bill_total, 
                         "Note": full_item_details 
-                    }])
+                    })
+                    
+                    # एंट्री 2: अगर कस्टमर ने अभी पैसे दिए हैं, तो उसकी अलग 'Advance' (पेमेंट) एंट्री
+                    if amount_paid > 0:
+                        entries.append({
+                            "Date": bill_date.strftime("%Y-%m-%d"),
+                            "Type": "Advance", 
+                            "Amount": amount_paid, 
+                            "Note": "Cash/Online paid with bill" 
+                        })
+
+                    new_entries_df = pd.DataFrame(entries)
                     if os.path.exists(ledger_filename):
                         existing_df = pd.read_csv(ledger_filename)
-                        updated_df = pd.concat([existing_df, new_entry], ignore_index=True)
-                    else: updated_df = new_entry
+                        updated_df = pd.concat([existing_df, new_entries_df], ignore_index=True)
+                    else: 
+                        updated_df = new_entries_df
+                        
                     updated_df.to_csv(ledger_filename, index=False)
 
                 # WhatsApp मैसेज
