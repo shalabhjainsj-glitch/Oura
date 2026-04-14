@@ -123,7 +123,8 @@ else:
     if migrated:
         save_config(current_config)
 
-def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config):
+# 🌟 PDF फंक्शन में 'invoice_date' का नया फीचर जोड़ा गया
+def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config, invoice_date):
     pdf = FPDF()
     pdf.add_page()
     
@@ -162,7 +163,8 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(30, 6, "Invoice Date: ")
     pdf.set_font("Arial", '', 10)
-    pdf.cell(40, 6, str(datetime.date.today()), ln=True)
+    # यहाँ कस्टम तारीख प्रिंट होगी
+    pdf.cell(40, 6, str(invoice_date), ln=True)
     
     pdf.cell(20, 6, "")
     pdf.cell(100, 6, f"Ph: {cust_mobile if cust_mobile else 'N/A'}")
@@ -275,10 +277,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(0, 5, "(Authorized Signatory)", ln=True, align='R')
     
     return pdf.output(dest='S').encode('latin1')
-
-@st.cache_data(show_spinner=False)
-def get_cached_pdf_bytes(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config):
-    return generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, config)
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
@@ -765,25 +763,26 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
 
         # ==========================================
-        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब
+        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब (UPGRADED)
         # ==========================================
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Ledger System)")
             
-            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें (Ledger)", "📂 पुराने PDF बिल (Invoices)", "📝 मैनुअल एंट्री"], horizontal=True)
+            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (Ledger)", "📂 पुराने PDF बिल (Invoices)", "📝 फॉर्म से नई एंट्री"], horizontal=True)
             st.markdown("---")
             
-            if ledger_menu == "📝 मैनुअल एंट्री":
+            if ledger_menu == "📝 फॉर्म से नई एंट्री":
+                st.info("💡 यहाँ से आप किसी पार्टी के पुराने पेमेंट या नए बिल की मैन्युअल एंट्री कर सकते हैं। तारीख अपनी मर्जी से बदल लें।")
                 with st.form("billing_entry_form", clear_on_submit=True):
                     col_l1, col_l2 = st.columns(2)
                     with col_l1:
                         ledger_customer = st.text_input("पार्टी का नाम (Customer Name)*").strip().upper()
                         ledger_amount = st.number_input("अमाउंट (₹)*", min_value=0.0, step=100.0)
                     with col_l2:
-                        ledger_status = st.selectbox("कैटेगरी चुनें", ["Bill (मार्केट से लेना है)", "Payment/Advance (पार्टी से आ गया)"])
-                        ledger_note = st.text_input("विवरण / रिमार्क (जैसे: 12-inch Speakers etc.)")
+                        ledger_status = st.selectbox("कैटेगरी चुनें", ["Bill (मार्केट से लेना है)", "Advance (पार्टी से पेमेंट आ गया)"])
+                        ledger_note = st.text_input("विवरण / रिमार्क (जैसे: Cash received, Old bill etc.)")
                         
-                    ledger_date = st.date_input("तारीख", datetime.datetime.today())
+                    ledger_date = st.date_input("तारीख (Date)", datetime.datetime.today())
                     save_ledger_btn = st.form_submit_button("एंट्री सेव करें 💾")
                     
                     if save_ledger_btn:
@@ -802,9 +801,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             updated_df.to_csv(filename, index=False)
                             st.success(f"✅ {ledger_customer} के खाते में एंट्री सेव हो गई!")
             
-            elif ledger_menu == "📂 खाते देखें (Ledger)":
+            elif ledger_menu == "📂 खाते देखें और अपडेट करें (Ledger)":
                 ledger_files = [f for f in os.listdir(SAVE_FOLDER) if f.endswith('.csv')]
                 if ledger_files:
+                    st.success("💡 **स्मार्ट फीचर:** नीचे दी गई टेबल किसी एक्सेल शीट की तरह काम करती है। आप सीधा टेबल में क्लिक करके **नई लाइन जोड़ सकते हैं (पेमेंट कब-कब आए दर्ज करने के लिए)**, पुरानी तारीख बदल सकते हैं या गलत एंट्री हटा सकते हैं। बदलाव के बाद **'सेव करें'** दबाएं।")
                     for file in ledger_files:
                         cust_name_file = file.replace("_ledger.csv", "")
                         with st.expander(f"👤 {cust_name_file} का खाता"):
@@ -823,11 +823,22 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             elif net_balance < 0: lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
                             else: lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
 
-                            st.dataframe(df_ledger, use_container_width=True)
+                            # --- LIVE EXCEL-LIKE EDITOR ---
+                            edited_df = st.data_editor(df_ledger, num_rows="dynamic", use_container_width=True, key=f"ed_{file}")
                             
-                            if st.button("🗑️ फाइल डिलीट करें", key=f"del_{file}"):
-                                os.remove(file_path)
-                                st.rerun()
+                            col_b1, col_b2, col_b3 = st.columns([2, 1, 1])
+                            with col_b1:
+                                if not edited_df.equals(df_ledger):
+                                    if st.button("💾 खाते में बदलाव सेव करें", key=f"save_ed_{file}", type="primary"):
+                                        edited_df.to_csv(file_path, index=False)
+                                        st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
+                                        st.rerun()
+                            with col_b2:
+                                pass # Spacing
+                            with col_b3:
+                                if st.button("🗑️ पूरी फाइल डिलीट करें", key=f"del_{file}"):
+                                    os.remove(file_path)
+                                    st.rerun()
                 else:
                     st.info("ℹ️ अभी तक किसी पार्टी का खाता नहीं बना है।")
 
@@ -1140,6 +1151,9 @@ if st.session_state.cart:
             cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
+            # 🌟 बिल की तारीख चुनने का नया ऑप्शन 
+            bill_date = st.date_input(t("Invoice Date", "बिल की तारीख"), datetime.date.today())
+            
             gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
                                      [t("Without GST (Estimate)", "बिना GST (Estimate)"), "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
             
@@ -1163,10 +1177,10 @@ if st.session_state.cart:
 
         if is_valid:
             if st.session_state.cart:
-                # 1. PDF जनरेट करना
+                # 1. PDF जनरेट करना (इसमें अब कस्टम तारीख 'bill_date' भी जाएगी)
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
-                    cust_gst, gst_percent, shipping_cost, last_balance, current_config
+                    cust_gst, gst_percent, shipping_cost, last_balance, current_config, bill_date
                 )
                 
                 safe_name = cust_name.replace(' ', '_') if cust_name else 'Cash'
@@ -1179,7 +1193,7 @@ if st.session_state.cart:
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
 
-                # --- 🌟 नया फीचर 2: लेजर में फुल डिटेल सेव करना ---
+                # --- 🌟 नया फीचर 2: लेजर में फुल डिटेल और चुनी हुई तारीख सेव करना ---
                 item_details_list = []
                 taxable_amount = 0
                 for k, item in st.session_state.cart.items():
@@ -1194,7 +1208,7 @@ if st.session_state.cart:
                 if cust_name:
                     ledger_filename = f"{SAVE_FOLDER}/{cust_name.strip().upper()}_ledger.csv"
                     new_entry = pd.DataFrame([{
-                        "Date": datetime.datetime.today().strftime("%Y-%m-%d"), 
+                        "Date": bill_date.strftime("%Y-%m-%d"), # 🌟 चुनी हुई तारीख
                         "Type": "Bill", 
                         "Amount": final_ledger_amount, 
                         "Note": full_item_details 
