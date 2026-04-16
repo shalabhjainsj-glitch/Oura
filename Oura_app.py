@@ -123,7 +123,6 @@ else:
     if migrated:
         save_config(current_config)
 
-# 🌟 PDF फंक्शन
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date):
     pdf = FPDF()
     pdf.add_page()
@@ -879,19 +878,19 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
-# 🌟 नया फीचर: फोटो के ऊपर WhatsApp और Facebook के शेयर बटन
-def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", fb_link=""):
+# 🌟 नया फीचर: फोटो के ऊपर डाउनलोड और WhatsApp बटन
+def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
     if not path_str: return []
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
     if not paths: return []
     
     html_code = '<div style="position: relative;">'
     
-    # शेयर बटन्स का ब्लॉक (फोटो के ऊपर)
-    if wa_link or fb_link:
+    # 🌟 फोटो के ऊपर Facebook (Download) और WhatsApp बटन
+    if wa_link or first_img_link:
         html_code += '<div style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px;">'
-        if fb_link:
-            html_code += f'<a href="{fb_link}" target="_blank" style="background-color: #1877F2; color: white; padding: 6px 12px; border-radius: 20px; text-decoration: none; font-size: 13px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">📘 FB</a>'
+        if first_img_link:
+            html_code += f'<a href="{first_img_link}" download="oura_product.jpg" target="_blank" style="background-color: #1877F2; color: white; padding: 6px 12px; border-radius: 20px; text-decoration: none; font-size: 13px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">📥 Photo</a>'
         if wa_link:
             html_code += f'<a href="{wa_link}" target="_blank" style="background-color: #25D366; color: white; padding: 6px 12px; border-radius: 20px; text-decoration: none; font-size: 13px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">💬 WA</a>'
         html_code += '</div>'
@@ -927,7 +926,7 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
-    # 🌟 WhatsApp और Facebook के लिए शेयर लिंक तैयार करना
+    # WhatsApp शेयर लिंक
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
     share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
@@ -939,14 +938,12 @@ def show_product_card(row, idx, prefix):
         share_text += f"\n📷 *{t('Product Photo:', 'प्रोडक्ट फोटो:')}* {img_link_for_wa}"
     
     wa_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
-    # फेसबुक शेयर लिंक 
-    fb_link = f"https://www.facebook.com/sharer/sharer.php?u={urllib.parse.quote(app_link)}"
 
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
         
         # 🌟 बटन लिंक्स को गैलरी फंक्शन में भेजना
-        all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, fb_link)
+        all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
         
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
@@ -1013,9 +1010,8 @@ def show_product_card(row, idx, prefix):
         if can_market:
             with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
                 fb_text_copy = f"🔥 OURA PRODUCTS - {row.get('Name')} 🔥\n\n📦 {t('Wholesale Rate:', 'होलसेल रेट:')} ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n🛵 {t('Single Piece Rate:', 'सिंगल पीस रेट:')} ₹{retail_price}\n🏭 {t('Direct from Manufacturer:', 'सीधा मैन्युफैक्चरर से:')} Delhi (Oura Products)\n\n👇 {t('Check rates and order online now:', 'अभी रेट चेक करें और ऑनलाइन ऑर्डर करें:')}\n{app_link}\n\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
-                st.info(t("💡 **Tip:** Copy the text below and paste it on Facebook.", "💡 **टिप:** नीचे दिए गए टेक्स्ट को Copy करें और Facebook पर Paste कर दें। (फोटो के ऊपर वाले नीले बटन से सीधा लिंक शेयर होगा)"))
+                st.info(t("💡 **Tip:** 1. Click '📥 Photo' on the image above to save it. \n2. Copy the text below. \n3. Paste on Facebook!", "💡 **टिप:** 1. ऊपर फोटो पर बने नीले '📥 Photo' बटन को दबाकर फोटो सेव करें। \n2. नीचे से टेक्स्ट Copy करें। \n3. फेसबुक पर जाकर पेस्ट कर दें!"))
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
-                if img_link_for_wa: st.markdown(f"**[📥 {t('Download Photo Here', 'फोटो यहाँ से डाउनलोड करें')}]({img_link_for_wa})**", unsafe_allow_html=True)
 
         if can_edit:
             with st.expander(t("✏️ Edit Product (रेट, स्टॉक या फोटो बदलें)", "✏️ रेट, स्टॉक या डिलीवरी बदलें (Edit)")):
