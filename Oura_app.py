@@ -15,10 +15,8 @@ from PIL import Image
 import datetime
 from fpdf import FPDF
 
-# --- फोल्डर सेटअप (ताकि एरर न आए) ---
-SAVE_FOLDER = "billing_records"
+# --- फोल्डर सेटअप (PDF के लिए) ---
 INVOICE_FOLDER = "saved_invoices"
-if not os.path.exists(SAVE_FOLDER): os.makedirs(SAVE_FOLDER)
 if not os.path.exists(INVOICE_FOLDER): os.makedirs(INVOICE_FOLDER)
 
 # --- फायरबेस सिस्टम ---
@@ -442,7 +440,7 @@ def t(en_text, hi_text):
 
 expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
     try:
         docs = db.collection('products').stream()
@@ -451,6 +449,26 @@ def load_products():
             return pd.DataFrame(data)
     except: pass
     return pd.DataFrame(columns=expected_columns)
+
+# --- फास्ट डेटा लोडिंग के लिए कैशिंग (Caching) (FIREBASE LEDGER) ---
+@st.cache_data(ttl=300, show_spinner=False) # 5 मिनट तक डेटा सेव रखेगा, जिससे ऐप तुरंत खुलेगा
+def load_ledger_data():
+    ledger_data = {}
+    try:
+        customers = db.collection('ledgers').stream()
+        for cust in customers:
+            cust_name = cust.id
+            transactions = []
+            docs = db.collection('ledgers').document(cust_name).collection('transactions').order_by("Date").stream()
+            for doc in docs:
+                t_data = doc.to_dict()
+                t_data['doc_id'] = doc.id # एडिट/डिलीट कंट्रोल के लिए ID सेव करना
+                transactions.append(t_data)
+            if transactions:
+                ledger_data[cust_name] = pd.DataFrame(transactions)
+    except Exception as e:
+        pass
+    return ledger_data
 
 def toggle_stock_callback(doc_id, key):
     if key in st.session_state:
@@ -786,54 +804,51 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
 
         # ==========================================
-        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब
+        # 🌟 नया फास्ट और एडमिन-कंट्रोल्ड लेजर (Firebase)
         # ==========================================
         with tab_ledger:
-            st.subheader("📒 पार्टियों का खाता (Ledger System)")
+            st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
             
-            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (Ledger)", "📂 पुराने PDF बिल (Invoices)", "📝 फॉर्म से नई एंट्री"], horizontal=True)
+            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (View/Edit)", "📝 नई एंट्री (Manual Entry)", "📥 GSTR-1 रिपोर्ट डाउनलोड"], horizontal=True)
             st.markdown("---")
             
-            if ledger_menu == "📝 फॉर्म से नई एंट्री":
-                st.info("💡 यहाँ से आप किसी पार्टी के पुराने पेमेंट या नए बिल की मैन्युअल एंट्री कर सकते हैं।")
-                with st.form("billing_entry_form", clear_on_submit=True):
+            if ledger_menu == "📝 नई एंट्री (Manual Entry)":
+                st.info("💡 यहाँ से आप किसी भी पार्टी का पुराना पेमेंट या नया बिल डायरेक्ट खाते में चढ़ा सकते हैं।")
+                with st.form("firebase_ledger_entry", clear_on_submit=True):
                     col_l1, col_l2 = st.columns(2)
                     with col_l1:
                         ledger_customer = st.text_input("पार्टी का नाम (Customer Name)*").strip().upper()
                         ledger_amount = st.number_input("अमाउंट (₹)*", min_value=0.0, step=100.0)
                     with col_l2:
                         ledger_status = st.selectbox("कैटेगरी चुनें", ["Bill (मार्केट से लेना है)", "Advance (पार्टी से पेमेंट आ गया)"])
-                        ledger_note = st.text_input("विवरण / रिमार्क (जैसे: Cash received, Old bill etc.)")
+                        ledger_note = st.text_input("विवरण (जैसे: Cash from shop, Old balance)")
                         
                     ledger_date = st.date_input("तारीख (Date)", datetime.datetime.today())
                     save_ledger_btn = st.form_submit_button("एंट्री सेव करें 💾")
                     
-                    if save_ledger_btn:
-                        if ledger_customer and ledger_amount > 0:
-                            filename = f"{SAVE_FOLDER}/{ledger_customer}_ledger.csv"
-                            new_entry = pd.DataFrame([{
-                                "Date": ledger_date.strftime("%Y-%m-%d"), 
-                                "Type": "Bill" if "Bill" in ledger_status else "Advance", 
-                                "Amount": ledger_amount, 
-                                "Note": ledger_note
-                            }])
-                            if os.path.exists(filename):
-                                existing_df = pd.read_csv(filename)
-                                updated_df = pd.concat([existing_df, new_entry], ignore_index=True)
-                            else: updated_df = new_entry
-                            updated_df.to_csv(filename, index=False)
-                            st.success(f"✅ {ledger_customer} के खाते में एंट्री सेव हो गई!")
+                    if save_ledger_btn and ledger_customer and ledger_amount > 0:
+                        new_entry = {
+                            "Date": ledger_date.strftime("%Y-%m-%d"), 
+                            "Type": "Bill" if "Bill" in ledger_status else "Advance", 
+                            "Amount": ledger_amount, 
+                            "Note": ledger_note,
+                            "Timestamp": firestore.SERVER_TIMESTAMP
+                        }
+                        # Firebase में डायरेक्ट सेव
+                        db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
+                        
+                        load_ledger_data.clear() # कैश रिफ्रेश करने के लिए
+                        st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
             
-            elif ledger_menu == "📂 खाते देखें और अपडेट करें (Ledger)":
-                ledger_files = [f for f in os.listdir(SAVE_FOLDER) if f.endswith('.csv')]
-                if ledger_files:
-                    st.success("💡 **स्मार्ट फीचर:** नीचे दी गई टेबल किसी एक्सेल शीट की तरह काम करती है। आप सीधा टेबल में क्लिक करके **नई लाइन जोड़ सकते हैं**, पुरानी तारीख बदल सकते हैं या गलत एंट्री हटा सकते हैं।")
-                    for file in ledger_files:
-                        cust_name_file = file.replace("_ledger.csv", "")
-                        with st.expander(f"👤 {cust_name_file} का खाता"):
-                            file_path = f"{SAVE_FOLDER}/{file}"
-                            df_ledger = pd.read_csv(file_path)
-                            
+            elif ledger_menu == "📂 खाते देखें और अपडेट करें (View/Edit)":
+                all_ledgers = load_ledger_data()
+                
+                if not all_ledgers:
+                    st.info("ℹ️ अभी तक किसी पार्टी का खाता नहीं बना है।")
+                else:
+                    st.success("💡 **एडमिन कंट्रोल:** आप नीचे किसी भी खाते में जाकर गलत एंट्री पर टिक लगाकर उसे हटा सकते हैं, या अमाउंट और डिटेल्स बदल सकते हैं।")
+                    for cust_name, df_ledger in all_ledgers.items():
+                        with st.expander(f"👤 {cust_name} का खाता"):
                             total_bill = df_ledger[df_ledger["Type"] == "Bill"]["Amount"].sum()
                             total_advance = df_ledger[df_ledger["Type"] == "Advance"]["Amount"].sum()
                             net_balance = total_bill - total_advance
@@ -846,33 +861,55 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             elif net_balance < 0: lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
                             else: lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
 
-                            edited_df = st.data_editor(df_ledger, num_rows="dynamic", use_container_width=True, key=f"ed_{file}")
+                            # UI में दिखाने के लिए doc_id छिपा देंगे ताकि टेबल साफ दिखे
+                            display_df = df_ledger.drop(columns=['doc_id', 'Timestamp'], errors='ignore')
+                            display_df['Delete'] = False # एडमिन को डिलीट करने का ऑप्शन देने के लिए
                             
-                            col_b1, col_b2, col_b3 = st.columns([2, 1, 1])
-                            with col_b1:
-                                if not edited_df.equals(df_ledger):
-                                    if st.button("💾 खाते में बदलाव सेव करें", key=f"save_ed_{file}", type="primary"):
-                                        edited_df.to_csv(file_path, index=False)
-                                        st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
-                                        st.rerun()
-                            with col_b2:
-                                pass 
-                            with col_b3:
-                                if st.button("🗑️ पूरी फाइल डिलीट करें", key=f"del_{file}"):
-                                    os.remove(file_path)
+                            edited_df = st.data_editor(display_df, num_rows="dynamic", use_container_width=True, key=f"ed_{cust_name}")
+                            
+                            if st.button("💾 खाते में बदलाव सेव करें", key=f"save_ed_{cust_name}", type="primary"):
+                                with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
+                                    # एडमिन ने जो बदलाव किए या डिलीट टिक किया है, उसे Firebase से अपडेट करें
+                                    for idx, row in edited_df.iterrows():
+                                        if idx < len(df_ledger): # Existing entry
+                                            doc_id = df_ledger.iloc[idx]['doc_id']
+                                            if row.get('Delete', False):
+                                                db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).delete()
+                                            else:
+                                                # Check if fields were modified
+                                                original_row = df_ledger.iloc[idx]
+                                                if row['Amount'] != original_row['Amount'] or row['Note'] != original_row['Note'] or row['Type'] != original_row['Type'] or row['Date'] != original_row['Date']:
+                                                    db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).update({
+                                                        "Amount": row['Amount'],
+                                                        "Note": row['Note'],
+                                                        "Type": row['Type'],
+                                                        "Date": row['Date']
+                                                    })
+                                    
+                                    load_ledger_data.clear()
+                                    st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
+                                    time.sleep(1)
                                     st.rerun()
-                else:
-                    st.info("ℹ️ अभी तक किसी पार्टी का खाता नहीं बना है।")
 
-            elif ledger_menu == "📂 पुराने PDF बिल (Invoices)":
-                pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
-                if pdf_files:
-                    st.markdown("यहाँ आपके द्वारा जनरेट किए गए सभी बिल सुरक्षित हैं। आप इन्हें कभी भी डाउनलोड कर सकते हैं:")
-                    for pdf_f in sorted(pdf_files, reverse=True):
-                        with open(f"{INVOICE_FOLDER}/{pdf_f}", "rb") as f:
-                            st.download_button(label=f"📄 {pdf_f}", data=f.read(), file_name=pdf_f, mime="application/pdf", key=f"dl_pdf_{pdf_f}")
-                else:
-                    st.info("ℹ️ अभी तक कोई PDF बिल जनरेट और सेव नहीं हुआ है।")
+            elif ledger_menu == "📥 GSTR-1 रिपोर्ट डाउनलोड":
+                st.write("यहाँ से आप अपने CA को भेजने के लिए पूरे महीने की सेल रिपोर्ट एक क्लिक में डाउनलोड कर सकते हैं।")
+                all_ledgers = load_ledger_data()
+                if all_ledgers:
+                    combined_data = []
+                    for cust, df in all_ledgers.items():
+                        bills_only = df[df["Type"] == "Bill"].copy()
+                        bills_only["Customer Name"] = cust
+                        combined_data.append(bills_only)
+                    
+                    if combined_data:
+                        final_report = pd.concat(combined_data, ignore_index=True)
+                        csv = final_report.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📊 Excel (CSV) डाउनलोड करें",
+                            data=csv,
+                            file_name=f"Oura_Sales_Report_{datetime.datetime.today().strftime('%b_%Y')}.csv",
+                            mime="text/csv",
+                        )
 
     st.markdown("---")
 
@@ -942,7 +979,6 @@ def show_product_card(row, idx, prefix):
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
         
-        # 🌟 बटन लिंक्स को गैलरी फंक्शन में भेजना
         all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
         
         st.write(f"**{row.get('Name', 'Unknown')}**")
@@ -1222,13 +1258,19 @@ if st.session_state.cart:
             if st.session_state.cart:
                 auto_last_balance = 0.0
                 safe_name = cust_name.strip().upper() if cust_name else ""
-                ledger_filename = f"{SAVE_FOLDER}/{safe_name}_ledger.csv"
                 
-                if safe_name and os.path.exists(ledger_filename):
-                    temp_df = pd.read_csv(ledger_filename)
-                    t_bill = temp_df[temp_df["Type"] == "Bill"]["Amount"].sum()
-                    t_adv = temp_df[temp_df["Type"] == "Advance"]["Amount"].sum()
-                    auto_last_balance = t_bill - t_adv
+                # Firebase से पुराना बैलेंस निकालना
+                if safe_name:
+                    try:
+                        docs = db.collection('ledgers').document(safe_name).collection('transactions').stream()
+                        t_bill = 0
+                        t_adv = 0
+                        for doc in docs:
+                            d = doc.to_dict()
+                            if d.get("Type") == "Bill": t_bill += d.get("Amount", 0)
+                            elif d.get("Type") == "Advance": t_adv += d.get("Amount", 0)
+                        auto_last_balance = t_bill - t_adv
+                    except: pass
 
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
@@ -1240,6 +1282,7 @@ if st.session_state.cart:
                 st.session_state.ready_filename = f"OURA_Bill_{safe_file_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
 
+                # PDF को लोकल फोल्डर में भी बैकअप के लिए सेव रखना
                 pdf_path = f"{INVOICE_FOLDER}/{st.session_state.ready_filename}"
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
@@ -1255,30 +1298,32 @@ if st.session_state.cart:
                 current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
+                # नए बिल और पेमेंट को Firebase Ledger में सेव करना
                 if safe_name:
-                    entries = []
-                    entries.append({
+                    batch = db.batch()
+                    ledger_ref = db.collection('ledgers').document(safe_name).collection('transactions')
+                    
+                    bill_entry = {
                         "Date": bill_date.strftime("%Y-%m-%d"),
                         "Type": "Bill", 
                         "Amount": current_bill_total, 
-                        "Note": full_item_details 
-                    })
+                        "Note": full_item_details,
+                        "Timestamp": firestore.SERVER_TIMESTAMP
+                    }
+                    batch.set(ledger_ref.document(), bill_entry)
+                    
                     if amount_paid > 0:
-                        entries.append({
+                        adv_entry = {
                             "Date": bill_date.strftime("%Y-%m-%d"),
                             "Type": "Advance", 
                             "Amount": amount_paid, 
-                            "Note": "Cash/Online paid with bill" 
-                        })
-
-                    new_entries_df = pd.DataFrame(entries)
-                    if os.path.exists(ledger_filename):
-                        existing_df = pd.read_csv(ledger_filename)
-                        updated_df = pd.concat([existing_df, new_entries_df], ignore_index=True)
-                    else: 
-                        updated_df = new_entries_df
-                        
-                    updated_df.to_csv(ledger_filename, index=False)
+                            "Note": "Cash/Online paid with bill",
+                            "Timestamp": firestore.SERVER_TIMESTAMP
+                        }
+                        batch.set(ledger_ref.document(), adv_entry)
+                    
+                    batch.commit()
+                    load_ledger_data.clear() # कैश रिफ्रेश करना
 
                 msg = f"🧾 *NEW ORDER RECEIVED* 🧾\n\n👤 *Cust:* {cust_name}\n📞 *Mob:* {cust_mobile}\n"
                 st.session_state.ready_msg_for_admin = msg
