@@ -123,7 +123,6 @@ else:
     if migrated:
         save_config(current_config)
 
-# 🌟 PDF फंक्शन: इसमें पुराना बैलेंस और अभी दिए पैसे का शानदार हिसाब है
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date):
     pdf = FPDF()
     pdf.add_page()
@@ -253,14 +252,12 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
     grand_total = taxable_amount + gst_amt
 
-    # --- 🌟 यहाँ पुराना बकाया जुड़ेगा या घटेगा ---
     if last_balance > 0:
         pdf.cell(160, 10, "Add: Previous Balance (Pichla Bakaya)", border=1, align='R')
         pdf.cell(30, 10, f"{last_balance:.2f}", border=1, align='R')
         pdf.ln()
         grand_total += last_balance
     elif last_balance < 0:
-        # अगर एडवांस है तो
         pdf.cell(160, 10, "Less: Previous Advance (Pichla Jama)", border=1, align='R')
         pdf.cell(30, 10, f"{abs(last_balance):.2f}", border=1, align='R')
         pdf.ln()
@@ -272,7 +269,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(30, 12, f"{grand_total:.2f}", border=1, align='R', fill=True)
     pdf.ln()
 
-    # --- 🌟 यहाँ अभी जमा किया कैश लेस (Less) होगा ---
     if amount_paid > 0:
         pdf.set_font("Arial", 'B', 10)
         pdf.cell(160, 10, "Less: Amount Paid Now (Advance/Cash)", border=1, align='R')
@@ -281,7 +277,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
         balance_due = grand_total - amount_paid
         pdf.set_font("Arial", 'B', 12)
-        pdf.set_fill_color(255, 200, 200) # हल्का लाल रंग बकाया के लिए
+        pdf.set_fill_color(255, 200, 200) 
         pdf.cell(160, 12, "NET BALANCE DUE (Rs)", border=1, align='R', fill=True)
         pdf.cell(30, 12, f"{balance_due:.2f}", border=1, align='R', fill=True)
         pdf.ln()
@@ -790,7 +786,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
 
         # ==========================================
-        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब (UPGRADED)
+        # 🌟 लेजर (Ledger) और बिल मैनेजमेंट टैब
         # ==========================================
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Ledger System)")
@@ -831,7 +827,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             elif ledger_menu == "📂 खाते देखें और अपडेट करें (Ledger)":
                 ledger_files = [f for f in os.listdir(SAVE_FOLDER) if f.endswith('.csv')]
                 if ledger_files:
-                    st.success("💡 **स्मार्ट फीचर:** नीचे दी गई टेबल किसी एक्सेल शीट की तरह काम करती है। आप सीधा टेबल में क्लिक करके **नई लाइन जोड़ सकते हैं (पेमेंट कब-कब आए दर्ज करने के लिए)**, पुरानी तारीख बदल सकते हैं या गलत एंट्री हटा सकते हैं। बदलाव के बाद **'सेव करें'** दबाएं।")
+                    st.success("💡 **स्मार्ट फीचर:** नीचे दी गई टेबल किसी एक्सेल शीट की तरह काम करती है। आप सीधा टेबल में क्लिक करके **नई लाइन जोड़ सकते हैं**, पुरानी तारीख बदल सकते हैं या गलत एंट्री हटा सकते हैं।")
                     for file in ledger_files:
                         cust_name_file = file.replace("_ledger.csv", "")
                         with st.expander(f"👤 {cust_name_file} का खाता"):
@@ -860,7 +856,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                         st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
                                         st.rerun()
                             with col_b2:
-                                pass # Spacing
+                                pass 
                             with col_b3:
                                 if st.button("🗑️ पूरी फाइल डिलीट करें", key=f"del_{file}"):
                                     os.remove(file_path)
@@ -882,17 +878,26 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
-def show_swipe_gallery(path_str, is_in_stock=True):
+# 🌟 नया फीचर: शेयर बटन फोटो के ऊपर
+def show_swipe_gallery(path_str, is_in_stock=True, share_link=""):
     if not path_str: return []
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
     if not paths: return []
-    html_code = '<div class="swipe-gallery">'
+    
+    # फोटो के ऊपर Share बटन के लिए HTML Overlay
+    html_code = '<div style="position: relative;">'
+    
+    if share_link:
+        html_code += f'<a href="{share_link}" target="_blank" style="position: absolute; top: 10px; right: 10px; background-color: #25D366; color: white; padding: 6px 15px; border-radius: 20px; text-decoration: none; font-size: 14px; font-weight: bold; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">💬 Share</a>'
+        
+    html_code += '<div class="swipe-gallery">'
     img_style = "" if is_in_stock else "filter: grayscale(100%) opacity(60%);"
     for src in paths:
         if not src.startswith("http"):
             src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
         html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" style="{img_style}" loading="lazy" alt="Product Image"></a>'
-    html_code += '</div>'
+    
+    html_code += '</div></div>' # Close relative div
     html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">{t("Click photo to zoom 🔍", "ज़ूम करने के लिए फोटो पर क्लिक करें 🔍")}</div>'
     st.markdown(html_code, unsafe_allow_html=True)
     return paths
@@ -901,24 +906,46 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
+    # रेट और डिटेल पहले निकाल रहे हैं ताकि Share Text बन सके
+    try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
+    except: w_qty = 1
+    try: retail_price = float(row.get('Price', 0))
+    except: retail_price = 0.0
+    try: w_price = float(row.get('Wholesale_Price', retail_price))
+    except: w_price = retail_price
+    
+    image_path_str = str(row.get("Image_Path", ""))
+    paths_temp = [p.strip() for p in image_path_str.split('|') if p.strip()]
+    img_link_for_wa = ""
+    if paths_temp:
+        img_link_for_wa = paths_temp[0]
+        if not img_link_for_wa.startswith("http"):
+            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
+
+    # 🌟 WhatsApp शेयर का ऑटोमैटिक मैसेज बनाना (सभी के लिए इनेबल कर दिया गया है)
+    share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
+    share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
+    share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
+    share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
+    cat_url = urllib.parse.quote(str(row.get('Category', '')))
+    app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
+    share_text += f"\n🛒 *{t('Book Order:', 'ऑर्डर बुक करें:')}* {app_link}\n"
+    if img_link_for_wa:
+        share_text += f"\n📷 *{t('Product Photo:', 'प्रोडक्ट फोटो:')}* {img_link_for_wa}"
+    
+    share_link_wa = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
+
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
-        image_path_str = str(row.get("Image_Path", ""))
-        all_paths = show_swipe_gallery(image_path_str, is_in_stock)
-        img_link_for_wa = all_paths[0] if all_paths else ""
-        if img_link_for_wa and not img_link_for_wa.startswith("http"):
-            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
+        
+        # 🌟 यहाँ हम शेयर लिंक को गैलरी फंक्शन में भेज रहे हैं
+        all_paths = show_swipe_gallery(image_path_str, is_in_stock, share_link_wa)
         
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
         if pd.notna(seller_val) and str(seller_val).strip() != "":
             st.markdown(f"{t('🏪 Brand:', '🏪 सेलर / ब्रांड:')} <span style='color:#E65100; font-weight:bold;'>{str(seller_val).strip()}</span>", unsafe_allow_html=True)
-        try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
-        except: w_qty = 1
-        try: retail_price = float(row.get('Price', 0))
-        except: retail_price = 0.0
-        try: w_price = float(row.get('Wholesale_Price', retail_price))
-        except: w_price = retail_price
+            
         show_fd = current_config.get("free_delivery_tag", True)
         val_fd = row.get("Free_Delivery")
         if pd.notna(val_fd) and str(val_fd).strip() != "":
@@ -975,21 +1002,9 @@ def show_product_card(row, idx, prefix):
             with col_t2: st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
             with col_t3: st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
             with col_t4: st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
-            
-        if can_market:
-            if can_edit: st.markdown("<br>", unsafe_allow_html=True)
-            share_text = f"⚡ *OURA PRODUCTS - {row.get('Name')}* ⚡\n\n"
-            share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
-            share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
-            share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
-            cat_url = urllib.parse.quote(str(row.get('Category', '')))
-            app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
-            share_text += f"\n🛒 *{t('Book Order:', 'ऑर्डर बुक करें:')}* {app_link}\n"
-            if img_link_for_wa: share_text += f"\n📷 *{t('Product Photo:', 'प्रोडक्ट फोटो:')}* {img_link_for_wa}"
-            
-            encoded_share_text = urllib.parse.quote(share_text)
-            st.markdown(f'''<a href="https://wa.me/?text={encoded_share_text}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:8px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📢 {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}</a>''', unsafe_allow_html=True)
 
+        if can_market:
+            # नीचे वाले एक्सपैंडर में अब सिर्फ फेसबुक का टेक्स्ट रखा है क्योंकि WA का बटन फोटो पर ही है।
             with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
                 fb_text = f"🔥 OURA PRODUCTS - {row.get('Name')} 🔥\n\n📦 {t('Wholesale Rate:', 'होलसेल रेट:')} ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n🛵 {t('Single Piece Rate:', 'सिंगल पीस रेट:')} ₹{retail_price}\n🏭 {t('Direct from Manufacturer:', 'सीधा मैन्युफैक्चरर से:')} Delhi (Oura Products)\n\n👇 {t('Check rates and order online now:', 'अभी रेट चेक करें और ऑनलाइन ऑर्डर करें:')}\n{app_link}\n\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
                 st.info(t("💡 **Tip:** Copy the text below and paste it on Facebook.", "💡 **टिप:** नीचे दिए गए टेक्स्ट को Copy करें और Facebook पर Paste कर दें।"))
@@ -1203,7 +1218,6 @@ if st.session_state.cart:
 
         if is_valid:
             if st.session_state.cart:
-                # --- 🌟 1. ऑटोमैटिक पिछला बकाया (Last Balance) निकालना ---
                 auto_last_balance = 0.0
                 safe_name = cust_name.strip().upper() if cust_name else ""
                 ledger_filename = f"{SAVE_FOLDER}/{safe_name}_ledger.csv"
@@ -1214,7 +1228,6 @@ if st.session_state.cart:
                     t_adv = temp_df[temp_df["Type"] == "Advance"]["Amount"].sum()
                     auto_last_balance = t_bill - t_adv
 
-                # 2. PDF जनरेट करना
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
                     cust_gst, gst_percent, shipping_cost, auto_last_balance, amount_paid, current_config, bill_date
@@ -1225,12 +1238,10 @@ if st.session_state.cart:
                 st.session_state.ready_filename = f"OURA_Bill_{safe_file_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
 
-                # PDF सेव करना
                 pdf_path = f"{INVOICE_FOLDER}/{st.session_state.ready_filename}"
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
 
-                # --- 🌟 3. लेजर (खाते) में परफेक्ट एंट्री ---
                 item_details_list = []
                 taxable_amount = 0
                 for k, item in st.session_state.cart.items():
@@ -1244,14 +1255,12 @@ if st.session_state.cart:
                 
                 if safe_name:
                     entries = []
-                    # जो माल बिका उसकी एंट्री
                     entries.append({
                         "Date": bill_date.strftime("%Y-%m-%d"),
                         "Type": "Bill", 
                         "Amount": current_bill_total, 
                         "Note": full_item_details 
                     })
-                    # जो पैसा आया उसकी एंट्री
                     if amount_paid > 0:
                         entries.append({
                             "Date": bill_date.strftime("%Y-%m-%d"),
@@ -1269,7 +1278,6 @@ if st.session_state.cart:
                         
                     updated_df.to_csv(ledger_filename, index=False)
 
-                # WhatsApp मैसेज
                 msg = f"🧾 *NEW ORDER RECEIVED* 🧾\n\n👤 *Cust:* {cust_name}\n📞 *Mob:* {cust_mobile}\n"
                 st.session_state.ready_msg_for_admin = msg
 
