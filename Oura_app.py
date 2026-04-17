@@ -303,6 +303,7 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
+# 🌟 पुरानी गड़बड़ वाली CSS हटाकर साफ CSS लगा दी गई है
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -347,44 +348,6 @@ hide_streamlit_style = """
                 border-right: 1px solid #e2e8f0;
                 border-bottom: 1px solid #e2e8f0;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            }
-
-            div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="stHorizontalBlock"] {
-                display: flex !important;
-                flex-wrap: wrap !important;
-                gap: 10px;
-            }
-            div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="column"] {
-                min-width: calc(50% - 10px) !important; 
-                flex: 1 1 calc(50% - 10px) !important;
-                margin-bottom: 5px;
-            }
-            @media (min-width: 600px) {
-                div[data-testid="stContainer"]:has(.custom-cat-grid) div[data-testid="column"] {
-                    min-width: calc(25% - 10px) !important; 
-                    flex: 1 1 calc(25% - 10px) !important;
-                }
-            }
-
-            @media (max-width: 600px) {
-                div[data-testid="stHorizontalBlock"] { display: flex !important; flex-wrap: wrap !important; }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(.custom-cat-grid)) > div[data-testid="column"] {
-                    min-width: 23% !important; max-width: 25% !important; flex: 1 1 23% !important;
-                    padding: 0 2px !important; margin-bottom: 5px;
-                }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(.custom-cat-grid)) div.stButton > button {
-                    font-size: 11px !important; padding: 5px !important; min-height: 60px !important;
-                    word-wrap: break-word !important; white-space: normal !important;
-                }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(2)):not(:has(> div:nth-child(3))) > div[data-testid="column"]:first-child {
-                    min-width: 25% !important; flex: 1 1 25% !important;
-                }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(2)):not(:has(> div:nth-child(3))) > div[data-testid="column"]:nth-child(2) {
-                    min-width: 70% !important; flex: 1 1 70% !important;
-                }
-                div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div[data-testid="column"] {
-                    min-width: 100% !important; flex: 1 1 100% !important; margin-bottom: 15px;
-                }
             }
 
             .swipe-gallery {
@@ -451,7 +414,7 @@ def load_products():
     return pd.DataFrame(columns=expected_columns)
 
 # --- फास्ट डेटा लोडिंग के लिए कैशिंग (Caching) (FIREBASE LEDGER) ---
-@st.cache_data(ttl=300, show_spinner=False) # 5 मिनट तक डेटा सेव रखेगा, जिससे ऐप तुरंत खुलेगा
+@st.cache_data(ttl=300, show_spinner=False) 
 def load_ledger_data():
     ledger_data = {}
     try:
@@ -462,7 +425,7 @@ def load_ledger_data():
             docs = db.collection('ledgers').document(cust_name).collection('transactions').order_by("Date").stream()
             for doc in docs:
                 t_data = doc.to_dict()
-                t_data['doc_id'] = doc.id # एडिट/डिलीट कंट्रोल के लिए ID सेव करना
+                t_data['doc_id'] = doc.id 
                 transactions.append(t_data)
             if transactions:
                 ledger_data[cust_name] = pd.DataFrame(transactions)
@@ -620,9 +583,6 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 
     st.markdown("---")
 
-# ==========================================
-# ADMIN & SELLER DASHBOARD SECTION (WITH LEDGER TAB)
-# ==========================================
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
         st.success(t("✅ Logged in as Admin. You have full control.", "✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।"))
@@ -803,9 +763,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 time.sleep(1)
                 st.rerun()
 
-        # ==========================================
-        # 🌟 नया फास्ट और एडमिन-कंट्रोल्ड लेजर (Firebase)
-        # ==========================================
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
             
@@ -834,10 +791,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             "Note": ledger_note,
                             "Timestamp": firestore.SERVER_TIMESTAMP
                         }
-                        # Firebase में डायरेक्ट सेव
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
-                        
-                        load_ledger_data.clear() # कैश रिफ्रेश करने के लिए
+                        load_ledger_data.clear()
                         st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
             
             elif ledger_menu == "📂 खाते देखें और अपडेट करें (View/Edit)":
@@ -861,22 +816,19 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             elif net_balance < 0: lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
                             else: lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
 
-                            # UI में दिखाने के लिए doc_id छिपा देंगे ताकि टेबल साफ दिखे
                             display_df = df_ledger.drop(columns=['doc_id', 'Timestamp'], errors='ignore')
-                            display_df['Delete'] = False # एडमिन को डिलीट करने का ऑप्शन देने के लिए
+                            display_df['Delete'] = False
                             
                             edited_df = st.data_editor(display_df, num_rows="dynamic", use_container_width=True, key=f"ed_{cust_name}")
                             
                             if st.button("💾 खाते में बदलाव सेव करें", key=f"save_ed_{cust_name}", type="primary"):
                                 with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
-                                    # एडमिन ने जो बदलाव किए या डिलीट टिक किया है, उसे Firebase से अपडेट करें
                                     for idx, row in edited_df.iterrows():
-                                        if idx < len(df_ledger): # Existing entry
+                                        if idx < len(df_ledger):
                                             doc_id = df_ledger.iloc[idx]['doc_id']
                                             if row.get('Delete', False):
                                                 db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).delete()
                                             else:
-                                                # Check if fields were modified
                                                 original_row = df_ledger.iloc[idx]
                                                 if row['Amount'] != original_row['Amount'] or row['Note'] != original_row['Note'] or row['Type'] != original_row['Type'] or row['Date'] != original_row['Date']:
                                                     db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).update({
@@ -915,7 +867,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
-# 🌟 नया फीचर: फोटो के ऊपर डाउनलोड और WhatsApp बटन
 def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
     if not path_str: return []
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
@@ -923,7 +874,6 @@ def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""
     
     html_code = '<div style="position: relative;">'
     
-    # 🌟 फोटो के ऊपर Facebook (Download) और WhatsApp बटन
     if wa_link or first_img_link:
         html_code += '<div style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px;">'
         if first_img_link:
@@ -963,7 +913,6 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
-    # WhatsApp शेयर लिंक
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
     share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
@@ -1107,6 +1056,7 @@ else:
             for idx, row in filtered_df.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
+    # 🌟 नई CSS-Driven Category Grid (बास्केट की समस्या अब खत्म)
     elif st.session_state.selected_category is None:
         st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
@@ -1116,18 +1066,62 @@ else:
         else:
             cat_container = st.container()
             with cat_container:
-                st.markdown('<div class="custom-cat-grid"></div>', unsafe_allow_html=True)
-                for i in range(0, len(valid_categories), 4):
-                    cols = st.columns(4)
-                    for j in range(4):
-                        if i + j < len(valid_categories):
-                            cat = valid_categories[i + j]
-                            with cols[j]:
-                                if st.button(cat, key=f"cat_btn_{i+j}", use_container_width=True):
-                                    st.session_state.selected_category = cat
-                                    st.query_params["cat"] = cat
-                                    save_cart_to_url()
-                                    st.rerun()
+                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
+                st.markdown("""
+                <style>
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: wrap !important;
+                    gap: 10px !important;
+                    justify-content: flex-start !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] {
+                    width: calc(33.33% - 10px) !important; 
+                }
+                @media (min-width: 600px) {
+                    div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] {
+                        width: calc(20% - 10px) !important; 
+                    }
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) {
+                    display: none !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
+                    height: 85px !important;
+                    min-height: 85px !important;
+                    width: 100% !important;
+                    border-radius: 12px !important;
+                    background: linear-gradient(135deg, #ffffff, #f0f4f8) !important;
+                    border: 1px solid #c5d4eb !important;
+                    box-shadow: 2px 4px 8px rgba(0,0,0,0.06) !important;
+                    color: #1a202c !important;
+                    font-weight: 700 !important;
+                    font-size: 13px !important;
+                    white-space: normal !important;
+                    word-wrap: break-word !important;
+                    line-height: 1.2 !important;
+                    padding: 4px !important;
+                    transition: all 0.2s ease-in-out !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover {
+                    transform: translateY(-3px) !important;
+                    box-shadow: 2px 6px 12px rgba(0,0,0,0.12) !important;
+                    border-color: #2b6cb0 !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active {
+                    transform: scale(0.95) !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+
+                for idx, cat in enumerate(valid_categories):
+                    if st.button(cat, key=f"cat_btn_{idx}"):
+                        st.session_state.selected_category = cat
+                        st.query_params["cat"] = cat
+                        save_cart_to_url()
+                        st.rerun()
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
@@ -1259,7 +1253,6 @@ if st.session_state.cart:
                 auto_last_balance = 0.0
                 safe_name = cust_name.strip().upper() if cust_name else ""
                 
-                # Firebase से पुराना बैलेंस निकालना
                 if safe_name:
                     try:
                         docs = db.collection('ledgers').document(safe_name).collection('transactions').stream()
@@ -1282,7 +1275,6 @@ if st.session_state.cart:
                 st.session_state.ready_filename = f"OURA_Bill_{safe_file_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
 
-                # PDF को लोकल फोल्डर में भी बैकअप के लिए सेव रखना
                 pdf_path = f"{INVOICE_FOLDER}/{st.session_state.ready_filename}"
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
@@ -1298,7 +1290,6 @@ if st.session_state.cart:
                 current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
-                # नए बिल और पेमेंट को Firebase Ledger में सेव करना
                 if safe_name:
                     batch = db.batch()
                     ledger_ref = db.collection('ledgers').document(safe_name).collection('transactions')
@@ -1323,7 +1314,7 @@ if st.session_state.cart:
                         batch.set(ledger_ref.document(), adv_entry)
                     
                     batch.commit()
-                    load_ledger_data.clear() # कैश रिफ्रेश करना
+                    load_ledger_data.clear() 
 
                 msg = f"🧾 *NEW ORDER RECEIVED* 🧾\n\n👤 *Cust:* {cust_name}\n📞 *Mob:* {cust_mobile}\n"
                 st.session_state.ready_msg_for_admin = msg
