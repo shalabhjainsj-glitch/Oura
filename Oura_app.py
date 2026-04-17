@@ -303,7 +303,6 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# 🌟 सुरक्षित और नई CSS (बास्केट प्रॉब्लम ख़त्म)
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -413,7 +412,6 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
-# --- फास्ट डेटा लोडिंग के लिए कैशिंग (Caching) (FIREBASE LEDGER) ---
 @st.cache_data(ttl=300, show_spinner=False) 
 def load_ledger_data():
     ledger_data = {}
@@ -763,7 +761,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 time.sleep(1)
                 st.rerun()
 
-            # 🌟 नया केटेगरी मैनेजमेंट टूल (Category Management)
             st.markdown("---")
             st.subheader("🏷️ Category Management (नाम और इमोजी बदलें)")
             st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने आप अपडेट हो जाएंगे।")
@@ -797,7 +794,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
             
-            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (View/Edit)", "📝 नई एंट्री (Manual Entry)", "📥 GSTR-1 रिपोर्ट डाउनलोड"], horizontal=True)
+            # 🌟 GST Return हटा दिया गया और पुराने बिल का ऑप्शन वापस लगा दिया गया है
+            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (View/Edit)", "📝 नई एंट्री (Manual Entry)", "📂 पुराने PDF बिल (Invoices)"], horizontal=True)
             st.markdown("---")
             
             if ledger_menu == "📝 नई एंट्री (Manual Entry)":
@@ -874,25 +872,16 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                     time.sleep(1)
                                     st.rerun()
 
-            elif ledger_menu == "📥 GSTR-1 रिपोर्ट डाउनलोड":
-                st.write("यहाँ से आप अपने CA को भेजने के लिए पूरे महीने की सेल रिपोर्ट एक क्लिक में डाउनलोड कर सकते हैं।")
-                all_ledgers = load_ledger_data()
-                if all_ledgers:
-                    combined_data = []
-                    for cust, df in all_ledgers.items():
-                        bills_only = df[df["Type"] == "Bill"].copy()
-                        bills_only["Customer Name"] = cust
-                        combined_data.append(bills_only)
-                    
-                    if combined_data:
-                        final_report = pd.concat(combined_data, ignore_index=True)
-                        csv = final_report.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            label="📊 Excel (CSV) डाउनलोड करें",
-                            data=csv,
-                            file_name=f"Oura_Sales_Report_{datetime.datetime.today().strftime('%b_%Y')}.csv",
-                            mime="text/csv",
-                        )
+            # 🌟 पुराने PDF बिल वाला हिस्सा वापस आ गया है
+            elif ledger_menu == "📂 पुराने PDF बिल (Invoices)":
+                pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
+                if pdf_files:
+                    st.markdown("यहाँ आपके द्वारा जनरेट किए गए सभी बिल सुरक्षित हैं। आप इन्हें कभी भी डाउनलोड कर सकते हैं:")
+                    for pdf_f in sorted(pdf_files, reverse=True):
+                        with open(f"{INVOICE_FOLDER}/{pdf_f}", "rb") as f:
+                            st.download_button(label=f"📄 {pdf_f}", data=f.read(), file_name=pdf_f, mime="application/pdf", key=f"dl_pdf_{pdf_f}")
+                else:
+                    st.info("ℹ️ अभी तक कोई PDF बिल जनरेट और सेव नहीं हुआ है।")
 
     st.markdown("---")
 
@@ -1087,7 +1076,6 @@ else:
             for idx, row in filtered_df.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
-    # 🌟 नई CSS-Driven Category Grid (बास्केट की समस्या अब खत्म)
     elif st.session_state.selected_category is None:
         st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
