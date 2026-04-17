@@ -303,7 +303,7 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# 🌟 पुरानी गड़बड़ वाली CSS हटाकर साफ CSS लगा दी गई है
+# 🌟 सुरक्षित और नई CSS (बास्केट प्रॉब्लम ख़त्म)
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -762,6 +762,37 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.success("✅ Saved!")
                 time.sleep(1)
                 st.rerun()
+
+            # 🌟 नया केटेगरी मैनेजमेंट टूल (Category Management)
+            st.markdown("---")
+            st.subheader("🏷️ Category Management (नाम और इमोजी बदलें)")
+            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने आप अपडेट हो जाएंगे।")
+            
+            current_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            
+            if current_cats:
+                col_c1, col_c2 = st.columns(2)
+                with col_c1:
+                    old_cat = st.selectbox("पुरानी केटेगरी चुनें", current_cats)
+                with col_c2:
+                    new_cat_name = st.text_input("नया नाम और इमोजी डालें (जैसे: 🔊 Speakers)", value=old_cat)
+                
+                if st.button("💾 नाम अपडेट करें (Update Name)"):
+                    if new_cat_name and new_cat_name.strip() != old_cat:
+                        with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
+                            prods_to_update = products_df[products_df['Category'] == old_cat]
+                            batch = db.batch()
+                            
+                            for idx, row in prods_to_update.iterrows():
+                                doc_id = str(row['ID'])
+                                doc_ref = db.collection('products').document(doc_id)
+                                batch.update(doc_ref, {"Category": new_cat_name.strip()})
+                            
+                            batch.commit()
+                            load_products.clear()
+                            st.success(f"✅ केटेगरी का नाम बदलकर '{new_cat_name}' कर दिया गया है!")
+                            time.sleep(1)
+                            st.rerun()
 
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
