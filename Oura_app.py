@@ -15,8 +15,10 @@ from PIL import Image
 import datetime
 from fpdf import FPDF
 
-# --- फोल्डर सेटअप (PDF के लिए) ---
+# --- फोल्डर सेटअप (PDF और पुराने बैकअप के लिए) ---
+SAVE_FOLDER = "billing_records"
 INVOICE_FOLDER = "saved_invoices"
+if not os.path.exists(SAVE_FOLDER): os.makedirs(SAVE_FOLDER)
 if not os.path.exists(INVOICE_FOLDER): os.makedirs(INVOICE_FOLDER)
 
 # --- फायरबेस सिस्टम ---
@@ -295,14 +297,11 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     
     return pdf.output(dest='S').encode('latin1')
 
-@st.cache_data(show_spinner=False)
-def get_cached_pdf_bytes(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date):
-    return generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date)
-
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
+# 🌟 सुरक्षित और साफ CSS
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -790,11 +789,47 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             st.success(f"✅ केटेगरी का नाम बदलकर '{new_cat_name}' कर दिया गया है!")
                             time.sleep(1)
                             st.rerun()
+                            
+            st.markdown("---")
+            st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Recover Old Ledgers)")
+            st.warning("अगर आपके पुराने खाते नहीं दिख रहे हैं, तो नीचे दिया गया बटन दबाएं। यह आपके पुराने डेटा को नए क्लाउड सिस्टम में सुरक्षित कर देगा। (इसे सिर्फ एक बार दबाना है)")
+            
+            if st.button("🚀 पुराने खाते वापस लाएं (Migrate Data)"):
+                if os.path.exists(SAVE_FOLDER):
+                    old_files = [f for f in os.listdir(SAVE_FOLDER) if f.endswith('.csv')]
+                    if old_files:
+                        with st.spinner("पुराने खाते क्लाउड पर शिफ्ट हो रहे हैं... कृपया रुकें..."):
+                            for file in old_files:
+                                cust_name = file.replace("_ledger.csv", "")
+                                file_path = f"{SAVE_FOLDER}/{file}"
+                                try:
+                                    df = pd.read_csv(file_path)
+                                    for _, row in df.iterrows():
+                                        entry = {
+                                            "Date": str(row.get("Date", "")),
+                                            "Type": str(row.get("Type", "Bill")),
+                                            "Amount": float(row.get("Amount", 0.0)),
+                                            "Note": str(row.get("Note", "")),
+                                            "Timestamp": firestore.SERVER_TIMESTAMP
+                                        }
+                                        db.collection('ledgers').document(cust_name).collection('transactions').add(entry)
+                                    
+                                    os.rename(file_path, f"{file_path}.backup")
+                                except Exception as e:
+                                    st.error(f"{cust_name} का डेटा लाने में दिक्कत: {e}")
+                            
+                            load_ledger_data.clear() 
+                            st.success("✅ बधाई हो! आपके सारे पुराने खाते सफलतापूर्वक वापस आ गए हैं!")
+                            time.sleep(2)
+                            st.rerun()
+                    else:
+                        st.info("⚠️ कोई पुरानी फाइल नहीं मिली या डेटा पहले ही शिफ्ट हो चुका है।")
+                else:
+                    st.error("⚠️ 'billing_records' फोल्डर नहीं मिला!")
 
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
             
-            # 🌟 GST Return हटा दिया गया और पुराने बिल का ऑप्शन वापस लगा दिया गया है
             ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (View/Edit)", "📝 नई एंट्री (Manual Entry)", "📂 पुराने PDF बिल (Invoices)"], horizontal=True)
             st.markdown("---")
             
@@ -872,14 +907,31 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                     time.sleep(1)
                                     st.rerun()
 
-            # 🌟 पुराने PDF बिल वाला हिस्सा वापस आ गया है
             elif ledger_menu == "📂 पुराने PDF बिल (Invoices)":
                 pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
                 if pdf_files:
-                    st.markdown("यहाँ आपके द्वारा जनरेट किए गए सभी बिल सुरक्षित हैं। आप इन्हें कभी भी डाउनलोड कर सकते हैं:")
+                    st.markdown("यहाँ आपके द्वारा जनरेट किए गए सभी बिल सुरक्षित हैं। आप इन्हें डाउनलोड या डिलीट कर सकते हैं:")
                     for pdf_f in sorted(pdf_files, reverse=True):
-                        with open(f"{INVOICE_FOLDER}/{pdf_f}", "rb") as f:
-                            st.download_button(label=f"📄 {pdf_f}", data=f.read(), file_name=pdf_f, mime="application/pdf", key=f"dl_pdf_{pdf_f}")
+                        col_pdf1, col_pdf2 = st.columns([8, 2])
+                        with col_pdf1:
+                            with open(f"{INVOICE_FOLDER}/{pdf_f}", "rb") as f:
+                                st.download_button(
+                                    label=f"📄 {pdf_f}", 
+                                    data=f.read(), 
+                                    file_name=pdf_f, 
+                                    mime="application/pdf", 
+                                    key=f"dl_pdf_{pdf_f}",
+                                    use_container_width=True
+                                )
+                        with col_pdf2:
+                            if st.button("🗑️ डिलीट", key=f"del_pdf_{pdf_f}", type="primary"):
+                                try:
+                                    os.remove(f"{INVOICE_FOLDER}/{pdf_f}")
+                                    st.success("✅ बिल डिलीट हो गया!")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error("⚠️ बिल डिलीट करने में समस्या आई।")
                 else:
                     st.info("ℹ️ अभी तक कोई PDF बिल जनरेट और सेव नहीं हुआ है।")
 
