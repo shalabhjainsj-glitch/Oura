@@ -15,10 +15,8 @@ from PIL import Image
 import datetime
 from fpdf import FPDF
 
-# --- फोल्डर सेटअप (PDF और पुराने बैकअप के लिए) ---
-SAVE_FOLDER = "billing_records"
+# --- फोल्डर सेटअप (PDF के लिए) ---
 INVOICE_FOLDER = "saved_invoices"
-if not os.path.exists(SAVE_FOLDER): os.makedirs(SAVE_FOLDER)
 if not os.path.exists(INVOICE_FOLDER): os.makedirs(INVOICE_FOLDER)
 
 # --- फायरबेस सिस्टम ---
@@ -301,7 +299,6 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
-# 🌟 सुरक्षित और साफ CSS
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -411,35 +408,24 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
-@st.cache_data(ttl=300, show_spinner=False) 
+# 🚀 फिक्स: Cache हटा दिया है ताकि नई एंट्री तुरंत रिफ्रेश होकर दिखे
 def load_ledger_data():
     ledger_data = {}
     try:
-        # 1. Firebase से 'collection_group' के ज़रिए सीधे सारे छुपे हुए खाते निकालना
-        docs = db.collection_group('transactions').stream()
-        
-        temp_dict = {}
-        for doc in docs:
-            t_data = doc.to_dict()
-            t_data['doc_id'] = doc.id 
-            
-            # 2. एंट्री के अंदर से पार्टी (Parent Folder) का नाम निकालना 
-            cust_name = doc.reference.parent.parent.id
-            
-            if cust_name not in temp_dict:
-                temp_dict[cust_name] = []
-            temp_dict[cust_name].append(t_data)
-            
-        # 3. सभी खातों को टेबल (DataFrame) में बदलना और तारीख के हिसाब से सेट करना
-        for c_name, t_list in temp_dict.items():
-            df = pd.DataFrame(t_list)
-            if 'Date' in df.columns:
-                df = df.sort_values(by="Date")
-            ledger_data[c_name] = df
-            
+        customers = db.collection('ledgers').stream()
+        for cust in customers:
+            cust_name = cust.id
+            if cust_name == "config": continue
+            transactions = []
+            docs = db.collection('ledgers').document(cust_name).collection('transactions').order_by("Date").stream()
+            for doc in docs:
+                t_data = doc.to_dict()
+                t_data['doc_id'] = doc.id 
+                transactions.append(t_data)
+            if transactions:
+                ledger_data[cust_name] = pd.DataFrame(transactions)
     except Exception as e:
         pass
-        
     return ledger_data
 
 def toggle_stock_callback(doc_id, key):
@@ -803,43 +789,39 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             st.rerun()
                             
             st.markdown("---")
-            st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Recover Old Ledgers)")
-            st.warning("अगर आपके पुराने खाते नहीं दिख रहे हैं, तो नीचे दिया गया बटन दबाएं। यह आपके पुराने डेटा को नए क्लाउड सिस्टम में सुरक्षित कर देगा। (इसे सिर्फ एक बार दबाना है)")
+            # 🚀 फिक्स: इंटरनेट के लिए नया फाइल अपलोडर सिस्टम
+            st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
+            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
             
-            if st.button("🚀 पुराने खाते वापस लाएं (Migrate Data)"):
-                if os.path.exists(SAVE_FOLDER):
-                    old_files = [f for f in os.listdir(SAVE_FOLDER) if f.endswith('.csv')]
-                    if old_files:
-                        with st.spinner("पुराने खाते क्लाउड पर शिफ्ट हो रहे हैं... कृपया रुकें..."):
-                            for file in old_files:
-                                cust_name = file.replace("_ledger.csv", "")
-                                file_path = f"{SAVE_FOLDER}/{file}"
-                                try:
-                                    df = pd.read_csv(file_path)
-                                    # पैरेंट डॉक्यूमेंट बनाएं
-                                    db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
-                                    for _, row in df.iterrows():
-                                        entry = {
-                                            "Date": str(row.get("Date", "")),
-                                            "Type": str(row.get("Type", "Bill")),
-                                            "Amount": float(row.get("Amount", 0.0)),
-                                            "Note": str(row.get("Note", "")),
-                                            "Timestamp": firestore.SERVER_TIMESTAMP
-                                        }
-                                        db.collection('ledgers').document(cust_name).collection('transactions').add(entry)
-                                    
-                                    os.rename(file_path, f"{file_path}.backup")
-                                except Exception as e:
-                                    st.error(f"{cust_name} का डेटा लाने में दिक्कत: {e}")
-                            
-                            load_ledger_data.clear() 
-                            st.success("✅ बधाई हो! आपके सारे पुराने खाते सफलतापूर्वक वापस आ गए हैं!")
-                            time.sleep(2)
-                            st.rerun()
-                    else:
-                        st.info("⚠️ कोई पुरानी फाइल नहीं मिली या डेटा पहले ही शिफ्ट हो चुका है।")
+            uploaded_csvs = st.file_uploader("अपनी पुरानी CSV फाइलें चुनें (Select old _ledger.csv files)", type=["csv"], accept_multiple_files=True)
+            
+            if st.button("🚀 फाइलें क्लाउड पर सेव करें"):
+                if uploaded_csvs:
+                    with st.spinner("खाते क्लाउड पर शिफ्ट हो रहे हैं... कृपया रुकें..."):
+                        for file in uploaded_csvs:
+                            cust_name = file.name.replace("_ledger.csv", "").replace(".csv", "")
+                            try:
+                                df = pd.read_csv(file)
+                                # पैरेंट डॉक्यूमेंट बनाएं
+                                db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
+                                for _, row in df.iterrows():
+                                    entry = {
+                                        "Date": str(row.get("Date", "")),
+                                        "Type": str(row.get("Type", "Bill")),
+                                        "Amount": float(row.get("Amount", 0.0)),
+                                        "Note": str(row.get("Note", "")),
+                                        "Timestamp": firestore.SERVER_TIMESTAMP
+                                    }
+                                    db.collection('ledgers').document(cust_name).collection('transactions').add(entry)
+                                
+                            except Exception as e:
+                                st.error(f"{cust_name} की फाइल में दिक्कत: {e}")
+                        
+                        st.success("✅ बधाई हो! आपके सारे पुराने खाते सफलतापूर्वक क्लाउड पर सेव हो गए हैं!")
+                        time.sleep(2)
+                        st.rerun()
                 else:
-                    st.error("⚠️ 'billing_records' फोल्डर नहीं मिला!")
+                    st.error("⚠️ कृपया पहले 'Browse files' पर क्लिक करके कोई पुरानी .csv फाइल सेलेक्ट करें।")
 
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
@@ -869,7 +851,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         # पैरेंट डॉक्यूमेंट बनाने का फिक्स
                         db.collection('ledgers').document(ledger_customer).set({"active": True}, merge=True)
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
-                        load_ledger_data.clear()
                         st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
                         time.sleep(1)
                         st.rerun()
@@ -932,7 +913,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                             db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
                                             db.collection('ledgers').document(cust_name).collection('transactions').add(new_entry)
 
-                                load_ledger_data.clear()
                                 st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
                                 time.sleep(1)
                                 st.rerun()
@@ -1468,7 +1448,6 @@ if st.session_state.cart:
                         batch.set(ledger_ref.document(), adv_entry)
                     
                     batch.commit()
-                    load_ledger_data.clear() 
 
                 msg = f"🧾 *NEW ORDER RECEIVED* 🧾\n\n👤 *Cust:* {cust_name}\n📞 *Mob:* {cust_mobile}\n"
                 st.session_state.ready_msg_for_admin = msg
