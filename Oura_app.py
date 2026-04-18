@@ -587,7 +587,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             t("➕ Add Product", "➕ नया उत्पाद"), 
             t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
             t("⚙️ Settings", "⚙️ सेटिंग्स"),
-            t("📒 Ledger", "📒 खाता / लेजर")
+            t("📒 Ledger / Invoices", "📒 खाता और बिल (Ledger)")
         ])
     else:
         st.success(t(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)", f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)"))
@@ -830,11 +830,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
             
-            ledger_menu = st.radio("ऑप्शन चुनें:", ["📂 खाते देखें और अपडेट करें (View/Edit)", "📝 नई एंट्री (Manual Entry)", "📂 पुराने PDF बिल (Invoices)"], horizontal=True)
-            st.markdown("---")
-            
-            if ledger_menu == "📝 नई एंट्री (Manual Entry)":
-                st.info("💡 यहाँ से आप किसी भी पार्टी का पुराना पेमेंट या नया बिल डायरेक्ट खाते में चढ़ा सकते हैं।")
+            # --- 1. नई एंट्री / नया खाता ---
+            with st.expander("➕ नई एंट्री या नया खाता बनाएं (Add New Entry)", expanded=False):
                 with st.form("firebase_ledger_entry", clear_on_submit=True):
                     col_l1, col_l2 = st.columns(2)
                     with col_l1:
@@ -858,82 +855,136 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
                         load_ledger_data.clear()
                         st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
+                        time.sleep(1)
+                        st.rerun()
+
+            st.markdown("---")
+
+            # --- 2. खाते देखना और एडिट करना (View/Edit Ledgers) ---
+            st.markdown("### 👥 सभी खाते (Customer Ledgers)")
+            st.info("💡 **टिप:** आप सीधे टेबल के अंदर क्लिक करके नई एंट्री जोड़ सकते हैं, या पुराने अमाउंट और विवरण बदल सकते हैं। डिलीट करने के लिए 'Delete' बॉक्स पर टिक करें और 'सेव' दबाएं।")
+            all_ledgers = load_ledger_data()
             
-            elif ledger_menu == "📂 खाते देखें और अपडेट करें (View/Edit)":
-                all_ledgers = load_ledger_data()
+            if not all_ledgers:
+                st.warning("ℹ️ अभी तक किसी पार्टी का खाता नहीं बना है।")
+            else:
+                for cust_name, df_ledger in all_ledgers.items():
+                    with st.expander(f"👤 {cust_name} का खाता"):
+                        total_bill = df_ledger[df_ledger["Type"] == "Bill"]["Amount"].sum()
+                        total_advance = df_ledger[df_ledger["Type"] == "Advance"]["Amount"].sum()
+                        net_balance = total_bill - total_advance
+                        
+                        lc1, lc2, lc3 = st.columns(3)
+                        lc1.metric("कुल बिल (लेना है)", f"₹ {total_bill:,.2f}")
+                        lc2.metric("कुल जमा (आ गया)", f"₹ {total_advance:,.2f}")
+                        
+                        if net_balance > 0: lc3.metric("🔴 बकाया (Balance)", f"₹ {net_balance:,.2f}")
+                        elif net_balance < 0: lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
+                        else: lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
+
+                        display_df = df_ledger.drop(columns=['doc_id', 'Timestamp'], errors='ignore')
+                        display_df['Delete'] = False 
+                        
+                        edited_df = st.data_editor(display_df, num_rows="dynamic", use_container_width=True, key=f"ed_{cust_name}")
+                        
+                        if st.button(f"💾 {cust_name} का खाता सेव करें", key=f"save_ed_{cust_name}", type="primary"):
+                            with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
+                                for idx, row in edited_df.iterrows():
+                                    if idx < len(df_ledger): 
+                                        doc_id = df_ledger.iloc[idx]['doc_id']
+                                        if row.get('Delete', False):
+                                            db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).delete()
+                                        else:
+                                            original_row = df_ledger.iloc[idx]
+                                            if row['Amount'] != original_row['Amount'] or row['Note'] != original_row['Note'] or row['Type'] != original_row['Type'] or row['Date'] != original_row['Date']:
+                                                db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).update({
+                                                    "Amount": row['Amount'],
+                                                    "Note": row['Note'],
+                                                    "Type": row['Type'],
+                                                    "Date": row['Date']
+                                                })
+                                    else: 
+                                        if not row.get('Delete', False) and not pd.isna(row.get('Amount')):
+                                            new_entry = {
+                                                "Date": str(row.get('Date', datetime.datetime.today().strftime("%Y-%m-%d"))), 
+                                                "Type": str(row.get('Type', 'Bill')), 
+                                                "Amount": float(row.get('Amount', 0)), 
+                                                "Note": str(row.get('Note', '')),
+                                                "Timestamp": firestore.SERVER_TIMESTAMP
+                                            }
+                                            db.collection('ledgers').document(cust_name).collection('transactions').add(new_entry)
+
+                                load_ledger_data.clear()
+                                st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
+                                time.sleep(1)
+                                st.rerun()
+
+            st.markdown("---")
+
+            # --- 3. पुराने PDF बिल (Saved Invoices) ---
+            st.markdown("### 📂 सेव किए गए बिल (Saved Invoices)")
+            pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
+            
+            if pdf_files:
+                parsed_files = []
+                for pdf_f in pdf_files:
+                    name_part = "Unknown"
+                    date_part = "Unknown"
+                    sort_key = "0"
+                    try:
+                        clean_name = pdf_f.replace("OURA_Bill_", "").replace(".pdf", "")
+                        parts = clean_name.split("_")
+                        if len(parts) >= 3:
+                            time_str = parts[-1]
+                            date_str = parts[-2]
+                            name_str = "_".join(parts[:-2])
+                            
+                            formatted_date = f"{date_str[6:]}-{date_str[4:6]}-{date_str[:4]}"
+                            formatted_time = f"{time_str[:2]}:{time_str[2:]}"
+                            
+                            name_part = name_str.replace("_", " ")
+                            date_part = f"{formatted_date} | {formatted_time}"
+                            sort_key = f"{date_str}{time_str}"
+                        else:
+                            name_part = clean_name
+                    except:
+                        pass
+                    
+                    parsed_files.append({
+                        "filename": pdf_f,
+                        "name": name_part,
+                        "date": date_part,
+                        "sort_key": sort_key
+                    })
+                    
+                parsed_files.sort(key=lambda x: x["sort_key"], reverse=True)
                 
-                if not all_ledgers:
-                    st.info("ℹ️ अभी तक किसी पार्टी का खाता नहीं बना है।")
-                else:
-                    st.success("💡 **एडमिन कंट्रोल:** आप नीचे किसी भी खाते में जाकर गलत एंट्री पर टिक लगाकर उसे हटा सकते हैं, या अमाउंट और डिटेल्स बदल सकते हैं।")
-                    for cust_name, df_ledger in all_ledgers.items():
-                        with st.expander(f"👤 {cust_name} का खाता"):
-                            total_bill = df_ledger[df_ledger["Type"] == "Bill"]["Amount"].sum()
-                            total_advance = df_ledger[df_ledger["Type"] == "Advance"]["Amount"].sum()
-                            net_balance = total_bill - total_advance
-                            
-                            lc1, lc2, lc3 = st.columns(3)
-                            lc1.metric("कुल बिल (लेना है)", f"₹ {total_bill:,.2f}")
-                            lc2.metric("कुल जमा (आ गया)", f"₹ {total_advance:,.2f}")
-                            
-                            if net_balance > 0: lc3.metric("🔴 बकाया (Balance)", f"₹ {net_balance:,.2f}")
-                            elif net_balance < 0: lc3.metric("🟢 एक्स्ट्रा जमा (Advance)", f"₹ {abs(net_balance):,.2f}")
-                            else: lc3.metric("⚪ हिसाब चुकता", "₹ 0.00")
-
-                            display_df = df_ledger.drop(columns=['doc_id', 'Timestamp'], errors='ignore')
-                            display_df['Delete'] = False
-                            
-                            edited_df = st.data_editor(display_df, num_rows="dynamic", use_container_width=True, key=f"ed_{cust_name}")
-                            
-                            if st.button("💾 खाते में बदलाव सेव करें", key=f"save_ed_{cust_name}", type="primary"):
-                                with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
-                                    for idx, row in edited_df.iterrows():
-                                        if idx < len(df_ledger):
-                                            doc_id = df_ledger.iloc[idx]['doc_id']
-                                            if row.get('Delete', False):
-                                                db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).delete()
-                                            else:
-                                                original_row = df_ledger.iloc[idx]
-                                                if row['Amount'] != original_row['Amount'] or row['Note'] != original_row['Note'] or row['Type'] != original_row['Type'] or row['Date'] != original_row['Date']:
-                                                    db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).update({
-                                                        "Amount": row['Amount'],
-                                                        "Note": row['Note'],
-                                                        "Type": row['Type'],
-                                                        "Date": row['Date']
-                                                    })
-                                    
-                                    load_ledger_data.clear()
-                                    st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
-                                    time.sleep(1)
-                                    st.rerun()
-
-            elif ledger_menu == "📂 पुराने PDF बिल (Invoices)":
-                pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
-                if pdf_files:
-                    st.markdown("यहाँ आपके द्वारा जनरेट किए गए सभी बिल सुरक्षित हैं। आप इन्हें डाउनलोड या डिलीट कर सकते हैं:")
-                    for pdf_f in sorted(pdf_files, reverse=True):
-                        col_pdf1, col_pdf2 = st.columns([8, 2])
-                        with col_pdf1:
-                            with open(f"{INVOICE_FOLDER}/{pdf_f}", "rb") as f:
+                for item in parsed_files:
+                    with st.container(border=True):
+                        col_info, col_btn1, col_btn2 = st.columns([6, 2, 2])
+                        with col_info:
+                            st.markdown(f"👤 **{item['name']}** <br> 📅 <span style='color: gray; font-size: 14px;'>{item['date']}</span>", unsafe_allow_html=True)
+                        with col_btn1:
+                            with open(f"{INVOICE_FOLDER}/{item['filename']}", "rb") as f:
                                 st.download_button(
-                                    label=f"📄 {pdf_f}", 
+                                    label="📥 डाउनलोड", 
                                     data=f.read(), 
-                                    file_name=pdf_f, 
+                                    file_name=item['filename'], 
                                     mime="application/pdf", 
-                                    key=f"dl_pdf_{pdf_f}",
+                                    key=f"dl_pdf_{item['filename']}",
                                     use_container_width=True
                                 )
-                        with col_pdf2:
-                            if st.button("🗑️ डिलीट", key=f"del_pdf_{pdf_f}", type="primary"):
+                        with col_btn2:
+                            if st.button("🗑️ डिलीट", key=f"del_pdf_{item['filename']}", type="primary"):
                                 try:
-                                    os.remove(f"{INVOICE_FOLDER}/{pdf_f}")
+                                    os.remove(f"{INVOICE_FOLDER}/{item['filename']}")
                                     st.success("✅ बिल डिलीट हो गया!")
                                     time.sleep(1)
                                     st.rerun()
                                 except Exception as e:
                                     st.error("⚠️ बिल डिलीट करने में समस्या आई।")
-                else:
-                    st.info("ℹ️ अभी तक कोई PDF बिल जनरेट और सेव नहीं हुआ है।")
+            else:
+                st.info("ℹ️ अभी तक कोई PDF बिल जनरेट और सेव नहीं हुआ है।")
 
     st.markdown("---")
 
