@@ -415,19 +415,31 @@ def load_products():
 def load_ledger_data():
     ledger_data = {}
     try:
-        customers = db.collection('ledgers').stream()
-        for cust in customers:
-            cust_name = cust.id
-            transactions = []
-            docs = db.collection('ledgers').document(cust_name).collection('transactions').order_by("Date").stream()
-            for doc in docs:
-                t_data = doc.to_dict()
-                t_data['doc_id'] = doc.id 
-                transactions.append(t_data)
-            if transactions:
-                ledger_data[cust_name] = pd.DataFrame(transactions)
+        # 1. Firebase से 'collection_group' के ज़रिए सीधे सारे छुपे हुए खाते निकालना
+        docs = db.collection_group('transactions').stream()
+        
+        temp_dict = {}
+        for doc in docs:
+            t_data = doc.to_dict()
+            t_data['doc_id'] = doc.id 
+            
+            # 2. एंट्री के अंदर से पार्टी (Parent Folder) का नाम निकालना 
+            cust_name = doc.reference.parent.parent.id
+            
+            if cust_name not in temp_dict:
+                temp_dict[cust_name] = []
+            temp_dict[cust_name].append(t_data)
+            
+        # 3. सभी खातों को टेबल (DataFrame) में बदलना और तारीख के हिसाब से सेट करना
+        for c_name, t_list in temp_dict.items():
+            df = pd.DataFrame(t_list)
+            if 'Date' in df.columns:
+                df = df.sort_values(by="Date")
+            ledger_data[c_name] = df
+            
     except Exception as e:
         pass
+        
     return ledger_data
 
 def toggle_stock_callback(doc_id, key):
@@ -804,6 +816,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 file_path = f"{SAVE_FOLDER}/{file}"
                                 try:
                                     df = pd.read_csv(file_path)
+                                    # पैरेंट डॉक्यूमेंट बनाएं
+                                    db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
                                     for _, row in df.iterrows():
                                         entry = {
                                             "Date": str(row.get("Date", "")),
@@ -852,6 +866,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             "Note": ledger_note,
                             "Timestamp": firestore.SERVER_TIMESTAMP
                         }
+                        # पैरेंट डॉक्यूमेंट बनाने का फिक्स
+                        db.collection('ledgers').document(ledger_customer).set({"active": True}, merge=True)
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
                         load_ledger_data.clear()
                         st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
@@ -912,6 +928,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                                 "Note": str(row.get('Note', '')),
                                                 "Timestamp": firestore.SERVER_TIMESTAMP
                                             }
+                                            # पैरेंट फोल्डर के साथ नई एंट्री
+                                            db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
                                             db.collection('ledgers').document(cust_name).collection('transactions').add(new_entry)
 
                                 load_ledger_data.clear()
@@ -923,6 +941,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             # --- 3. पुराने PDF बिल (Saved Invoices) ---
             st.markdown("### 📂 सेव किए गए बिल (Saved Invoices)")
+            if not os.path.exists(INVOICE_FOLDER):
+                os.makedirs(INVOICE_FOLDER)
             pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
             
             if pdf_files:
@@ -1392,10 +1412,19 @@ if st.session_state.cart:
                     cust_gst, gst_percent, shipping_cost, auto_last_balance, amount_paid, current_config, bill_date
                 )
                 
-                safe_file_name = safe_name.replace(' ', '_') if safe_name else 'Cash'
+                # फिक्स: PDF के नाम में से गलत कैरेक्टर हटाना
+                if safe_name:
+                    safe_file_name = re.sub(r'[\\/*?:"<>|]', "", safe_name).replace(' ', '_')
+                else:
+                    safe_file_name = 'Cash'
+                    
                 date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
                 st.session_state.ready_filename = f"OURA_Bill_{safe_file_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
+
+                # फिक्स: फोल्डर को चेक करना और न होने पर बनाना
+                if not os.path.exists(INVOICE_FOLDER):
+                    os.makedirs(INVOICE_FOLDER)
 
                 pdf_path = f"{INVOICE_FOLDER}/{st.session_state.ready_filename}"
                 with open(pdf_path, "wb") as f:
@@ -1414,7 +1443,10 @@ if st.session_state.cart:
                 
                 if safe_name:
                     batch = db.batch()
-                    ledger_ref = db.collection('ledgers').document(safe_name).collection('transactions')
+                    parent_ref = db.collection('ledgers').document(safe_name)
+                    # फिक्स: पैरेंट फोल्डर बनाना
+                    batch.set(parent_ref, {"active": True}, merge=True)
+                    ledger_ref = parent_ref.collection('transactions')
                     
                     bill_entry = {
                         "Date": bill_date.strftime("%Y-%m-%d"),
