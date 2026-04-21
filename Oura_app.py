@@ -396,7 +396,8 @@ if 'lang' not in st.session_state:
 def t(en_text, hi_text):
     return en_text if st.session_state.lang == 'en' else hi_text
 
-expected_columns = ["ID", "Name", "Price", "Wholesale_Price", "Wholesale_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
+# 🚀 3-Tier Pricing Column Update
+expected_columns = ["ID", "Name", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -408,7 +409,6 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
-# 🚀 फिक्स: Cache हटा दिया है ताकि नई एंट्री तुरंत रिफ्रेश होकर दिखे
 def load_ledger_data():
     ledger_data = {}
     try:
@@ -461,10 +461,19 @@ if 'cart_loaded' not in st.session_state:
                     match = products_df[products_df['ID'].astype(str) == p_id]
                     if not match.empty:
                         row = match.iloc[0]
-                        w_qty = int(float(row.get('Wholesale_Qty', 1)))
-                        retail_price = row.get('Price', 0)
-                        w_price = float(row.get('Wholesale_Price', retail_price))
-                        final_price = w_price if qty >= w_qty else retail_price
+                        # 🚀 Cart Auto-Calculation for 3 Tiers
+                        retail_price = float(row.get('Price', 0))
+                        t1_qty = int(float(row.get('Tier1_Qty', row.get('Wholesale_Qty', 1))))
+                        t1_price = float(row.get('Tier1_Price', row.get('Wholesale_Price', retail_price)))
+                        t2_qty = int(float(row.get('Tier2_Qty', 0)))
+                        t2_price = float(row.get('Tier2_Price', t1_price))
+                        
+                        if t2_qty > t1_qty and qty >= t2_qty:
+                            final_price = t2_price
+                        elif qty >= t1_qty and t1_qty > 1:
+                            final_price = t1_price
+                        else:
+                            final_price = retail_price
                         
                         image_path_str = str(row.get("Image_Path", ""))
                         paths = [p.strip() for p in image_path_str.split('|') if p.strip()]
@@ -605,17 +614,32 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
         else:
             with st.form("add_product", clear_on_submit=True):
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
-                    new_name = st.text_input(t("Product Name", "नाम"))
-                    new_price = st.number_input(t("Single Piece Rate", "सिंगल पीस रेट"), min_value=0.0, value=0.0, step=0.50, format="%.2f")
-                with col_b:
-                    new_w_qty = st.number_input(t("Min Wholesale Qty", "होलसेल कम से कम पीस"), min_value=1, value=10)
-                    new_w_price = st.number_input(t("Wholesale Rate (Per Piece)", "होलसेल / बॉक्स रेट (प्रति पीस)"), min_value=0.0, value=0.0, step=0.50, format="%.2f")
-                    new_free_delivery = st.selectbox(t("Single Piece Delivery", "सिंगल पीस डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")])
+                # 🚀 3-Tier Input Form
+                col_id, col_name = st.columns([1, 2])
+                with col_id: new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
+                with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
-                new_in_stock = st.checkbox(t("✅ Product is currently in stock?", "✅ उत्पाद अभी स्टॉक में उपलब्ध है?"), value=True)
+                st.markdown("**💰 Pricing Tiers (रेट और पीस सेट करें)**")
+                col_p1, col_p2, col_p3 = st.columns(3)
+                with col_p1:
+                    st.markdown("**(1) Single / Sample**")
+                    new_price = st.number_input("सिंगल पीस रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
+                with col_p2:
+                    st.markdown("**(2) Tier 1 (Holesaler)**")
+                    new_t1_qty = st.number_input("कम से कम पीस", min_value=1, value=10, key="n_t1_q")
+                    new_t1_price = st.number_input("टियर 1 रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f", key="n_t1_p")
+                with col_p3:
+                    st.markdown("**(3) Tier 2 (Super Bulk)**")
+                    st.info("खाली छोड़ने के लिए 0 रखें")
+                    new_t2_qty = st.number_input("कम से कम पीस", min_value=0, value=0, key="n_t2_q")
+                    new_t2_price = st.number_input("टियर 2 रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f", key="n_t2_p")
+                
+                st.markdown("---")
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    new_free_delivery = st.selectbox(t("Delivery", "डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")])
+                with col_f2:
+                    new_in_stock = st.checkbox(t("✅ Product is currently in stock?", "✅ उत्पाद अभी स्टॉक में उपलब्ध है?"), value=True)
                 
                 if st.session_state.seller_logged_in:
                     st.info(f"🏪 {t('Your Brand/Seller Name', 'आपका ब्रांड/सेलर नाम')}: **{st.session_state.seller_logged_in}**")
@@ -633,6 +657,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 
                 uploaded_imgs = st.file_uploader(t("Upload Photos (Max 3)", "फोटो अपलोड करें (अधिकतम 3)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
                 submit_btn = st.form_submit_button(t("Save Product", "उत्पाद सेव करें"))
+                
                 if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
                     if len(uploaded_imgs) > 3: st.error(t("⚠️ Please select max 3 photos.", "⚠️ कृपया अधिकतम 3 फोटो ही चुनें।"))
                     else:
@@ -646,9 +671,12 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             final_path_str = "|".join(image_paths)
                             is_free = True if new_free_delivery in ["फ्री डिलीवरी", "Free Delivery"] else False
                             seller_val = new_seller_name.strip() if new_seller_name else ""
+                            
                             data = {
-                                "ID": new_id, "Name": new_name, "Price": new_price, "Wholesale_Price": new_w_price,
-                                "Wholesale_Qty": new_w_qty, "Category": final_cat, "Image_Path": final_path_str,
+                                "ID": new_id, "Name": new_name, "Price": new_price, 
+                                "Tier1_Price": new_t1_price, "Tier1_Qty": new_t1_qty, 
+                                "Tier2_Price": new_t2_price, "Tier2_Qty": new_t2_qty,
+                                "Category": final_cat, "Image_Path": final_path_str,
                                 "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock
                             }
                             db.collection('products').document(str(new_id)).set(data)
@@ -760,7 +788,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
             st.subheader("🏷️ Category Management (नाम और इमोजी बदलें)")
-            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने आप अपडेट हो जाएंगे।")
+            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने চরম अपडेट हो जाएंगे।")
             
             current_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
             
@@ -789,7 +817,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             st.rerun()
                             
             st.markdown("---")
-            # 🚀 फिक्स: इंटरनेट के लिए नया फाइल अपलोडर सिस्टम
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
             st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
             
@@ -802,7 +829,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             cust_name = file.name.replace("_ledger.csv", "").replace(".csv", "")
                             try:
                                 df = pd.read_csv(file)
-                                # पैरेंट डॉक्यूमेंट बनाएं
                                 db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
                                 for _, row in df.iterrows():
                                     entry = {
@@ -826,7 +852,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
         with tab_ledger:
             st.subheader("📒 पार्टियों का खाता (Smart Cloud Ledger)")
             
-            # --- 1. नई एंट्री / नया खाता ---
             with st.expander("➕ नई एंट्री या नया खाता बनाएं (Add New Entry)", expanded=False):
                 with st.form("firebase_ledger_entry", clear_on_submit=True):
                     col_l1, col_l2 = st.columns(2)
@@ -848,7 +873,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             "Note": ledger_note,
                             "Timestamp": firestore.SERVER_TIMESTAMP
                         }
-                        # पैरेंट डॉक्यूमेंट बनाने का फिक्स
                         db.collection('ledgers').document(ledger_customer).set({"active": True}, merge=True)
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
                         st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
@@ -857,7 +881,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
 
-            # --- 2. खाते देखना और एडिट करना (View/Edit Ledgers) ---
             st.markdown("### 👥 सभी खाते (Customer Ledgers)")
             st.info("💡 **टिप:** आप सीधे टेबल के अंदर क्लिक करके नई एंट्री जोड़ सकते हैं, या पुराने अमाउंट और विवरण बदल सकते हैं। डिलीट करने के लिए 'Delete' बॉक्स पर टिक करें और 'सेव' दबाएं।")
             all_ledgers = load_ledger_data()
@@ -909,7 +932,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                                 "Note": str(row.get('Note', '')),
                                                 "Timestamp": firestore.SERVER_TIMESTAMP
                                             }
-                                            # पैरेंट फोल्डर के साथ नई एंट्री
                                             db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
                                             db.collection('ledgers').document(cust_name).collection('transactions').add(new_entry)
 
@@ -919,7 +941,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
 
-            # --- 3. पुराने PDF बिल (Saved Invoices) ---
             st.markdown("### 📂 सेव किए गए बिल (Saved Invoices)")
             if not os.path.exists(INVOICE_FOLDER):
                 os.makedirs(INVOICE_FOLDER)
@@ -1021,12 +1042,12 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
-    try: w_qty = int(float(row.get('Wholesale_Qty', 1)))
-    except: w_qty = 1
-    try: retail_price = float(row.get('Price', 0))
-    except: retail_price = 0.0
-    try: w_price = float(row.get('Wholesale_Price', retail_price))
-    except: w_price = retail_price
+    # 🚀 Backward compatibility & extraction of 3 Tiers
+    retail_price = float(row.get('Price', 0))
+    t1_qty = int(float(row.get('Tier1_Qty', row.get('Wholesale_Qty', 1))))
+    t1_price = float(row.get('Tier1_Price', row.get('Wholesale_Price', retail_price)))
+    t2_qty = int(float(row.get('Tier2_Qty', 0)))
+    t2_price = float(row.get('Tier2_Price', t1_price))
     
     image_path_str = str(row.get("Image_Path", ""))
     paths_temp = [p.strip() for p in image_path_str.split('|') if p.strip()]
@@ -1037,8 +1058,10 @@ def show_product_card(row, idx, prefix):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
-    share_text += f"💰 *{t('Wholesale Rate:', 'होलसेल रेट:')}* ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n"
-    share_text += f"🛵 *{t('Retail Rate:', 'सिंगल पीस रेट:')}* ₹{retail_price}\n"
+    share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
+    if t2_qty > t1_qty: share_text += f"🔹 {t2_qty}+ Pcs: ₹{t2_price}\n"
+    if t1_qty > 1: share_text += f"🔹 {t1_qty}+ Pcs: ₹{t1_price}\n"
+    share_text += f"🔹 1+ Pcs: ₹{retail_price}\n\n"
     share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
     cat_url = urllib.parse.quote(str(row.get('Category', '')))
     app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
@@ -1063,29 +1086,59 @@ def show_product_card(row, idx, prefix):
         if pd.notna(val_fd) and str(val_fd).strip() != "":
             show_fd = str(val_fd).lower() in ['true', 'yes', '1']
             
-        t_sp_fd = t("🛵 **Single Piece (Free Delivery):**", "🛵 **सिंगल पीस (फ्री डिलीवरी):**")
-        t_sp_ex = t("🛵 **Single Piece Rate:**", "🛵 **सिंगल पीस रेट:**")
-        t_ws = t("📦 **Wholesale (Box Rate):**", "📦 **होलसेल (बॉक्स रेट):**")
-        t_min = t(f"Min {w_qty} pieces", f"कम से कम {w_qty} पीस")
-        t_ex = t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")
+        t_ex = t("(Extra Courier)", "(+ कोरियर चार्ज)")
+        t_fd = t("(Free Delivery)", "(फ्री डिलीवरी)")
+        del_tag = t_fd if show_fd else f"<span style='color:#d32f2f;font-size:11px;'>{t_ex}</span>"
 
-        if w_qty > 1:
-            if show_fd:
-                st.markdown(f"{t_sp_fd} ₹{retail_price} <br> {t_ws} ₹{w_price} *({t_min}, <span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)*", unsafe_allow_html=True)
-            else:
-                st.markdown(f"{t_sp_ex} ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)* <br> {t_ws} ₹{w_price} *({t_min}, <span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)*", unsafe_allow_html=True)
-        else:
-            if show_fd: st.markdown(f"{t_sp_ex} ₹{retail_price} *({t('Free Delivery','फ्री डिलीवरी')})*")
-            else: st.markdown(f"{t_sp_ex} ₹{retail_price} *(<span style='color:#d32f2f;font-weight:bold;'>{t_ex}</span>)*", unsafe_allow_html=True)
+        # 🚀 Beautiful 3-Tier Alibaba Style Pricing UI
+        if t2_qty > t1_qty: # All 3 tiers
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                <div style="text-align:center; flex:1;"><b>1+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                <div style="border-left:1px solid #ccc; height:30px;"></div>
+                <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                <div style="border-left:1px solid #ccc; height:30px;"></div>
+                <div style="text-align:center; flex:1;"><b>{t2_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
+            </div>
+            <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+            """, unsafe_allow_html=True)
+        elif t1_qty > 1: # Only 2 tiers
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                <div style="text-align:center; flex:1;"><b>1+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                <div style="border-left:1px solid #ccc; height:30px;"></div>
+                <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+            </div>
+            <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+            """, unsafe_allow_html=True)
+        else: # Only 1 tier (Single Rate)
+            st.markdown(f"""
+            <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
+                <b>सिंगल पीस रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
+                <span style="font-size:12px;">🛵 {del_tag}</span>
+            </div>
+            """, unsafe_allow_html=True)
             
         if is_in_stock:
-            qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस)"), min_value=1, value=1, key=f"q_{prefix_idx}")
+            qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस) डालें"), min_value=1, value=1, key=f"q_{prefix_idx}")
             if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
-                final_price = w_price if qty >= w_qty else retail_price
+                
+                # 🚀 Final Cart Calculation based on tiers
+                if t2_qty > t1_qty and qty >= t2_qty:
+                    final_price = t2_price
+                elif qty >= t1_qty and t1_qty > 1:
+                    final_price = t1_price
+                else:
+                    final_price = retail_price
+                    
                 if p_id in st.session_state.cart:
                     st.session_state.cart[p_id]["qty"] += qty
-                    if st.session_state.cart[p_id]["qty"] >= w_qty:
-                        st.session_state.cart[p_id]["price"] = w_price
+                    # Re-calculate tier if quantity increases
+                    current_cart_qty = st.session_state.cart[p_id]["qty"]
+                    if t2_qty > t1_qty and current_cart_qty >= t2_qty:
+                        st.session_state.cart[p_id]["price"] = t2_price
+                    elif current_cart_qty >= t1_qty and t1_qty > 1:
+                        st.session_state.cart[p_id]["price"] = t1_price
                 else:
                     st.session_state.cart[p_id] = {
                         "name": row.get('Name', 'Item'), 
@@ -1117,7 +1170,7 @@ def show_product_card(row, idx, prefix):
 
         if can_market:
             with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
-                fb_text_copy = f"🔥 OURA PRODUCTS - {row.get('Name')} 🔥\n\n📦 {t('Wholesale Rate:', 'होलसेल रेट:')} ₹{w_price} ({t('Min', 'कम से कम')} {w_qty} Pcs)\n🛵 {t('Single Piece Rate:', 'सिंगल पीस रेट:')} ₹{retail_price}\n🏭 {t('Direct from Manufacturer:', 'सीधा मैन्युफैक्चरर से:')} Delhi (Oura Products)\n\n👇 {t('Check rates and order online now:', 'अभी रेट चेक करें और ऑनलाइन ऑर्डर करें:')}\n{app_link}\n\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
+                fb_text_copy = share_text + "\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
                 st.info(t("💡 **Tip:** 1. Click '📥 Photo' on the image above to save it. \n2. Copy the text below. \n3. Paste on Facebook!", "💡 **टिप:** 1. ऊपर फोटो पर बने नीले '📥 Photo' बटन को दबाकर फोटो सेव करें। \n2. नीचे से टेक्स्ट Copy करें। \n3. फेसबुक पर जाकर पेस्ट कर दें!"))
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
@@ -1129,13 +1182,18 @@ def show_product_card(row, idx, prefix):
                         st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True)
                         e_name = str(row.get("Name", ""))
                         
-                    col_x, col_y = st.columns(2)
-                    with col_x:
-                        e_price = st.number_input("Retail Price (सिंगल रेट)", value=float(retail_price), format="%.2f", step=0.50)
-                        e_w_qty = st.number_input("Wholesale Qty (होलसेल पीस)", value=w_qty)
-                    with col_y:
-                        e_w_price = st.number_input("Wholesale Price (होलसेल रेट)", value=float(w_price), format="%.2f", step=0.50)
-                        e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
+                    # 🚀 Edit Form inputs for 3 Tiers
+                    e_price = st.number_input("सिंगल रेट (₹)", value=float(retail_price), format="%.2f", step=0.50)
+                    
+                    c_e1, c_e2 = st.columns(2)
+                    with c_e1: e_t1_qty = st.number_input("Tier 1 पीस", value=t1_qty)
+                    with c_e2: e_t1_price = st.number_input("Tier 1 रेट (₹)", value=float(t1_price), format="%.2f", step=0.50)
+                        
+                    c_e3, c_e4 = st.columns(2)
+                    with c_e3: e_t2_qty = st.number_input("Tier 2 पीस (0 = off)", value=t2_qty)
+                    with c_e4: e_t2_price = st.number_input("Tier 2 रेट (₹)", value=float(t2_price), format="%.2f", step=0.50)
+                        
+                    e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
                             
                     e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
                     update_btn = st.form_submit_button("✅ Update / सेव करें")
@@ -1144,8 +1202,10 @@ def show_product_card(row, idx, prefix):
                     target_id = str(row['ID'])
                     is_free_val = True if e_fd in ["फ्री डिलीवरी", "Free Delivery"] else False
                     update_dict = {
-                        "Price": e_price, "Wholesale_Price": e_w_price, 
-                        "Wholesale_Qty": e_w_qty, "Free_Delivery": is_free_val
+                        "Price": e_price, 
+                        "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
+                        "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
+                        "Free_Delivery": is_free_val
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
                     if e_imgs:
@@ -1392,7 +1452,6 @@ if st.session_state.cart:
                     cust_gst, gst_percent, shipping_cost, auto_last_balance, amount_paid, current_config, bill_date
                 )
                 
-                # फिक्स: PDF के नाम में से गलत कैरेक्टर हटाना
                 if safe_name:
                     safe_file_name = re.sub(r'[\\/*?:"<>|]', "", safe_name).replace(' ', '_')
                 else:
@@ -1402,7 +1461,6 @@ if st.session_state.cart:
                 st.session_state.ready_filename = f"OURA_Bill_{safe_file_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
 
-                # फिक्स: फोल्डर को चेक करना और न होने पर बनाना
                 if not os.path.exists(INVOICE_FOLDER):
                     os.makedirs(INVOICE_FOLDER)
 
@@ -1424,7 +1482,6 @@ if st.session_state.cart:
                 if safe_name:
                     batch = db.batch()
                     parent_ref = db.collection('ledgers').document(safe_name)
-                    # फिक्स: पैरेंट फोल्डर बनाना
                     batch.set(parent_ref, {"active": True}, merge=True)
                     ledger_ref = parent_ref.collection('transactions')
                     
