@@ -396,7 +396,19 @@ if 'lang' not in st.session_state:
 def t(en_text, hi_text):
     return en_text if st.session_state.lang == 'en' else hi_text
 
-# 🚀 Retail_Qty (Base Qty) कॉलम जोड़ा गया है
+# 🚀 क्रैश रोकने के लिए सेफ्टी गार्ड फंक्शन्स (Safety Guards for Empty/Bad Values)
+def safe_int(val, default=1):
+    try:
+        if pd.isna(val) or str(val).strip() == "": return default
+        return int(float(val))
+    except: return default
+
+def safe_float(val, default=0.0):
+    try:
+        if pd.isna(val) or str(val).strip() == "": return default
+        return float(val)
+    except: return default
+
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -409,7 +421,6 @@ def load_products():
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
-# 🚀 स्पीड फिक्स: Smart Caching वापस लगाया गया ताकि ऐप धीमा न हो
 @st.cache_data(ttl=300, show_spinner=False)
 def load_ledger_data():
     ledger_data = {}
@@ -459,16 +470,20 @@ if 'cart_loaded' not in st.session_state:
             if "-" in item:
                 try:
                     p_id, qty_str = item.split("-", 1)
-                    qty = int(qty_str)
+                    qty = safe_int(qty_str, 1)
                     match = products_df[products_df['ID'].astype(str) == p_id]
                     if not match.empty:
                         row = match.iloc[0]
-                        retail_qty = int(float(row.get('Retail_Qty', 1)))
-                        retail_price = float(row.get('Price', 0))
-                        t1_qty = int(float(row.get('Tier1_Qty', row.get('Wholesale_Qty', 1))))
-                        t1_price = float(row.get('Tier1_Price', row.get('Wholesale_Price', retail_price)))
-                        t2_qty = int(float(row.get('Tier2_Qty', 0)))
-                        t2_price = float(row.get('Tier2_Price', t1_price))
+                        
+                        # 🚀 कार्ट में भी सेफ्टी गार्ड्स का इस्तेमाल
+                        retail_qty = safe_int(row.get('Retail_Qty'), 1)
+                        retail_price = safe_float(row.get('Price'), 0.0)
+                        t1_qty_default = safe_int(row.get('Wholesale_Qty'), 1)
+                        t1_qty = safe_int(row.get('Tier1_Qty'), t1_qty_default)
+                        t1_price_default = safe_float(row.get('Wholesale_Price'), retail_price)
+                        t1_price = safe_float(row.get('Tier1_Price'), t1_price_default)
+                        t2_qty = safe_int(row.get('Tier2_Qty'), 0)
+                        t2_price = safe_float(row.get('Tier2_Price'), t1_price)
                         
                         if t2_qty > t1_qty and qty >= t2_qty:
                             final_price = t2_price
@@ -624,7 +639,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 col_p1, col_p2, col_p3 = st.columns(3)
                 with col_p1:
                     st.markdown("**(1) Base / Sample**")
-                    # 🚀 कस्टम बेस पीस
                     new_retail_qty = st.number_input("कम से कम पीस (Base)", min_value=1, value=1, key="n_r_q")
                     new_price = st.number_input("बेस रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
                 with col_p2:
@@ -1049,13 +1063,18 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
-    # 🚀 कस्टम बेस पीस (Custom Base Qty)
-    retail_qty = int(float(row.get('Retail_Qty', 1)))
-    retail_price = float(row.get('Price', 0))
-    t1_qty = int(float(row.get('Tier1_Qty', row.get('Wholesale_Qty', 1))))
-    t1_price = float(row.get('Tier1_Price', row.get('Wholesale_Price', retail_price)))
-    t2_qty = int(float(row.get('Tier2_Qty', 0)))
-    t2_price = float(row.get('Tier2_Price', t1_price))
+    # 🚀 खाली/गलत डेटा से क्रैश रोकने के लिए सेफ्टी गार्ड (Safety Guards applied)
+    retail_qty = safe_int(row.get('Retail_Qty'), 1)
+    retail_price = safe_float(row.get('Price'), 0.0)
+    
+    t1_qty_default = safe_int(row.get('Wholesale_Qty'), 1)
+    t1_qty = safe_int(row.get('Tier1_Qty'), t1_qty_default)
+    
+    t1_price_default = safe_float(row.get('Wholesale_Price'), retail_price)
+    t1_price = safe_float(row.get('Tier1_Price'), t1_price_default)
+    
+    t2_qty = safe_int(row.get('Tier2_Qty'), 0)
+    t2_price = safe_float(row.get('Tier2_Price'), t1_price)
     
     image_path_str = str(row.get("Image_Path", ""))
     paths_temp = [p.strip() for p in image_path_str.split('|') if p.strip()]
@@ -1127,7 +1146,6 @@ def show_product_card(row, idx, prefix):
             """, unsafe_allow_html=True)
             
         if is_in_stock:
-            # 🚀 फिक्स: ग्राहक बेस पीस से कम का आर्डर नहीं डाल सकता 
             qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस) डालें"), min_value=retail_qty, value=retail_qty, key=f"q_{prefix_idx}")
             if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
                 
@@ -1188,7 +1206,6 @@ def show_product_card(row, idx, prefix):
                         st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True)
                         e_name = str(row.get("Name", ""))
                         
-                    # 🚀 एडिट फॉर्म में भी बेस पीस बदलने का ऑप्शन
                     c_e01, c_e02 = st.columns(2)
                     with c_e01: e_retail_qty = st.number_input("सिंगल/बेस पीस", value=retail_qty)
                     with c_e02: e_price = st.number_input("बेस रेट (₹)", value=float(retail_price), format="%.2f", step=0.50)
