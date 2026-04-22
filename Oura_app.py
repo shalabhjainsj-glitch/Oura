@@ -1548,7 +1548,7 @@ if st.session_state.cart:
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
-# 🚀 100% वर्किंग और सुंदर 3D उड़ती हुई कंप्यूटर गुड़िया (Right Side)
+# 🚀 100% वर्किंग, मोबाइल-फ्रेंडली और सुंदर 3D उड़ती हुई कंप्यूटर गुड़िया (Right Side)
 ai_js_code = f"""
 <script>
 const parentDoc = window.parent.document;
@@ -1564,64 +1564,62 @@ if (!parentDoc.getElementById('oura-ai-widget')) {{
         100% {{ transform: translateY(0px); }}
     }}
     #oura-ai-btn {{
-        position: fixed; bottom: 90px; right: 20px; z-index: 9999999;
+        position: fixed; bottom: 90px; right: 15px; z-index: 9999999;
         cursor: pointer; animation: floatDoll 3s ease-in-out infinite;
         filter: drop-shadow(0px 8px 10px rgba(0,0,0,0.3));
-        transition: transform 0.2s;
     }}
-    #oura-ai-btn:hover {{ transform: scale(1.1); }}
-    #oura-ai-btn img {{ width: 75px; height: 75px; border-radius: 50%; border: 3px solid #2b6cb0; background: white; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+    #oura-ai-btn img {{ width: 70px; height: 70px; border-radius: 50%; border: 3px solid #2b6cb0; background: white; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
     
     #ai-chat-box {{
-        position: fixed; bottom: 180px; right: 20px; z-index: 9999999;
-        width: 320px; height: 420px; background: #ffffff; border-radius: 20px;
+        position: fixed; bottom: 170px; right: 15px; z-index: 9999999;
+        width: 320px; max-width: 90vw; height: 400px; max-height: 60vh; background: #ffffff; border-radius: 15px;
         box-shadow: 0 15px 30px rgba(0,0,0,0.2); display: none;
         flex-direction: column; overflow: hidden; border: 2px solid #e2e8f0;
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Poppins', sans-serif; box-sizing: border-box;
     }}
+    #ai-chat-box * {{ box-sizing: border-box; }}
+    
     .ai-header {{
         background: linear-gradient(135deg, #2b6cb0 0%, #4299e1 100%);
-        color: white; padding: 15px; font-weight: 600; font-size: 16px;
+        color: white; padding: 12px 15px; font-weight: 600; font-size: 16px;
         display: flex; justify-content: space-between; align-items: center;
     }}
     .ai-messages {{
         flex: 1; padding: 15px; overflow-y: auto; background: #fdfdfd;
-        display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth;
+        display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth;
     }}
     .msg-ai {{
         background: #f1f3f5; padding: 10px 15px; border-radius: 0 15px 15px 15px;
-        align-self: flex-start; max-width: 85%; font-size: 14px; border: 1px solid #e9ecef;
-        line-height: 1.4; color: #333;
+        align-self: flex-start; max-width: 85%; font-size: 13px; border: 1px solid #e9ecef;
+        color: #333;
     }}
     .msg-user {{
         background: #2b6cb0; color: white; padding: 10px 15px; border-radius: 15px 0 15px 15px;
-        align-self: flex-end; max-width: 85%; font-size: 14px; line-height: 1.4;
+        align-self: flex-end; max-width: 85%; font-size: 13px;
     }}
     .ai-input-area {{
-        display: flex; border-top: 1px solid #eee; padding: 12px; background: white;
+        display: flex; border-top: 1px solid #eee; padding: 10px; background: white; align-items: center; width: 100%;
     }}
     .ai-input-area input {{
-        flex: 1; padding: 10px 15px; border: 1px solid #ccc; border-radius: 25px;
-        outline: none; font-size: 14px; font-family: 'Poppins', sans-serif;
+        flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 20px;
+        outline: none; font-size: 14px; min-width: 0;
     }}
     .ai-input-area button {{
-        background: #2b6cb0; color: white; border: none; padding: 10px 18px;
-        margin-left: 8px; border-radius: 25px; cursor: pointer; font-weight: 600;
-        transition: background 0.2s;
+        background: #25D366; color: white; border: none; padding: 10px 16px;
+        margin-left: 8px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 14px;
     }}
-    .ai-input-area button:hover {{ background: #2c5282; }}
     </style>
     
     <div id="ai-chat-box">
         <div class="ai-header">
             <span>👩‍💻 Oura Helpline</span>
-            <span style="cursor:pointer; font-size:18px;" onclick="document.getElementById('ai-chat-box').style.display='none'">✖</span>
+            <span style="cursor:pointer; font-size:20px; line-height: 1;" onclick="document.getElementById('ai-chat-box').style.display='none'">×</span>
         </div>
         <div class="ai-messages" id="ai-msgs">
             <div class="msg-ai">नमस्ते! 🙏 मैं Oura की असिस्टेंट हूँ। बताइए, मैं आपकी क्या मदद कर सकती हूँ?</div>
         </div>
         <div class="ai-input-area">
-            <input type="text" id="ai-input" placeholder="अपना सवाल यहाँ लिखें..." onkeypress="if(event.key === 'Enter') window.parent.sendAIMsg()"/>
+            <input type="text" id="ai-input" placeholder="मैसेज लिखें..." onkeypress="if(event.key === 'Enter') window.parent.sendAIMsg()"/>
             <button onclick="window.parent.sendAIMsg()">Send</button>
         </div>
     </div>
