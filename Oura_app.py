@@ -396,7 +396,7 @@ if 'lang' not in st.session_state:
 def t(en_text, hi_text):
     return en_text if st.session_state.lang == 'en' else hi_text
 
-# 🚀 क्रैश रोकने के लिए सेफ्टी गार्ड फंक्शन्स (Safety Guards for Empty/Bad Values)
+# 🚀 क्रैश रोकने के लिए सेफ्टी गार्ड फंक्शन्स
 def safe_int(val, default=1):
     try:
         if pd.isna(val) or str(val).strip() == "": return default
@@ -475,7 +475,6 @@ if 'cart_loaded' not in st.session_state:
                     if not match.empty:
                         row = match.iloc[0]
                         
-                        # 🚀 कार्ट में भी सेफ्टी गार्ड्स का इस्तेमाल
                         retail_qty = safe_int(row.get('Retail_Qty'), 1)
                         retail_price = safe_float(row.get('Price'), 0.0)
                         t1_qty_default = safe_int(row.get('Wholesale_Qty'), 1)
@@ -806,7 +805,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
             st.subheader("🏷️ Category Management (नाम और इमोजी बदलें)")
-            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने चरम अपडेट हो जाएंगे।")
+            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने आप अपडेट हो जाएंगे।")
             
             current_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
             
@@ -1063,7 +1062,6 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
-    # 🚀 खाली/गलत डेटा से क्रैश रोकने के लिए सेफ्टी गार्ड (Safety Guards applied)
     retail_qty = safe_int(row.get('Retail_Qty'), 1)
     retail_price = safe_float(row.get('Price'), 0.0)
     
@@ -1372,7 +1370,7 @@ else:
             for idx, row in cat_products.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
-st.markdown("<br><br><br>", unsafe_allow_html=True) 
+st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
 st.header(t("🛒 Your Basket", "🛒 आपकी बास्केट"))
 
@@ -1558,39 +1556,132 @@ if st.session_state.cart:
         st.rerun()
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
-st.markdown(f'''<a id="oura-wa-btn" href="https://wa.me/{admin_wa_number}" target="_blank" title="WhatsApp Us">💬 WhatsApp</a>''', unsafe_allow_html=True)
 
-drag_js_code = """
+# 🚀 3D उड़ती हुई कंप्यूटर गुड़िया (Floating AI Assistant Widget)
+floating_ai_html = f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+@keyframes floatDoll {{
+    0% {{ transform: translateY(0px); }}
+    50% {{ transform: translateY(-15px); }}
+    100% {{ transform: translateY(0px); }}
+}}
+#oura-ai-btn {{
+    position: fixed; bottom: 30px; left: 15px; z-index: 9999999;
+    cursor: pointer; animation: floatDoll 3s ease-in-out infinite;
+    filter: drop-shadow(0px 8px 10px rgba(0,0,0,0.3));
+    transition: transform 0.2s;
+}}
+#oura-ai-btn:hover {{ transform: scale(1.1); }}
+#oura-ai-btn img {{ width: 80px; height: 80px; }}
+
+#ai-chat-box {{
+    position: fixed; bottom: 120px; left: 15px; z-index: 9999999;
+    width: 320px; height: 420px; background: #ffffff; border-radius: 20px;
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2); display: none;
+    flex-direction: column; overflow: hidden; border: 2px solid #e2e8f0;
+    font-family: 'Poppins', sans-serif;
+}}
+.ai-header {{
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    color: #333; padding: 15px; font-weight: 600; font-size: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #eee;
+}}
+.ai-messages {{
+    flex: 1; padding: 15px; overflow-y: auto; background: #fdfdfd;
+    display: flex; flex-direction: column; gap: 12px;
+}}
+.msg-ai {{
+    background: #f1f3f5; padding: 10px 15px; border-radius: 0 15px 15px 15px;
+    align-self: flex-start; max-width: 85%; font-size: 14px; border: 1px solid #e9ecef;
+    line-height: 1.4; color: #333;
+}}
+.msg-user {{
+    background: #2b6cb0; color: white; padding: 10px 15px; border-radius: 15px 0 15px 15px;
+    align-self: flex-end; max-width: 85%; font-size: 14px; line-height: 1.4;
+}}
+.ai-input-area {{
+    display: flex; border-top: 1px solid #eee; padding: 12px; background: white;
+}}
+.ai-input-area input {{
+    flex: 1; padding: 10px 15px; border: 1px solid #ccc; border-radius: 25px;
+    outline: none; font-size: 14px; font-family: 'Poppins', sans-serif;
+}}
+.ai-input-area button {{
+    background: #2b6cb0; color: white; border: none; padding: 10px 18px;
+    margin-left: 8px; border-radius: 25px; cursor: pointer; font-weight: 600;
+    transition: background 0.2s;
+}}
+.ai-input-area button:hover {{ background: #2c5282; }}
+</style>
+
+<div id="ai-chat-box">
+    <div class="ai-header">
+        <span>🧚‍♀️ Oura AI Assistant</span>
+        <span style="cursor:pointer; font-size:18px;" onclick="document.getElementById('ai-chat-box').style.display='none'">✖</span>
+    </div>
+    <div class="ai-messages" id="ai-msgs">
+        <div class="msg-ai">नमस्ते! 🙏 मैं Oura Products की कंप्यूटर गुड़िया (AI Assistant) हूँ! मैं आपकी क्या मदद कर सकती हूँ?</div>
+    </div>
+    <div class="ai-input-area">
+        <input type="text" id="ai-input" placeholder="अपना सवाल यहाँ लिखें..." onkeypress="if(event.key === 'Enter') sendAIMsg()"/>
+        <button onclick="sendAIMsg()">Send</button>
+    </div>
+</div>
+
+<div id="oura-ai-btn" onclick="toggleAI()">
+    <img src="https://cdn-icons-png.flaticon.com/512/8649/8649591.png" alt="Oura AI Doll"/>
+</div>
+
 <script>
-const parentDoc = window.parent.document;
-const btn = parentDoc.getElementById('oura-wa-btn');
-if (btn && !btn.dataset.draggable) {
-    btn.dataset.draggable = "true";
-    let isDragging = false, startY, startTop;
-    const onStart = (e) => {
-        if(e.type === 'mousedown' || e.type === 'touchstart') {
-            isDragging = true; startY = e.touches ? e.touches[0].clientY : e.clientY;
-            startTop = btn.offsetTop; btn.style.transition = 'none';
-        }
-    };
-    const onMove = (e) => {
-        if (!isDragging) return;
-        e.preventDefault(); 
-        let currentY = e.touches ? e.touches[0].clientY : e.clientY;
-        let newTop = startTop + (currentY - startY);
-        if (newTop < 80) newTop = 80;
-        if (newTop > parentDoc.documentElement.clientHeight - 80) newTop = parentDoc.documentElement.clientHeight - 80;
-        btn.style.top = newTop + 'px'; btn.style.bottom = 'auto'; 
-    };
-    const onEnd = () => { isDragging = false; };
-    btn.addEventListener('touchstart', onStart, {passive: false});
-    parentDoc.addEventListener('touchmove', onMove, {passive: false});
-    parentDoc.addEventListener('touchend', onEnd);
-    btn.addEventListener('mousedown', onStart);
-    parentDoc.addEventListener('mousemove', onMove);
-    parentDoc.addEventListener('mouseup', onEnd);
-    btn.addEventListener('click', (e) => { if (Math.abs(btn.offsetTop - startTop) > 10) e.preventDefault(); });
-}
+let msgCount = 0;
+const adminWA = "{admin_wa_number}";
+
+function toggleAI() {{
+    let box = document.getElementById('ai-chat-box');
+    box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'flex' : 'none';
+}}
+
+function sendAIMsg() {{
+    let input = document.getElementById('ai-input');
+    let text = input.value.trim();
+    if(!text) return;
+    
+    let msgs = document.getElementById('ai-msgs');
+    msgs.innerHTML += `<div class="msg-user">${{text}}</div>`;
+    input.value = '';
+    msgs.scrollTop = msgs.scrollHeight;
+    msgCount++;
+    
+    setTimeout(() => {{
+        let reply = "";
+        let t = text.toLowerCase();
+        
+        if(msgCount >= 4 || t.includes("call") || t.includes("admin") || t.includes("owner") || t.includes("मालिक") || t.includes("whatsapp") || t.includes("bat") || t.includes("बात")) {{
+            reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए।<br><br>📲 <a href="https://wa.me/${{adminWA}}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${{adminWA}}</b>`;
+        }} 
+        else if(t.includes("rate") || t.includes("price") || t.includes("रेट") || t.includes("प्राइस") || t.includes("कितने")) {{
+            reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने आप लग जाएगा! 🛍️";
+        }} 
+        else if(t.includes("delivery") || t.includes("डिलीवरी") || t.includes("shipping") || t.includes("पहुंचेगा")) {{
+            reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
+        }} 
+        else if(t.includes("seller") || t.includes("सेलर") || t.includes("अकाउंट") || t.includes("दुकान")) {{
+            reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
+        }} 
+        else if(t.includes("hi") || t.includes("hello") || t.includes("नमस्ते")) {{
+            reply = "हेलो जी! 🧚‍♀️ बताइए मैं आपको कौन से प्रोडक्ट या रेट की जानकारी दूँ?";
+        }}
+        else {{
+            reply = "मैं अभी नई हूँ और सीख रही हूँ! 🧚‍♀️ आप होलसेल रेट, डिलीवरी या सेलर अकाउंट के बारे में पूछ सकते हैं। <br><br>मुझसे नहीं, सीधे मालिक से बात करने के लिए बस '<b>Call</b>' या '<b>Admin</b>' लिखें।";
+        }}
+        
+        msgs.innerHTML += `<div class="msg-ai">${{reply}}</div>`;
+        msgs.scrollTop = msgs.scrollHeight;
+    }}, 800); // Thodi der baad reply (Natural feel)
+}}
 </script>
 """
-st_components.html(drag_js_code, height=0, width=0)
+st.markdown(floating_ai_html, unsafe_allow_html=True)
