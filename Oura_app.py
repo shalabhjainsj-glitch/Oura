@@ -541,6 +541,7 @@ with col_login:
             st.session_state.admin_logged_in = False
             st.session_state.seller_logged_in = None
             st.session_state.show_login = False
+            st.toast("Logged out", icon="👋")
             st.rerun()
 
 hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
@@ -569,6 +570,7 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                     st.session_state.admin_logged_in = True
                     st.session_state.seller_logged_in = None
                     st.session_state.show_login = False
+                    st.toast(t("Logged in as Admin", "एडमिन के रूप में लॉगिन!"), icon="✅")
                     st.rerun()
                 else: st.error(t("❌ Incorrect Password!", "❌ गलत पासवर्ड!"))
         else:
@@ -580,6 +582,7 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                     st.session_state.seller_logged_in = s_data["name"] if isinstance(s_data, dict) else s_data
                     st.session_state.admin_logged_in = False
                     st.session_state.show_login = False
+                    st.toast(t(f"Welcome Seller: {st.session_state.seller_logged_in}", f"स्वागत है सेलर: {st.session_state.seller_logged_in}"), icon="✅")
                     st.rerun()
                 else: st.error(t("❌ Invalid Token! Contact Admin.", "❌ गलत टोकन! कृपया एडमिन से संपर्क करें।"))
             
@@ -596,7 +599,6 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
-        st.success(t("✅ Logged in as Admin. You have full control.", "✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।"))
         tab_add, tab_banner, tab_settings, tab_ledger = st.tabs([
             t("➕ Add Product", "➕ नया उत्पाद"), 
             t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
@@ -604,7 +606,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             t("📒 Ledger / Invoices", "📒 खाता और बिल (Ledger)")
         ])
     else:
-        st.success(t(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)", f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)"))
         tab_add, = st.tabs([t("➕ Add Product", "➕ नया उत्पाद")])
     
     with tab_add:
@@ -704,12 +705,16 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["has_banner"] = True
                     current_config["banner_url"] = b_url
                     save_config(current_config)
+                    st.toast("Banner Saved!", icon="✅")
+                    time.sleep(1)
                     st.rerun()
             if current_config.get("has_banner", False):
                 if st.button("❌ Remove Banner"):
                     current_config["has_banner"] = False
                     current_config["banner_url"] = ""
                     save_config(current_config)
+                    st.toast("Banner Removed!", icon="✅")
+                    time.sleep(1)
                     st.rerun()
             st.markdown("---")
             st.subheader("📱 App Logo")
@@ -721,12 +726,16 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["has_logo"] = True
                     current_config["logo_url"] = l_url
                     save_config(current_config)
+                    st.toast("Logo Saved!", icon="✅")
+                    time.sleep(1)
                     st.rerun()
             if current_config.get("has_logo", False):
                 if st.button("❌ Remove Logo"):
                     current_config["has_logo"] = False
                     current_config["logo_url"] = ""
                     save_config(current_config)
+                    st.toast("Logo Removed!", icon="✅")
+                    time.sleep(1)
                     st.rerun()
         
         with tab_settings:
@@ -743,7 +752,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 if new_s_name and new_s_token:
                     current_config["sellers"][new_s_token] = {"name": new_s_name, "phone": new_s_phone}
                     save_config(current_config)
-                    st.success(f"✅ Added Seller: {new_s_name}")
+                    st.toast(f"Added Seller: {new_s_name}", icon="✅")
                     time.sleep(1)
                     st.rerun()
                 else:
@@ -762,7 +771,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         if st.button("❌ Block / Delete", key=f"del_sel_{token}"):
                             del current_config["sellers"][token]
                             save_config(current_config)
-                            st.success(f"🚫 {s_name} का अकाउंट बंद कर दिया गया है!")
+                            st.toast(f"{s_name} का अकाउंट बंद कर दिया गया है!", icon="🚫")
                             time.sleep(1)
                             st.rerun()
 
@@ -790,7 +799,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 current_config["gpay_upi"] = new_gpay
                 current_config["bhim_upi"] = new_bhim
                 save_config(current_config)
-                st.success("✅ Saved!")
+                st.toast("Settings Saved!", icon="✅")
                 time.sleep(1)
                 st.rerun()
 
@@ -820,7 +829,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             
                             batch.commit()
                             load_products.clear()
-                            st.success(f"✅ केटेगरी का नाम बदलकर '{new_cat_name}' कर दिया गया है!")
+                            st.toast(f"केटेगरी का नाम बदल गया!", icon="✅")
                             time.sleep(1)
                             st.rerun()
                             
@@ -852,7 +861,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 st.error(f"{cust_name} की फाइल में दिक्कत: {e}")
                         
                         load_ledger_data.clear()
-                        st.success("✅ बधाई हो! आपके सारे पुराने खाते सफलतापूर्वक क्लाउड पर सेव हो गए हैं!")
+                        st.toast("पुराने खाते क्लाउड पर सेव हो गए!", icon="✅")
                         time.sleep(2)
                         st.rerun()
                 else:
@@ -885,7 +894,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         db.collection('ledgers').document(ledger_customer).set({"active": True}, merge=True)
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
                         load_ledger_data.clear()
-                        st.success(f"✅ {ledger_customer} के खाते में एंट्री लाइव हो गई!")
+                        st.toast(f"{ledger_customer} के खाते में एंट्री लाइव हो गई!", icon="✅")
                         time.sleep(1)
                         st.rerun()
 
@@ -946,7 +955,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                             db.collection('ledgers').document(cust_name).collection('transactions').add(new_entry)
 
                                 load_ledger_data.clear()
-                                st.success("✅ खाता सफलतापूर्वक अपडेट हो गया!")
+                                st.toast("खाता अपडेट हो गया!", icon="✅")
                                 time.sleep(1)
                                 st.rerun()
 
@@ -1010,7 +1019,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             if st.button("🗑️ डिलीट", key=f"del_pdf_{item['filename']}", type="primary"):
                                 try:
                                     os.remove(f"{INVOICE_FOLDER}/{item['filename']}")
-                                    st.success("✅ बिल डिलीट हो गया!")
+                                    st.toast("बिल डिलीट हो गया!", icon="✅")
                                     time.sleep(1)
                                     st.rerun()
                                 except Exception as e:
@@ -1161,7 +1170,7 @@ def show_product_card(row, idx, prefix):
                         "seller": str(seller_val).strip() if pd.notna(seller_val) else ""
                     }
                 save_cart_to_url()
-                st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
+                st.toast(t("Added to Cart!", "कार्ट में जुड़ गया!"), icon="🛒")
         else:
             st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
@@ -1233,12 +1242,16 @@ def show_product_card(row, idx, prefix):
                                 
                     db.collection('products').document(target_id).update(update_dict)
                     load_products.clear()
+                    st.toast("Product Updated!", icon="✅")
+                    time.sleep(1)
                     st.rerun()
 
             st.markdown("---")
             if st.button(t("🗑️ Delete Product", "🗑️ यह उत्पाद हमेशा के लिए हटाएं (Delete)"), key=f"del_p_{prefix_idx}"):
                 db.collection('products').document(str(row['ID'])).delete()
                 load_products.clear()
+                st.toast("Product Deleted!", icon="🗑️")
+                time.sleep(1)
                 st.rerun()
 
 if products_df.empty:
@@ -1260,60 +1273,11 @@ else:
         if len(valid_categories) == 0: 
             st.write(t("No categories yet.", "अभी कोई कैटेगरी नहीं है।"))
         else:
-            cat_container = st.container()
-            with cat_container:
-                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
-                st.markdown("""
-                <style>
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    flex-wrap: wrap !important;
-                    gap: 10px !important;
-                    justify-content: flex-start !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] {
-                    width: calc(33.33% - 10px) !important; 
-                }
-                @media (min-width: 600px) {
-                    div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] {
-                        width: calc(20% - 10px) !important; 
-                    }
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) {
-                    display: none !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 85px !important;
-                    min-height: 85px !important;
-                    width: 100% !important;
-                    border-radius: 12px !important;
-                    background: linear-gradient(135deg, #ffffff, #f0f4f8) !important;
-                    border: 1px solid #c5d4eb !important;
-                    box-shadow: 2px 4px 8px rgba(0,0,0,0.06) !important;
-                    color: #1a202c !important;
-                    font-weight: 700 !important;
-                    font-size: 13px !important;
-                    white-space: normal !important;
-                    word-wrap: break-word !important;
-                    line-height: 1.2 !important;
-                    padding: 4px !important;
-                    transition: all 0.2s ease-in-out !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover {
-                    transform: translateY(-3px) !important;
-                    box-shadow: 2px 6px 12px rgba(0,0,0,0.12) !important;
-                    border-color: #2b6cb0 !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active {
-                    transform: scale(0.95) !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
-
-                for idx, cat in enumerate(valid_categories):
-                    if st.button(cat, key=f"cat_btn_{idx}"):
+            # 🚀 फिक्स: कैटेगरीज के लिए नेटिव कॉलम्स (CSS बग हटा दिया गया)
+            cat_cols = st.columns(2)
+            for idx, cat in enumerate(valid_categories):
+                with cat_cols[idx % 2]:
+                    if st.button(cat, key=f"cat_btn_{idx}", use_container_width=True):
                         st.session_state.selected_category = cat
                         st.query_params["cat"] = cat
                         save_cart_to_url()
@@ -1407,8 +1371,10 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
+    
+    # 🚀 फिक्स: अब यह लाइन पिचकेगी नहीं, सुंदर दिखेगी!
     st.markdown(f"### 🤝 {t('100% Customer Satisfaction', '100% ग्राहक संतुष्टि (Customer Trust)')}")
-    st.success(t("✅ **Live Packing Proof:** Video & photo of your package will be sent to WhatsApp before dispatch.", "✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी।"))
+    st.info(t("✅ **Live Packing Proof:** Video & photo of your package will be sent to WhatsApp before dispatch.", "✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी।"))
 
     st.markdown("---")
     st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
@@ -1548,7 +1514,7 @@ if st.session_state.cart:
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
-# 🚀 100% वर्किंग, मोबाइल-फ्रेंडली और सुंदर 3D उड़ती हुई कंप्यूटर गुड़िया (Right Side)
+# 🚀 100% वर्किंग, मोबाइल-फ्रेंडली और सुंदर AI Assistant (Right Side)
 ai_js_code = """
 <script>
 const parentWin = window.parent;
@@ -1562,29 +1528,31 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
     @keyframes floatDoll {
         0% { transform: translateY(0px); }
-        50% { transform: translateY(-15px); }
+        50% { transform: translateY(-12px); }
         100% { transform: translateY(0px); }
     }
     #oura-ai-btn {
         position: fixed; bottom: 90px; right: 15px; z-index: 9999999;
         cursor: pointer; animation: floatDoll 3s ease-in-out infinite;
-        filter: drop-shadow(0px 8px 10px rgba(0,0,0,0.3));
+        filter: drop-shadow(0px 6px 8px rgba(0,0,0,0.25));
     }
-    #oura-ai-btn img { width: 70px; height: 70px; border-radius: 50%; border: 3px solid #2b6cb0; background: white; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    #oura-ai-btn img { 
+        width: 70px; height: 70px; border-radius: 50%; 
+        border: 3px solid #2b6cb0; background: white; object-fit: cover; 
+    }
     
     #ai-chat-box {
         position: fixed; bottom: 170px; right: 15px; z-index: 9999999;
-        width: 320px; max-width: 90vw; height: 400px; max-height: 60vh; background: #ffffff; border-radius: 15px;
-        box-shadow: 0 15px 30px rgba(0,0,0,0.2); display: none;
-        flex-direction: column; overflow: hidden; border: 2px solid #e2e8f0;
-        font-family: 'Poppins', sans-serif; box-sizing: border-box;
+        width: 320px; max-width: 90vw; height: 420px; max-height: 60vh; 
+        background: #ffffff; border-radius: 15px; box-shadow: 0 15px 30px rgba(0,0,0,0.2); 
+        display: none; flex-direction: column; overflow: hidden; 
+        border: 2px solid #e2e8f0; font-family: 'Poppins', sans-serif; box-sizing: border-box;
     }
-    #ai-chat-box * { box-sizing: border-box; }
     
     .ai-header {
         background: linear-gradient(135deg, #2b6cb0 0%, #4299e1 100%);
         color: white; padding: 12px 15px; font-weight: 600; font-size: 16px;
-        display: flex; justify-content: space-between; align-items: center;
+        display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
     }
     .ai-messages {
         flex: 1; padding: 15px; overflow-y: auto; background: #fdfdfd;
@@ -1592,42 +1560,46 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
     }
     .msg-ai {
         background: #f1f3f5; padding: 10px 15px; border-radius: 0 15px 15px 15px;
-        align-self: flex-start; max-width: 85%; font-size: 13px; border: 1px solid #e9ecef;
-        color: #333;
+        align-self: flex-start; max-width: 85%; font-size: 13px; border: 1px solid #e9ecef; color: #333;
     }
     .msg-user {
         background: #2b6cb0; color: white; padding: 10px 15px; border-radius: 15px 0 15px 15px;
         align-self: flex-end; max-width: 85%; font-size: 13px;
     }
-    .ai-input-area {
-        display: flex; border-top: 1px solid #eee; padding: 10px; background: white; align-items: center; width: 100%;
+    
+    /* 🚀 फिक्स: हरा सेंड बटन जो कभी स्क्रीन से बाहर नहीं जाएगा */
+    .ai-input-container {
+        display: flex; padding: 10px; background: white; border-top: 1px solid #eee;
+        align-items: center; width: 100%; box-sizing: border-box; flex-shrink: 0;
     }
-    .ai-input-area input {
-        flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 20px;
-        outline: none; font-size: 14px; min-width: 0;
+    .ai-input-container input {
+        flex: 1; padding: 12px 15px; border: 1px solid #ccc; border-radius: 20px;
+        outline: none; font-size: 14px; min-width: 0; box-sizing: border-box;
     }
-    .ai-input-area button {
-        background: #25D366; color: white; border: none; padding: 10px 16px;
-        margin-left: 8px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 14px;
+    .ai-input-container button {
+        background: #25D366; color: white; border: none; padding: 12px 18px;
+        margin-left: 8px; border-radius: 20px; cursor: pointer; font-weight: bold; 
+        font-size: 14px; box-sizing: border-box; flex-shrink: 0;
     }
+    .ai-input-container button:active { background: #1da851; transform: scale(0.95); }
     </style>
     
     <div id="ai-chat-box">
         <div class="ai-header">
             <span>👩‍💻 Oura Helpline</span>
-            <span id="close-ai-btn" style="cursor:pointer; font-size:20px; line-height: 1;">×</span>
+            <span id="close-ai-btn" style="cursor:pointer; font-size:22px; line-height:1;">×</span>
         </div>
         <div class="ai-messages" id="ai-msgs">
             <div class="msg-ai">नमस्ते! 🙏 मैं Oura की असिस्टेंट हूँ। बताइए, मैं आपकी क्या मदद कर सकती हूँ?</div>
         </div>
-        <div class="ai-input-area">
+        <div class="ai-input-container">
             <input type="text" id="ai-input" placeholder="मैसेज लिखें..."/>
             <button id="ai-send-btn">Send</button>
         </div>
     </div>
     
     <div id="oura-ai-btn">
-        <img src="https://img.icons8.com/color/256/customer-support.png" alt="AI Girl"/>
+        <img src="https://img.freepik.com/premium-vector/customer-service-woman-with-headset-avatar-vector-illustration-flat-style_185448-356.jpg" alt="AI Support Girl"/>
     </div>
     `;
     parentDoc.body.appendChild(widgetDiv);
@@ -1674,7 +1646,6 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
         }, 800);
     }
 
-    // 🚀 फिक्स: Event Listeners का सही इस्तेमाल
     parentDoc.getElementById('ai-send-btn').addEventListener('click', handleSend);
     
     parentDoc.getElementById('ai-input').addEventListener('keypress', function(e) {
