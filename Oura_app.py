@@ -892,7 +892,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             st.markdown("---")
 
             st.markdown("### 👥 सभी खाते (Customer Ledgers)")
-            st.info("💡 **टिप:** आप सीधे टेबल के अंदर क्लिक करके नई एंट्री जोड़ सकते हैं, या पुराने अमाउंट और विवरण बदल सकते हैं। डिलीट करने के लिए 'Delete' बॉक्स पर टिक करें और 'सेव' दबाएं।")
+            st.info("💡 **टिप:** आप सीधे टेबल अंदर क्लिक करके नई एंट्री जोड़ सकते हैं, या पुराने अमाउंट और विवरण बदल सकते हैं। डिलीट करने के लिए 'Delete' बॉक्स पर टिक करें और 'सेव' दबाएं।")
             all_ledgers = load_ledger_data()
             
             if not all_ledgers:
@@ -1106,64 +1106,80 @@ def show_product_card(row, idx, prefix):
         t_fd = t("(Free Delivery)", "(फ्री डिलीवरी)")
         del_tag = t_fd if show_fd else f"<span style='color:#d32f2f;font-size:11px;'>{t_ex}</span>"
 
-        if t2_qty > t1_qty: 
+        if retail_price <= 0:
             st.markdown(f"""
-            <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                <div style="text-align:center; flex:1;"><b>{retail_qty}+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
-                <div style="border-left:1px solid #ccc; height:30px;"></div>
-                <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
-                <div style="border-left:1px solid #ccc; height:30px;"></div>
-                <div style="text-align:center; flex:1;"><b>{t2_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
-            </div>
-            <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
-            """, unsafe_allow_html=True)
-        elif t1_qty > retail_qty: 
-            st.markdown(f"""
-            <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                <div style="text-align:center; flex:1;"><b>{retail_qty}+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
-                <div style="border-left:1px solid #ccc; height:30px;"></div>
-                <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
-            </div>
-            <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
-            """, unsafe_allow_html=True)
-        else: 
-            st.markdown(f"""
-            <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
-                <b>{retail_qty}+ Pcs रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
-                <span style="font-size:12px;">🛵 {del_tag}</span>
+            <div style="background-color:#fff3cd; padding:10px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:10px; text-align:center;">
+                <span style="color:#856404; font-size:15px; font-weight:bold;">🚨 प्राइस जानने के लिए संपर्क करें</span>
             </div>
             """, unsafe_allow_html=True)
             
-        if is_in_stock:
-            qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस) डालें"), min_value=retail_qty, value=retail_qty, key=f"q_{prefix_idx}")
-            if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
-                
-                if t2_qty > t1_qty and qty >= t2_qty:
-                    final_price = t2_price
-                elif t1_qty > retail_qty and qty >= t1_qty:
-                    final_price = t1_price
-                else:
-                    final_price = retail_price
-                    
-                if p_id in st.session_state.cart:
-                    st.session_state.cart[p_id]["qty"] += qty
-                    current_cart_qty = st.session_state.cart[p_id]["qty"]
-                    if t2_qty > t1_qty and current_cart_qty >= t2_qty:
-                        st.session_state.cart[p_id]["price"] = t2_price
-                    elif t1_qty > retail_qty and current_cart_qty >= t1_qty:
-                        st.session_state.cart[p_id]["price"] = t1_price
-                else:
-                    st.session_state.cart[p_id] = {
-                        "name": row.get('Name', 'Item'), 
-                        "price": final_price, 
-                        "qty": qty, 
-                        "img_link": img_link_for_wa,
-                        "seller": str(seller_val).strip() if pd.notna(seller_val) else ""
-                    }
-                save_cart_to_url()
-                st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
+            if is_in_stock:
+                ask_qty = st.number_input(t("Quantity (Pieces)", "कितने पीस चाहिए? (मात्रा)"), min_value=1, value=1, key=f"ask_q_{prefix_idx}")
+                admin_num = current_config.get("admin_whatsapp", "919891587437")
+                wa_msg = urllib.parse.quote(f"नमस्ते Oura Products,\nमुझे *{row.get('Name', 'इस प्रोडक्ट')}* के {ask_qty} पीस की आवश्यकता है। कृपया मुझे इसका बेस्ट रेट बताएं।")
+                wa_btn_link = f"https://wa.me/{admin_num}?text={wa_msg}"
+                st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 {ask_qty} Pcs का रेट WhatsApp पर पूछें</a>', unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
+            if t2_qty > t1_qty: 
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t2_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
+                </div>
+                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                """, unsafe_allow_html=True)
+            elif t1_qty > retail_qty: 
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                </div>
+                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                """, unsafe_allow_html=True)
+            else: 
+                st.markdown(f"""
+                <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
+                    <b>{retail_qty}+ Pcs रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
+                    <span style="font-size:12px;">🛵 {del_tag}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            if is_in_stock:
+                qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस) डालें"), min_value=retail_qty, value=retail_qty, key=f"q_{prefix_idx}")
+                if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
+                    
+                    if t2_qty > t1_qty and qty >= t2_qty:
+                        final_price = t2_price
+                    elif t1_qty > retail_qty and qty >= t1_qty:
+                        final_price = t1_price
+                    else:
+                        final_price = retail_price
+                        
+                    if p_id in st.session_state.cart:
+                        st.session_state.cart[p_id]["qty"] += qty
+                        current_cart_qty = st.session_state.cart[p_id]["qty"]
+                        if t2_qty > t1_qty and current_cart_qty >= t2_qty:
+                            st.session_state.cart[p_id]["price"] = t2_price
+                        elif t1_qty > retail_qty and current_cart_qty >= t1_qty:
+                            st.session_state.cart[p_id]["price"] = t1_price
+                    else:
+                        st.session_state.cart[p_id] = {
+                            "name": row.get('Name', 'Item'), 
+                            "price": final_price, 
+                            "qty": qty, 
+                            "img_link": img_link_for_wa,
+                            "seller": str(seller_val).strip() if pd.notna(seller_val) else ""
+                        }
+                    save_cart_to_url()
+                    st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
+            else:
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
         can_edit = False
         if st.session_state.admin_logged_in: can_edit = True
