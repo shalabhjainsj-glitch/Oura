@@ -403,7 +403,6 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-# 🚀 DB Columns में Main_Category को पूरी तरह से हटा दिया गया है
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -413,7 +412,6 @@ def load_products():
         data = [doc.to_dict() for doc in docs]
         if data:
             df = pd.DataFrame(data)
-            # पुराने प्रोडक्ट्स की यूनिट को सुरक्षित करने के लिए
             if 'Unit_Base' not in df.columns: df['Unit_Base'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T1' not in df.columns: df['Unit_T1'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T2' not in df.columns: df['Unit_T2'] = df.get('Unit_Type', 'Pcs')
@@ -1238,12 +1236,12 @@ def show_product_card(row, idx, prefix):
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
-            # 🚀 BUG FIXED HERE (Error in Edit Form for Units)
+            # 🚀 BUG FIXED HERE (Added keys to all inputs)
             with st.expander(t("✏️ Edit & Move Product (रेट बदलें या बॉक्स शिफ्ट करें)", "✏️ रेट बदलें या प्रोडक्ट दूसरे बॉक्स में शिफ्ट करें")):
                 with st.form(f"edit_form_{prefix_idx}"):
-                    if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")))
+                    if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")), key=f"enm_{prefix_idx}")
                     else:
-                        st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True)
+                        st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True, key=f"enm_ro_{prefix_idx}")
                         e_name = str(row.get("Name", ""))
                     
                     st.markdown("**🔄 प्रोडक्ट को दूसरी केटेगरी (बॉक्स) में भेजें:**")
@@ -1254,17 +1252,16 @@ def show_product_card(row, idx, prefix):
                         cat_idx = all_cats.index(current_cat) if current_cat in all_cats else 0
                         e_cat_choice = st.selectbox("Category (बॉक्स)", all_cats + ["Create New..."], index=cat_idx, key=f"ec_{prefix_idx}")
                         if e_cat_choice == "Create New...":
-                            e_cat = st.text_input("नया बॉक्स टाइप करें", value=current_cat)
+                            e_cat = st.text_input("नया बॉक्स टाइप करें", value=current_cat, key=f"ec_text_{prefix_idx}")
                         else:
                             e_cat = e_cat_choice
                     else:
-                        e_cat = st.text_input("नया बॉक्स टाइप करें", value=current_cat)
+                        e_cat = st.text_input("नया बॉक्स टाइप करें", value=current_cat, key=f"ec_text_alt_{prefix_idx}")
                         
                     st.markdown("---")
                     st.markdown("**💰 Pricing Tiers (यूनिट और रेट)**")
                     unit_opts = ["Pcs (पीस)", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
                     
-                    # Safe logic to find matching index without errors
                     idx_b = next((i for i, opt in enumerate(unit_opts) if u_base in opt), 0)
                     idx_t1 = next((i for i, opt in enumerate(unit_opts) if u_t1 in opt), 0)
                     idx_t2 = next((i for i, opt in enumerate(unit_opts) if u_t2 in opt), 0)
@@ -1272,23 +1269,23 @@ def show_product_card(row, idx, prefix):
                     st.markdown("**Tier 1 (Base):**")
                     c_e01, c_e02, c_e03 = st.columns([2, 1, 1])
                     with c_e01: e_u_base = st.selectbox("इकाई", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
-                    with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty)
-                    with c_e03: e_price = st.number_input("रेट (₹)", value=float(retail_price), format="%.2f", step=0.50)
+                    with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty, key=f"erq_{prefix_idx}")
+                    with c_e03: e_price = st.number_input("रेट (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_{prefix_idx}")
                     
                     st.markdown("**Tier 2 (Bulk):**")
                     c_e1, c_e2, c_e3 = st.columns([2, 1, 1])
                     with c_e1: e_u_t1 = st.selectbox("इकाई", unit_opts, index=idx_t1, key=f"eu_t1_{prefix_idx}")
-                    with c_e2: e_t1_qty = st.number_input("कम से कम", value=t1_qty)
-                    with c_e3: e_t1_price = st.number_input("रेट (₹)", value=float(t1_price), format="%.2f", step=0.50)
+                    with c_e2: e_t1_qty = st.number_input("कम से कम", value=t1_qty, key=f"et1q_{prefix_idx}")
+                    with c_e3: e_t1_price = st.number_input("रेट (₹)", value=float(t1_price), format="%.2f", step=0.50, key=f"et1p_{prefix_idx}")
                         
                     st.markdown("**Tier 3 (Super Bulk):**")
                     c_e4, c_e5, c_e6 = st.columns([2, 1, 1])
                     with c_e4: e_u_t2 = st.selectbox("इकाई", unit_opts, index=idx_t2, key=f"eu_t2_{prefix_idx}")
-                    with c_e5: e_t2_qty = st.number_input("कम से कम (0=off)", value=t2_qty)
-                    with c_e6: e_t2_price = st.number_input("रेट (₹)", value=float(t2_price), format="%.2f", step=0.50)
+                    with c_e5: e_t2_qty = st.number_input("कम से कम (0=off)", value=t2_qty, key=f"et2q_{prefix_idx}")
+                    with c_e6: e_t2_price = st.number_input("रेट (₹)", value=float(t2_price), format="%.2f", step=0.50, key=f"et2p_{prefix_idx}")
                         
                     st.markdown("---")
-                    e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
+                    e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1, key=f"efd_{prefix_idx}")
                             
                     e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
                     update_btn = st.form_submit_button("✅ Update & Save (सेव करें)")
@@ -1330,7 +1327,7 @@ else:
     if search_query:
         st.subheader(t(f"Search results for '{search_query}':", f"'{search_query}' के सर्च रिजल्ट:"))
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
+        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद मिला।"))
         else:
             cols = st.columns(3)
             for idx, row in filtered_df.reset_index().iterrows():
@@ -1612,7 +1609,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
@@ -1767,4 +1764,3 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
 """.replace("__ADMIN_WA__", str(admin_wa_number))
 
 st_components.html(ai_js_code, height=0, width=0)
-
