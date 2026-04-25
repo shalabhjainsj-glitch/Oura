@@ -1283,39 +1283,39 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
-                # यहाँ हमने बॉक्स वाला CSS डाल दिया है (ताकि सिंगल कैटेगरी भी बॉक्स में दिखे)
+                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 12px !important; justify-content: flex-start !important;
+                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
                 }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(50% - 12px) !important; }
-                @media (min-width: 600px) { div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 12px) !important; } }
+                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
                 
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 100px !important; 
-                    min-height: 100px !important; 
+                    height: 90px !important; 
+                    min-height: 90px !important; 
                     width: 100% !important; 
-                    border-radius: 16px !important;
+                    border-radius: 12px !important;
                     background: #ffffff !important; 
                     border: 2px solid #e2e8f0 !important;
-                    box-shadow: 0 4px 10px rgba(0,0,0,0.08) !important; 
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
                     color: #1a202c !important; 
                     font-weight: 700 !important;
-                    font-size: 15px !important; 
+                    font-size: 13px !important; 
                     white-space: normal !important; 
                     word-wrap: break-word !important; 
-                    line-height: 1.3 !important; 
-                    padding: 8px !important; 
+                    line-height: 1.2 !important; 
+                    padding: 4px !important; 
                     transition: all 0.2s ease-in-out !important;
                     display: flex !important;
                     align-items: center !important;
                     justify-content: center !important;
                     text-align: center !important;
                 }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-4px) !important; box-shadow: 0 8px 15px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
                 </style>
                 """, unsafe_allow_html=True)
@@ -1545,7 +1545,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
