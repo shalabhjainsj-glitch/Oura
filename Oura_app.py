@@ -206,7 +206,11 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
         pdf.cell(15, 10, str(idx), border=1, align='C')
         pdf.cell(90, 10, clean_name, border=1, align='L')
-        pdf.cell(25, 10, f"{item['qty']} Pcs", border=1, align='C')
+        
+        # यहाँ PDF में पीस की जगह सेट की गई यूनिट (जैसे Dozen) प्रिंट होगी
+        unit_display = item.get('unit', 'Pcs')
+        pdf.cell(25, 10, f"{item['qty']} {unit_display[:5]}", border=1, align='C')
+        
         pdf.cell(30, 10, f"{item['price']:.2f}", border=1, align='R')
         pdf.cell(30, 10, f"{amt:.2f}", border=1, align='R')
         pdf.ln()
@@ -400,7 +404,8 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock"]
+# 🚀 Unit_Type को डेटाबेस कॉलम्स में जोड़ दिया गया है
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Type"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -408,7 +413,11 @@ def load_products():
         docs = db.collection('products').stream()
         data = [doc.to_dict() for doc in docs]
         if data:
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+            if 'Unit_Type' not in df.columns:
+                df['Unit_Type'] = 'Pcs'
+            df['Unit_Type'].fillna('Pcs', inplace=True)
+            return df
     except: pass
     return pd.DataFrame(columns=expected_columns)
 
@@ -482,6 +491,8 @@ if 'cart_loaded' not in st.session_state:
                         else:
                             final_price = retail_price
                         
+                        u_disp = str(row.get("Unit_Type", "Pcs")).split(" ")[0]
+                        
                         image_path_str = str(row.get("Image_Path", ""))
                         paths = [p.strip() for p in image_path_str.split('|') if p.strip()]
                         img_link = paths[0] if paths else ""
@@ -493,7 +504,8 @@ if 'cart_loaded' not in st.session_state:
                             "price": final_price,
                             "qty": qty,
                             "img_link": img_link,
-                            "seller": str(row.get("Seller_Name", "")).strip()
+                            "seller": str(row.get("Seller_Name", "")).strip(),
+                            "unit": u_disp
                         }
                 except Exception as e:
                     pass
@@ -625,20 +637,28 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_id: new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
                 with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
-                st.markdown("**💰 Pricing Tiers (रेट और पीस सेट करें)**")
+                st.markdown("---")
+                # 🚀 नया फीचर: मापने की इकाई (Unit Type)
+                st.markdown("**💰 Pricing Tiers (रेट और क्वांटिटी सेट करें)**")
+                col_unit, col_emp = st.columns([1, 2])
+                with col_unit:
+                    new_unit_type = st.selectbox("मापने की इकाई (Unit)", ["Pcs", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"])
+                    
+                u_label = new_unit_type.split(" ")[0]
+                
                 col_p1, col_p2, col_p3 = st.columns(3)
                 with col_p1:
                     st.markdown("**(1) Base / Sample**")
-                    new_retail_qty = st.number_input("कम से कम पीस (Base)", min_value=1, value=1, key="n_r_q")
+                    new_retail_qty = st.number_input(f"कम से कम ({u_label})", min_value=1, value=1, key="n_r_q")
                     new_price = st.number_input("बेस रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
                 with col_p2:
                     st.markdown("**(2) Tier 1 (Holesaler)**")
-                    new_t1_qty = st.number_input("कम से कम पीस", min_value=1, value=10, key="n_t1_q")
+                    new_t1_qty = st.number_input(f"कम से कम ({u_label})", min_value=1, value=10, key="n_t1_q")
                     new_t1_price = st.number_input("टियर 1 रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f", key="n_t1_p")
                 with col_p3:
                     st.markdown("**(3) Tier 2 (Super Bulk)**")
                     st.info("खाली छोड़ने के लिए 0 रखें")
-                    new_t2_qty = st.number_input("कम से कम पीस", min_value=0, value=0, key="n_t2_q")
+                    new_t2_qty = st.number_input(f"कम से कम ({u_label})", min_value=0, value=0, key="n_t2_q")
                     new_t2_price = st.number_input("टियर 2 रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f", key="n_t2_p")
                 
                 st.markdown("---")
@@ -685,7 +705,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 "Tier1_Price": new_t1_price, "Tier1_Qty": new_t1_qty, 
                                 "Tier2_Price": new_t2_price, "Tier2_Qty": new_t2_qty,
                                 "Category": final_cat, "Image_Path": final_path_str,
-                                "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock
+                                "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock,
+                                "Unit_Type": new_unit_type
                             }
                             db.collection('products').document(str(new_id)).set(data)
                             load_products.clear()
@@ -1065,6 +1086,8 @@ def show_product_card(row, idx, prefix):
     t2_qty = safe_int(row.get('Tier2_Qty'), 0)
     t2_price = safe_float(row.get('Tier2_Price'), t1_price)
     
+    u_disp = str(row.get("Unit_Type", "Pcs")).split(" ")[0]
+    
     image_path_str = str(row.get("Image_Path", ""))
     paths_temp = [p.strip() for p in image_path_str.split('|') if p.strip()]
     img_link_for_wa = ""
@@ -1075,9 +1098,9 @@ def show_product_card(row, idx, prefix):
 
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
-    if t2_qty > t1_qty: share_text += f"🔹 {t2_qty}+ Pcs: ₹{t2_price}\n"
-    if t1_qty > retail_qty: share_text += f"🔹 {t1_qty}+ Pcs: ₹{t1_price}\n"
-    share_text += f"🔹 {retail_qty}+ Pcs: ₹{retail_price}\n\n"
+    if t2_qty > t1_qty: share_text += f"🔹 {t2_qty}+ {u_disp}: ₹{t2_price}\n"
+    if t1_qty > retail_qty: share_text += f"🔹 {t1_qty}+ {u_disp}: ₹{t1_price}\n"
+    share_text += f"🔹 {retail_qty}+ {u_disp}: ₹{retail_price}\n\n"
     share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
     cat_url = urllib.parse.quote(str(row.get('Category', '')))
     app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
@@ -1114,44 +1137,44 @@ def show_product_card(row, idx, prefix):
             """, unsafe_allow_html=True)
             
             if is_in_stock:
-                ask_qty = st.number_input(t("Quantity (Pieces)", "कितने पीस चाहिए? (मात्रा)"), min_value=1, value=1, key=f"ask_q_{prefix_idx}")
+                ask_qty = st.number_input(f"कितने {u_disp} चाहिए?", min_value=1, value=1, key=f"ask_q_{prefix_idx}")
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
-                wa_msg = urllib.parse.quote(f"नमस्ते Oura Products,\nमुझे *{row.get('Name', 'इस प्रोडक्ट')}* के {ask_qty} पीस की आवश्यकता है। कृपया मुझे इसका बेस्ट रेट बताएं।")
+                wa_msg = urllib.parse.quote(f"नमस्ते Oura Products,\nमुझे *{row.get('Name', 'इस प्रोडक्ट')}* के {ask_qty} {u_disp} की आवश्यकता है। कृपया मुझे इसका बेस्ट रेट बताएं।")
                 wa_btn_link = f"https://wa.me/{admin_num}?text={wa_msg}"
-                st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 {ask_qty} Pcs का रेट WhatsApp पर पूछें</a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 {ask_qty} {u_disp} का रेट WhatsApp पर पूछें</a>', unsafe_allow_html=True)
             else:
                 st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
             if t2_qty > t1_qty: 
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_disp}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
                     <div style="border-left:1px solid #ccc; height:30px;"></div>
-                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_disp}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
                     <div style="border-left:1px solid #ccc; height:30px;"></div>
-                    <div style="text-align:center; flex:1;"><b>{t2_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{t2_qty}+ {u_disp}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
                 </div>
                 <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
                 """, unsafe_allow_html=True)
             elif t1_qty > retail_qty: 
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ Pcs</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_disp}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
                     <div style="border-left:1px solid #ccc; height:30px;"></div>
-                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ Pcs</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_disp}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
                 </div>
                 <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
                 """, unsafe_allow_html=True)
             else: 
                 st.markdown(f"""
                 <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
-                    <b>{retail_qty}+ Pcs रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
+                    <b>{retail_qty}+ {u_disp} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
                     <span style="font-size:12px;">🛵 {del_tag}</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
             if is_in_stock:
-                qty = st.number_input(t("Quantity (Pieces)", "मात्रा (पीस) डालें"), min_value=retail_qty, value=retail_qty, key=f"q_{prefix_idx}")
+                qty = st.number_input(f"मात्रा ({u_disp}) डालें", min_value=retail_qty, value=retail_qty, key=f"q_{prefix_idx}")
                 if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
                     
                     if t2_qty > t1_qty and qty >= t2_qty:
@@ -1174,7 +1197,8 @@ def show_product_card(row, idx, prefix):
                             "price": final_price, 
                             "qty": qty, 
                             "img_link": img_link_for_wa,
-                            "seller": str(seller_val).strip() if pd.notna(seller_val) else ""
+                            "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
+                            "unit": u_disp
                         }
                     save_cart_to_url()
                     st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
@@ -1212,17 +1236,29 @@ def show_product_card(row, idx, prefix):
                         e_name = str(row.get("Name", ""))
                         
                     e_cat = st.text_input("Category Box (बॉक्स का नाम)", value=str(row.get("Category", "")))
+                    
+                    e_c0, e_cempty = st.columns([1, 1])
+                    with e_c0:
+                        current_unit = str(row.get("Unit_Type", "Pcs"))
+                        unit_opts = ["Pcs", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
+                        found_idx = 0
+                        for i, opt in enumerate(unit_opts):
+                            if current_unit in opt:
+                                found_idx = i
+                                break
+                        e_unit = st.selectbox("Unit (इकाई)", unit_opts, index=found_idx, key=f"e_u_{prefix_idx}")
+                        e_u_label = e_unit.split(" ")[0]
                         
                     c_e01, c_e02 = st.columns(2)
-                    with c_e01: e_retail_qty = st.number_input("सिंगल/बेस पीस", value=retail_qty)
+                    with c_e01: e_retail_qty = st.number_input(f"सिंगल/बेस ({e_u_label})", value=retail_qty)
                     with c_e02: e_price = st.number_input("बेस रेट (₹)", value=float(retail_price), format="%.2f", step=0.50)
                     
                     c_e1, c_e2 = st.columns(2)
-                    with c_e1: e_t1_qty = st.number_input("Tier 1 पीस", value=t1_qty)
+                    with c_e1: e_t1_qty = st.number_input(f"Tier 1 ({e_u_label})", value=t1_qty)
                     with c_e2: e_t1_price = st.number_input("Tier 1 रेट (₹)", value=float(t1_price), format="%.2f", step=0.50)
                         
                     c_e3, c_e4 = st.columns(2)
-                    with c_e3: e_t2_qty = st.number_input("Tier 2 पीस (0 = off)", value=t2_qty)
+                    with c_e3: e_t2_qty = st.number_input(f"Tier 2 ({e_u_label}) (0=off)", value=t2_qty)
                     with c_e4: e_t2_price = st.number_input("Tier 2 रेट (₹)", value=float(t2_price), format="%.2f", step=0.50)
                         
                     e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1)
@@ -1238,6 +1274,7 @@ def show_product_card(row, idx, prefix):
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
                         "Category": e_cat.strip(),
+                        "Unit_Type": e_unit,
                         "Free_Delivery": is_free_val
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
@@ -1387,7 +1424,10 @@ if st.session_state.cart:
         with col_details:
             st.write(f"✔️ **{item['name']}**")
             c1, c2 = st.columns([7, 3])
-            with c1: st.write(f"{t('Qty:', 'मात्रा:')} {item['qty']} x ₹{item['price']:.2f} = **₹{subtotal:.2f}**")
+            
+            # 🚀 कार्ट में भी यूनिट (Dozen/Box) दिखेगा
+            unit_display = item.get('unit', 'Pcs')
+            with c1: st.write(f"{t('Qty:', 'मात्रा:')} {item['qty']} {unit_display} x ₹{item['price']:.2f} = **₹{subtotal:.2f}**")
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
@@ -1493,7 +1533,8 @@ if st.session_state.cart:
                 item_details_list = []
                 taxable_amount = 0
                 for k, item in st.session_state.cart.items():
-                    item_details_list.append(f"{item['name']} ({item['qty']}Pcs)")
+                    item_unit = item.get('unit', 'Pcs')
+                    item_details_list.append(f"{item['name']} ({item['qty']} {item_unit})")
                     taxable_amount += (item['qty'] * item['price'])
                 
                 taxable_amount += shipping_cost
@@ -1545,7 +1586,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
