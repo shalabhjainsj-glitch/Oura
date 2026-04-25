@@ -656,7 +656,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
                 cat_options = [t("Create New Category...", "नयी केटेगरी बनाएं...")] + existing_cats
-                selected_cat = st.selectbox(t("Select Category", "केटेगरी चुनें"), cat_options)
+                selected_cat = st.selectbox(t("Select Category (Box)", "केटेगरी (बॉक्स) चुनें"), cat_options)
                 if selected_cat == t("Create New Category...", "नयी केटेगरी बनाएं..."):
                     final_cat = st.text_input(t("Enter New Category Name (Emojis allowed 👕👟)", "नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)"))
                 else:
@@ -1204,12 +1204,14 @@ def show_product_card(row, idx, prefix):
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
-            with st.expander(t("✏️ Edit Product (रेट, स्टॉक या फोटो बदलें)", "✏️ रेट, स्टॉक या डिलीवरी बदलें (Edit)")):
+            with st.expander(t("✏️ Edit Product (रेट, स्टॉक या बॉक्स बदलें)", "✏️ रेट, स्टॉक या बॉक्स बदलें (Edit)")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")))
                     else:
                         st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True)
                         e_name = str(row.get("Name", ""))
+                        
+                    e_cat = st.text_input("Category Box (बॉक्स का नाम)", value=str(row.get("Category", "")))
                         
                     c_e01, c_e02 = st.columns(2)
                     with c_e01: e_retail_qty = st.number_input("सिंगल/बेस पीस", value=retail_qty)
@@ -1235,6 +1237,7 @@ def show_product_card(row, idx, prefix):
                         "Retail_Qty": e_retail_qty, "Price": e_price, 
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
+                        "Category": e_cat.strip(),
                         "Free_Delivery": is_free_val
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
@@ -1270,7 +1273,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज"))
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1279,52 +1282,41 @@ else:
             cat_container = st.container()
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
+                
+                # यहाँ हमने बॉक्स वाला CSS डाल दिया है (ताकि सिंगल कैटेगरी भी बॉक्स में दिखे)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    flex-wrap: wrap !important;
-                    gap: 10px !important;
-                    justify-content: flex-start !important;
+                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 12px !important; justify-content: flex-start !important;
                 }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] {
-                    width: calc(33.33% - 10px) !important; 
-                }
-                @media (min-width: 600px) {
-                    div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] {
-                        width: calc(20% - 10px) !important; 
-                    }
-                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(50% - 12px) !important; }
+                @media (min-width: 600px) { div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 12px) !important; } }
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) {
-                    display: none !important;
-                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
+                
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 85px !important;
-                    min-height: 85px !important;
-                    width: 100% !important;
-                    border-radius: 12px !important;
-                    background: linear-gradient(135deg, #ffffff, #f0f4f8) !important;
-                    border: 1px solid #c5d4eb !important;
-                    box-shadow: 2px 4px 8px rgba(0,0,0,0.06) !important;
-                    color: #1a202c !important;
+                    height: 100px !important; 
+                    min-height: 100px !important; 
+                    width: 100% !important; 
+                    border-radius: 16px !important;
+                    background: #ffffff !important; 
+                    border: 2px solid #e2e8f0 !important;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.08) !important; 
+                    color: #1a202c !important; 
                     font-weight: 700 !important;
-                    font-size: 13px !important;
-                    white-space: normal !important;
-                    word-wrap: break-word !important;
-                    line-height: 1.2 !important;
-                    padding: 4px !important;
+                    font-size: 15px !important; 
+                    white-space: normal !important; 
+                    word-wrap: break-word !important; 
+                    line-height: 1.3 !important; 
+                    padding: 8px !important; 
                     transition: all 0.2s ease-in-out !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    text-align: center !important;
                 }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover {
-                    transform: translateY(-3px) !important;
-                    box-shadow: 2px 6px 12px rgba(0,0,0,0.12) !important;
-                    border-color: #2b6cb0 !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active {
-                    transform: scale(0.95) !important;
-                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-4px) !important; box-shadow: 0 8px 15px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
                 </style>
                 """, unsafe_allow_html=True)
 
@@ -1338,7 +1330,7 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        if st.button(t("🏠 All Categories", "🏠 सारी कैटेगरीज"), key="float_back_btn"):
+        if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params: del st.query_params["cat"]
             save_cart_to_url()
@@ -1349,7 +1341,7 @@ else:
         const parentDoc = window.parent.document;
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
-            if (btn.innerText && (btn.innerText.includes('सारी कैटेगरीज') || btn.innerText.includes('All Categories'))) {
+            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
                 btn.style.position = 'fixed';
                 btn.style.bottom = '120px';
                 btn.style.left = '15px';
@@ -1371,7 +1363,7 @@ else:
         st_components.html(float_js, height=0, width=0)
 
         cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
-        if cat_products.empty: st.write(t("No products in this category yet.", "इस कैटेगरी में अभी कोई उत्पाद नहीं है।"))
+        if cat_products.empty: st.write(t("No products in this category yet.", "इस बॉक्स में अभी कोई उत्पाद नहीं है।"))
         else:
             cols = st.columns(3)
             for idx, row in cat_products.reset_index().iterrows():
@@ -1564,7 +1556,6 @@ if st.session_state.cart:
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
-# 🚀 100% वर्किंग, मोबाइल-फ्रेंडली और सुंदर 3D उड़ती हुई कंप्यूटर गुड़िया (Right Side)
 ai_js_code = """
 <script>
 const parentWin = window.parent;
@@ -1690,7 +1681,6 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
         }, 800);
     }
 
-    // 🚀 फिक्स: Event Listeners का सही इस्तेमाल
     parentDoc.getElementById('ai-send-btn').addEventListener('click', handleSend);
     
     parentDoc.getElementById('ai-input').addEventListener('keypress', function(e) {
@@ -1711,4 +1701,3 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
 
 st_components.html(ai_js_code, height=0, width=0)
 
-```
