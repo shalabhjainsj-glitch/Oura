@@ -813,34 +813,35 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 time.sleep(1)
                 st.rerun()
 
+            # 🚀 FIXED: DEDICATED CATEGORY RENAME SECTION RESTORED
             st.markdown("---")
-            st.subheader("📦 Bulk Move / Rename Categories (पूरी केटेगरी शिफ्ट करें)")
-            st.info("यहाँ से आप पूरी केटेगरी (बॉक्स) को किसी नए नाम से 'Move' कर सकते हैं या नाम बदल सकते हैं।")
+            st.subheader("🏷️ Category Management (नाम और इमोजी बदलें)")
+            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने आप अपडेट हो जाएंगे।")
             
-            cats_list = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-            if cats_list:
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    b_old_cat = st.selectbox("Old Category (किसे मूव करना है)", cats_list)
-                with col_b2:
-                    b_new_cat_choice = st.selectbox("Move To (कहाँ ले जाना है)", cats_list + ["Create New..."])
-                    if b_new_cat_choice == "Create New...":
-                        b_new_cat = st.text_input("नया नाम/इमोजी टाइप करें:", value=b_old_cat)
-                    else:
-                        b_new_cat = b_new_cat_choice
-
-                if st.button("🚀 Move / Update All Products", type="primary"):
-                    if b_new_cat:
-                        with st.spinner("शिफ्ट हो रहा है..."):
-                            prods_to_move = products_df[products_df['Category'] == b_old_cat]
+            current_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            
+            if current_cats:
+                col_c1, col_c2 = st.columns(2)
+                with col_c1:
+                    old_cat = st.selectbox("पुरानी केटेगरी (बॉक्स) चुनें", current_cats, key="ren_old_cat")
+                with col_c2:
+                    new_cat_name = st.text_input("नया नाम और इमोजी डालें (जैसे: 🔊 Speakers)", value=old_cat, key="ren_new_cat")
+                
+                if st.button("💾 नाम अपडेट करें (Update Name)", key="btn_ren_cat"):
+                    if new_cat_name and new_cat_name.strip() != old_cat:
+                        with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
+                            prods_to_update = products_df[products_df['Category'] == old_cat]
                             batch = db.batch()
-                            for idx, row in prods_to_move.iterrows():
-                                doc_ref = db.collection('products').document(str(row['ID']))
-                                batch.update(doc_ref, {"Category": b_new_cat.strip()})
+                            
+                            for idx, row in prods_to_update.iterrows():
+                                doc_id = str(row['ID'])
+                                doc_ref = db.collection('products').document(doc_id)
+                                batch.update(doc_ref, {"Category": new_cat_name.strip()})
+                            
                             batch.commit()
                             load_products.clear()
-                            st.success(f"✅ सारे प्रोडक्ट्स सफलतापूर्वक '{b_new_cat}' में शिफ्ट हो गए!")
-                            time.sleep(2)
+                            st.success(f"✅ केटेगरी का नाम बदलकर '{new_cat_name}' कर दिया गया है!")
+                            time.sleep(1)
                             st.rerun()
 
             st.markdown("---")
@@ -1236,7 +1237,7 @@ def show_product_card(row, idx, prefix):
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
-            # 🚀 BUG FIXED HERE (Added keys to all inputs)
+            # 🚀 BUG COMPLETELY FIXED: ALL inputs have completely unique keys
             with st.expander(t("✏️ Edit & Move Product (रेट बदलें या बॉक्स शिफ्ट करें)", "✏️ रेट बदलें या प्रोडक्ट दूसरे बॉक्स में शिफ्ट करें")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")), key=f"enm_{prefix_idx}")
@@ -1609,7 +1610,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
