@@ -311,63 +311,69 @@ hide_streamlit_style = """
             
             .stApp { background-color: #f4f6f9; }
 
-            /* 🚀 NEW: 3-COLUMN MOBILE GRID CSS FOR PRODUCTS */
-            @media (max-width: 768px) {
-                div[data-testid="column"]:has(.prod-marker) {
-                    width: calc(33.33% - 6px) !important;
-                    flex: 1 1 calc(33.33% - 6px) !important;
-                    min-width: calc(33.33% - 6px) !important;
-                    padding: 2px !important;
-                }
-                div[data-testid="stHorizontalBlock"]:has(.prod-marker) {
-                    flex-wrap: wrap !important;
-                    gap: 6px !important;
-                }
+            /* 🚀 STRICT 3-COLUMN CSS FOR MOBILE GROCERY STYLE */
+            div[data-testid="stHorizontalBlock"]:has(.prod-marker) {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                gap: 6px !important;
+            }
+            div[data-testid="stHorizontalBlock"]:has(.prod-marker) > div[data-testid="column"] {
+                width: calc(33.33% - 6px) !important;
+                min-width: calc(33.33% - 6px) !important;
+                flex: 1 1 calc(33.33% - 6px) !important;
+                padding: 0 !important;
             }
             
-            /* COMPACT PRODUCT CARD STYLING */
+            /* COMPACT PRODUCT CARD DESIGN */
             div[data-testid="column"]:has(.prod-marker) div[data-testid="stContainer"] {
-                padding: 6px !important;
+                padding: 4px !important;
                 border-radius: 8px !important;
                 background: white !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.08) !important;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
             }
-            div[data-testid="column"]:has(.prod-marker) div[data-testid="stImage"] img {
+            div[data-testid="column"]:has(.prod-marker) img {
                 height: 90px !important;
+                width: 100% !important;
                 object-fit: cover !important;
                 border-radius: 6px !important;
+                margin-bottom: 2px;
             }
+            
+            /* ULTRA COMPACT INPUTS & BUTTONS */
             div[data-testid="column"]:has(.prod-marker) .stSelectbox > div > div {
-                min-height: 26px !important;
-                height: 26px !important;
-                font-size: 11px !important;
-                padding: 0 4px !important;
+                min-height: 22px !important;
+                height: 22px !important;
+                font-size: 10px !important;
+                padding: 0 2px !important;
             }
             div[data-testid="column"]:has(.prod-marker) .stNumberInput > div > div > input {
-                min-height: 26px !important;
-                height: 26px !important;
-                font-size: 11px !important;
-                padding: 0 4px !important;
+                min-height: 22px !important;
+                height: 22px !important;
+                font-size: 10px !important;
+                padding: 0 2px !important;
                 text-align: center !important;
             }
             div[data-testid="column"]:has(.prod-marker) .stNumberInput button {
-                display: none !important; /* Hide +/- buttons to save space */
+                display: none !important; /* Hide +/- to save space */
             }
             div[data-testid="column"]:has(.prod-marker) .stButton > button {
                 min-height: 26px !important;
                 height: 26px !important;
                 padding: 0px !important;
-                font-size: 14px !important;
+                font-size: 13px !important;
                 font-weight: bold !important;
-                background-color: #f6ad55 !important;
+                background-color: #25D366 !important;
                 color: white !important;
                 border-radius: 6px !important;
-            }
-            div[data-testid="column"]:has(.prod-marker) .stButton > button:hover {
-                background-color: #ed8936 !important;
+                width: 100% !important;
+                margin-top: 2px !important;
             }
             
-            /* Box Design for Categories */
+            /* Box Design for Main Categories (4 Columns) */
             div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
                 display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
             }
@@ -376,8 +382,8 @@ hide_streamlit_style = """
             div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
             
             div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                height: 90px !important; 
-                min-height: 90px !important; 
+                height: 80px !important; 
+                min-height: 80px !important; 
                 width: 100% !important; 
                 border-radius: 12px !important;
                 background: #ffffff !important; 
@@ -385,20 +391,9 @@ hide_streamlit_style = """
                 box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
                 color: #1a202c !important; 
                 font-weight: 700 !important;
-                font-size: 13px !important; 
-                white-space: normal !important; 
-                word-wrap: break-word !important; 
+                font-size: 12px !important; 
                 line-height: 1.2 !important; 
-                padding: 4px !important; 
-                transition: all 0.2s ease-in-out !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
             }
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
-            
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -444,7 +439,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Main_Category", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -453,6 +448,8 @@ def load_products():
         data = [doc.to_dict() for doc in docs]
         if data:
             df = pd.DataFrame(data)
+            if 'Main_Category' not in df.columns: df['Main_Category'] = '📦 Other (अन्य)'
+            df['Main_Category'].fillna('📦 Other (अन्य)', inplace=True)
             if 'Unit_Base' not in df.columns: df['Unit_Base'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T1' not in df.columns: df['Unit_T1'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T2' not in df.columns: df['Unit_T2'] = df.get('Unit_Type', 'Pcs')
@@ -533,30 +530,15 @@ if 'cart_loaded' not in st.session_state:
                             "qty": qty, "img_link": img_link,
                             "seller": str(row.get("Seller_Name", "")).strip(), "unit": unit
                         }
-                elif "-" in item:
-                    p_id, qty_str = item.split("-", 1)
-                    qty = safe_int(qty_str, 1)
-                    match = products_df[products_df['ID'].astype(str) == p_id]
-                    if not match.empty:
-                        row = match.iloc[0]
-                        retail_price = safe_float(row.get('Price'), 0.0)
-                        image_path_str = str(row.get("Image_Path", ""))
-                        paths = [p.strip() for p in image_path_str.split('|') if p.strip()]
-                        img_link = paths[0] if paths else ""
-                        if img_link and not img_link.startswith("http"):
-                            img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
-                        k_part = f"{p_id}|Pcs|{retail_price}"
-                        st.session_state.cart[k_part] = {
-                            "name": row.get('Name', 'Item'), "price": retail_price, "qty": qty, "img_link": img_link, "seller": str(row.get("Seller_Name", "")).strip(), "unit": "Pcs"
-                        }
             except Exception as e:
                 pass
     st.session_state.cart_loaded = True
 
-if "cat" in st.query_params:
-    st.session_state.selected_category = st.query_params["cat"]
-else:
-    st.session_state.selected_category = None
+if "main_cat" in st.query_params: st.session_state.selected_main_cat = st.query_params["main_cat"]
+else: st.session_state.selected_main_cat = None
+
+if "sub_cat" in st.query_params: st.session_state.selected_sub_cat = st.query_params["sub_cat"]
+else: st.session_state.selected_sub_cat = None
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'seller_logged_in' not in st.session_state: st.session_state.seller_logged_in = None
@@ -680,7 +662,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
                 st.markdown("**💰 Pricing Tiers (हर रेट के लिए अलग-अलग यूनिट और मात्रा सेट करें)**")
-                unit_options = ["Pcs (पीस)", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
+                unit_options = ["Pcs", "Dozen", "Box", "Set"]
                 
                 st.markdown("**(1) Base / Sample**")
                 c1, c2, c3 = st.columns([1, 1, 1])
@@ -701,6 +683,31 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with c9: new_t2_price = st.number_input("रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f", key="n_t2_p")
                 
                 st.markdown("---")
+                col_mc, col_sc = st.columns(2)
+                existing_main_cats = products_df['Main_Category'].dropna().unique().tolist() if not products_df.empty and 'Main_Category' in products_df.columns else []
+                m_cat_options = [t("Create New Main Category...", "नयी मेन केटेगरी बनाएं...")] + existing_main_cats
+                with col_mc:
+                    selected_main_cat = st.selectbox(t("Select Main Category", "मेन केटेगरी (उदा: 📱 Electronics)"), m_cat_options)
+                    if selected_main_cat == t("Create New Main Category...", "नयी मेन केटेगरी बनाएं..."):
+                        final_main_cat = st.text_input(t("Enter New Main Category Name", "नई मेन केटेगरी का नाम लिखें"))
+                    else:
+                        final_main_cat = selected_main_cat
+                
+                with col_sc:
+                    if selected_main_cat != t("Create New Main Category...", "नयी मेन केटेगरी बनाएं..."):
+                        existing_sub_cats = products_df[products_df['Main_Category'] == selected_main_cat]['Category'].dropna().unique().tolist()
+                    else:
+                        existing_sub_cats = []
+                    
+                    s_cat_options = [t("Create New Sub Category...", "नयी सब-केटेगरी बनाएं...")] + existing_sub_cats
+                    selected_sub_cat = st.selectbox(t("Select Sub Category", "सब-केटेगरी बॉक्स (उदा: 🔊 Speakers)"), s_cat_options)
+                    
+                    if selected_sub_cat == t("Create New Sub Category...", "नयी सब-केटेगरी बनाएं..."):
+                        final_sub_cat = st.text_input(t("Enter New Sub Category Name", "नई सब-केटेगरी का नाम लिखें"))
+                    else:
+                        final_sub_cat = selected_sub_cat
+                
+                st.markdown("---")
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
                     new_free_delivery = st.selectbox(t("Delivery", "डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")])
@@ -713,18 +720,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 else:
                     new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ नहीं दिखेगा)"))
                 
-                existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-                cat_options = [t("Create New Category...", "नयी केटेगरी बनाएं...")] + existing_cats
-                selected_cat = st.selectbox(t("Select Category (Box)", "केटेगरी (बॉक्स) चुनें"), cat_options)
-                if selected_cat == t("Create New Category...", "नयी केटेगरी बनाएं..."):
-                    final_cat = st.text_input(t("Enter New Category Name (Emojis allowed 👕👟)", "नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)"))
-                else:
-                    final_cat = selected_cat
-                
                 uploaded_imgs = st.file_uploader(t("Upload Photos (Max 3)", "फोटो अपलोड करें (अधिकतम 3)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
                 submit_btn = st.form_submit_button(t("Save Product", "उत्पाद सेव करें"))
                 
-                if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
+                if submit_btn and new_id and new_name and uploaded_imgs and final_main_cat and final_sub_cat:
                     if len(uploaded_imgs) > 3: st.error(t("⚠️ Please select max 3 photos.", "⚠️ कृपया अधिकतम 3 फोटो ही चुनें।"))
                     else:
                         with st.spinner("Saving..."):
@@ -743,7 +742,9 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 "Retail_Qty": new_retail_qty, "Price": new_price, 
                                 "Tier1_Price": new_t1_price, "Tier1_Qty": new_t1_qty, 
                                 "Tier2_Price": new_t2_price, "Tier2_Qty": new_t2_qty,
-                                "Category": final_cat, "Image_Path": final_path_str,
+                                "Main_Category": final_main_cat,
+                                "Category": final_sub_cat,
+                                "Image_Path": final_path_str,
                                 "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock,
                                 "Unit_Base": new_u_base, "Unit_T1": new_u_t1, "Unit_T2": new_u_t2
                             }
@@ -855,34 +856,46 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
 
             st.markdown("---")
-            st.subheader("🏷️ Category Management (नाम और इमोजी बदलें)")
-            st.info("💡 टिप: Windows पर इमोजी के लिए (Win + .) दबाएं। यहाँ से नाम बदलने पर उस केटेगरी के सभी प्रोडक्ट्स अपने आप अपडेट हो जाएंगे।")
+            st.subheader("📦 Bulk Move / Rename Categories (पूरी केटेगरी शिफ्ट करें)")
+            st.info("यहाँ से आप पूरी केटेगरी (बॉक्स) को किसी नए नाम से 'Move' कर सकते हैं या नाम बदल सकते हैं।")
             
-            current_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-            
-            if current_cats:
-                col_c1, col_c2 = st.columns(2)
-                with col_c1:
-                    old_cat = st.selectbox("पुरानी केटेगरी (बॉक्स) चुनें", current_cats, key="ren_old_cat")
-                with col_c2:
-                    new_cat_name = st.text_input("नया नाम और इमोजी डालें (जैसे: 🔊 Speakers)", value=old_cat, key="ren_new_cat")
+            mcats_list = products_df['Main_Category'].dropna().unique().tolist() if not products_df.empty and 'Main_Category' in products_df.columns else []
+            if mcats_list:
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    b_old_mcat = st.selectbox("Old Main Category (पुरानी)", mcats_list)
+                with col_b2:
+                    scats_list = products_df[products_df['Main_Category'] == b_old_mcat]['Category'].dropna().unique().tolist()
+                    b_old_scat = st.selectbox("Old Sub Category to Move (किसे मूव करना है)", scats_list) if scats_list else None
                 
-                if st.button("💾 नाम अपडेट करें (Update Name)", key="btn_ren_cat"):
-                    if new_cat_name and new_cat_name.strip() != old_cat:
-                        with st.spinner("क्लाउड पर अपडेट हो रहा है..."):
-                            prods_to_update = products_df[products_df['Category'] == old_cat]
-                            batch = db.batch()
-                            
-                            for idx, row in prods_to_update.iterrows():
-                                doc_id = str(row['ID'])
-                                doc_ref = db.collection('products').document(doc_id)
-                                batch.update(doc_ref, {"Category": new_cat_name.strip()})
-                            
-                            batch.commit()
-                            load_products.clear()
-                            st.success(f"✅ केटेगरी का नाम बदलकर '{new_cat_name}' कर दिया गया है!")
-                            time.sleep(1)
-                            st.rerun()
+                if b_old_scat:
+                    st.markdown("**👇 कहाँ ले जाना है? (Target)**")
+                    col_b3, col_b4 = st.columns(2)
+                    with col_b3:
+                        b_new_mcat_choice = st.selectbox("Move to Main Category", mcats_list + ["Create New..."])
+                        if b_new_mcat_choice == "Create New...":
+                            b_new_mcat = st.text_input("नई मेन केटेगरी का नाम:", value=b_old_mcat)
+                        else:
+                            b_new_mcat = b_new_mcat_choice
+                    with col_b4:
+                        b_new_scat = st.text_input("New Sub Category Name (नया नाम/इमोजी):", value=b_old_scat)
+
+                    if st.button("🚀 Move / Update All Products", type="primary"):
+                        if b_new_mcat and b_new_scat:
+                            with st.spinner("शिफ्ट हो रहा है..."):
+                                prods_to_move = products_df[(products_df['Main_Category'] == b_old_mcat) & (products_df['Category'] == b_old_scat)]
+                                batch = db.batch()
+                                for idx, row in prods_to_move.iterrows():
+                                    doc_ref = db.collection('products').document(str(row['ID']))
+                                    batch.update(doc_ref, {
+                                        "Main_Category": b_new_mcat.strip(), 
+                                        "Category": b_new_scat.strip()
+                                    })
+                                batch.commit()
+                                load_products.clear()
+                                st.success(f"✅ सारे प्रोडक्ट्स सफलतापूर्वक '{b_new_mcat} ➡️ {b_new_scat}' में शिफ्ट हो गए!")
+                                time.sleep(2)
+                                st.rerun()
 
             st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
@@ -952,7 +965,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             st.markdown("---")
 
             st.markdown("### 👥 सभी खाते (Customer Ledgers)")
-            st.info("💡 **टिप:** आप सीधे टेबल अंदर क्लिक करके नई एंट्री जोड़ सकते हैं, या पुराने अमाउंट और विवरण बदल सकते हैं। डिलीट करने के लिए 'Delete' बॉक्स पर टिक करें और 'सेव' दबाएं।")
+            st.info("💡 **टिप:** आप सीधे टेबल के अंदर क्लिक करके नई एंट्री जोड़ सकते हैं, या पुराने अमाउंट और विवरण बदल सकते हैं। डिलीट करने के लिए 'Delete' बॉक्स पर टिक करें और 'सेव' दबाएं।")
             all_ledgers = load_ledger_data()
             
             if not all_ledgers:
@@ -1195,18 +1208,30 @@ def show_product_card(row, idx, prefix):
                         st.text_input("Name - Read Only", value=safe_name, disabled=True, key=f"enm_ro_{prefix_idx}")
                         e_name = safe_name
                     
-                    all_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-                    current_cat = str(row.get("Category", ""))
-                    if all_cats:
-                        cat_idx = all_cats.index(current_cat) if current_cat in all_cats else 0
-                        e_cat_choice = st.selectbox("Category (Box)", all_cats + ["Create New..."], index=cat_idx, key=f"ec_{prefix_idx}")
-                        if e_cat_choice == "Create New...":
-                            e_cat = st.text_input("New Box Name", value=current_cat, key=f"ec_text_{prefix_idx}")
-                        else:
-                            e_cat = e_cat_choice
+                    # Edit Categories
+                    all_mcats = products_df['Main_Category'].dropna().unique().tolist() if not products_df.empty and 'Main_Category' in products_df.columns else []
+                    current_mcat = str(row.get("Main_Category", "📦 Other (अन्य)"))
+                    mcat_idx = all_mcats.index(current_mcat) if current_mcat in all_mcats else 0
+                    
+                    e_mcat_choice = st.selectbox("Main Category", all_mcats + ["Create New..."], index=mcat_idx, key=f"emcat_{prefix_idx}")
+                    if e_mcat_choice == "Create New...":
+                        e_mcat = st.text_input("New Main Category", value=current_mcat, key=f"emcat_text_{prefix_idx}")
                     else:
-                        e_cat = st.text_input("New Box Name", value=current_cat, key=f"ec_text_alt_{prefix_idx}")
-                        
+                        e_mcat = e_mcat_choice
+                    
+                    all_scats = products_df[products_df['Main_Category'] == e_mcat_choice]['Category'].dropna().unique().tolist() if e_mcat_choice != "Create New..." else []
+                    current_scat = str(row.get("Category", ""))
+                    scat_idx = all_scats.index(current_scat) if current_scat in all_scats else 0
+                    
+                    if all_scats:
+                        e_scat_choice = st.selectbox("Sub Category (Box)", all_scats + ["Create New..."], index=scat_idx, key=f"escat_{prefix_idx}")
+                        if e_scat_choice == "Create New...":
+                            e_scat = st.text_input("New Sub Category", value=current_scat, key=f"escat_text_{prefix_idx}")
+                        else:
+                            e_scat = e_scat_choice
+                    else:
+                        e_scat = st.text_input("New Sub Category", value=current_scat, key=f"escat_text_alt_{prefix_idx}")
+
                     unit_opts = ["Pcs", "Dozen", "Box", "Set"]
                     idx_b = next((i for i, opt in enumerate(unit_opts) if u_base in opt), 0)
                     idx_t1 = next((i for i, opt in enumerate(unit_opts) if u_t1 in opt), 0)
@@ -1233,7 +1258,8 @@ def show_product_card(row, idx, prefix):
                         "Retail_Qty": e_retail_qty, "Price": e_price, 
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
-                        "Category": e_cat.strip(), "In_Stock": e_is_stk,
+                        "Main_Category": e_mcat.strip(),
+                        "Category": e_scat.strip(), "In_Stock": e_is_stk,
                         "Unit_Base": e_u_base, "Unit_T1": e_u_t1, "Unit_T2": e_u_t2
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
@@ -1254,104 +1280,84 @@ else:
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
         if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
         else:
-            cols = st.columns(3)
-            for idx, row in filtered_df.reset_index().iterrows():
-                with cols[idx % 3]: show_product_card(row, idx, "search")
+            for i in range(0, len(filtered_df), 3):
+                cols = st.columns(3)
+                for j in range(3):
+                    if i + j < len(filtered_df):
+                        row = filtered_df.iloc[i + j]
+                        with cols[j]:
+                            show_product_card(row, i+j, "search")
     
-    elif st.session_state.selected_category is None:
-        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
-        valid_categories = products_df['Category'].dropna().unique().tolist()
+    elif st.session_state.selected_main_cat is None:
+        st.subheader(t("🛍️ Shop by Department", "🛍️ मेन-कैटेगरीज (डिपार्टमेंट चुनें)"))
+        valid_main_categories = products_df['Main_Category'].dropna().unique().tolist()
         
-        if len(valid_categories) == 0: 
-            st.write(t("No categories yet.", "अभी कोई बॉक्स नहीं है।"))
+        if len(valid_main_categories) == 0: 
+            st.write(t("No main categories yet.", "अभी कोई मेन-कैटेगरी नहीं है।"))
         else:
             cat_container = st.container()
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
-                
-                st.markdown("""
-                <style>
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
-                
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 90px !important; 
-                    min-height: 90px !important; 
-                    width: 100% !important; 
-                    border-radius: 12px !important;
-                    background: #ffffff !important; 
-                    border: 2px solid #e2e8f0 !important;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
-                    color: #1a202c !important; 
-                    font-weight: 700 !important;
-                    font-size: 13px !important; 
-                    white-space: normal !important; 
-                    word-wrap: break-word !important; 
-                    line-height: 1.2 !important; 
-                    padding: 4px !important; 
-                    transition: all 0.2s ease-in-out !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    text-align: center !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
-                </style>
-                """, unsafe_allow_html=True)
-
-                for idx, cat in enumerate(valid_categories):
-                    if st.button(cat, key=f"cat_btn_{idx}"):
-                        st.session_state.selected_category = cat
-                        st.query_params["cat"] = cat
-                        save_cart_to_url()
+                for idx, m_cat in enumerate(valid_main_categories):
+                    if st.button(m_cat, key=f"mcat_btn_{idx}"):
+                        st.session_state.selected_main_cat = m_cat
+                        st.query_params["main_cat"] = m_cat
+                        if "sub_cat" in st.query_params: del st.query_params["sub_cat"]
+                        st.session_state.selected_sub_cat = None
                         st.rerun()
-            
-    else:
-        st.subheader(f"📂 {st.session_state.selected_category}")
-        
-        if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
-            st.session_state.selected_category = None
-            if "cat" in st.query_params: del st.query_params["cat"]
-            save_cart_to_url()
+                        
+    elif st.session_state.selected_sub_cat is None:
+        if st.button("⬅️ " + t("Back to Departments", "वापस मेन पेज पर जाएं"), key="back_to_main_btn"):
+            st.session_state.selected_main_cat = None
+            if "main_cat" in st.query_params: del st.query_params["main_cat"]
             st.rerun()
             
-        float_js = """
-        <script>
-        const parentDoc = window.parent.document;
-        const buttons = parentDoc.querySelectorAll('button');
-        buttons.forEach(btn => {
-            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
-                btn.style.position = 'fixed';
-                btn.style.bottom = '120px';
-                btn.style.left = '15px';
-                btn.style.zIndex = '999999';
-                btn.style.background = '#2b6cb0'; 
-                btn.style.color = 'white';
-                btn.style.padding = '12px 18px';
-                btn.style.borderRadius = '50px';
-                btn.style.border = '2px solid white';
-                btn.style.fontWeight = 'bold';
-                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                btn.style.minHeight = 'auto'; 
-                btn.style.width = 'auto';
-                btn.style.animation = 'none';
-            }
-        });
-        </script>
-        """
-        st_components.html(float_js, height=0, width=0)
-
-        cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
-        if cat_products.empty: st.write(t("No products in this category yet.", "इस बॉक्स में अभी कोई उत्पाद नहीं है।"))
+        st.subheader(f"📂 {st.session_state.selected_main_cat}")
+        st.markdown(f"**👇 {t('Select a Category (Box):', 'नीचे दिए गए बॉक्स में से चुनें:')}**")
+        
+        valid_sub_categories = products_df[products_df['Main_Category'] == st.session_state.selected_main_cat]['Category'].dropna().unique().tolist()
+        
+        if len(valid_sub_categories) == 0: 
+            st.write(t("No boxes here yet.", "अभी इस डिपार्टमेंट में कोई बॉक्स नहीं है।"))
         else:
-            cols = st.columns(3)
-            for idx, row in cat_products.reset_index().iterrows():
-                with cols[idx % 3]: show_product_card(row, idx, "cat_view")
+            sub_cat_container = st.container()
+            with sub_cat_container:
+                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
+                for idx, s_cat in enumerate(valid_sub_categories):
+                    if st.button(s_cat, key=f"scat_btn_{idx}"):
+                        st.session_state.selected_sub_cat = s_cat
+                        st.query_params["sub_cat"] = s_cat
+                        st.rerun()
+                        
+    else:
+        col_nav1, col_nav2 = st.columns([1, 1])
+        with col_nav1:
+            if st.button("⬅️ " + t("Back to Boxes", "वापस पिछले बॉक्स पर जाएं"), key="back_to_sub_btn"):
+                st.session_state.selected_sub_cat = None
+                if "sub_cat" in st.query_params: del st.query_params["sub_cat"]
+                st.rerun()
+        with col_nav2:
+            if st.button("🏠 " + t("Home", "होम पेज पर जाएं"), key="back_home_btn"):
+                st.session_state.selected_main_cat = None
+                st.session_state.selected_sub_cat = None
+                st.query_params.clear()
+                st.rerun()
+                
+        st.subheader(f"🏷️ {st.session_state.selected_main_cat} ➡️ {st.session_state.selected_sub_cat}")
+        
+        cat_products = products_df[(products_df['Main_Category'] == st.session_state.selected_main_cat) & (products_df['Category'] == st.session_state.selected_sub_cat)]
+        
+        if cat_products.empty: 
+            st.write(t("No products in this box yet.", "इस बॉक्स में अभी कोई उत्पाद नहीं है।"))
+        else:
+            # 🚀 STRICT 3-COLUMN RENDER LOOP
+            for i in range(0, len(cat_products), 3):
+                cols = st.columns(3)
+                for j in range(3):
+                    if i + j < len(cat_products):
+                        row = cat_products.iloc[i + j]
+                        with cols[j]:
+                            show_product_card(row, i+j, "cat_view")
 
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
@@ -1532,7 +1538,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
