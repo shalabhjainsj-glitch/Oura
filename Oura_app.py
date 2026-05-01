@@ -311,89 +311,53 @@ hide_streamlit_style = """
             
             .stApp { background-color: #f4f6f9; }
 
-            /* 🚀 STRICT 3-COLUMN CSS FOR MOBILE GROCERY STYLE */
-            div[data-testid="stHorizontalBlock"]:has(.prod-marker) {
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: nowrap !important;
-                gap: 6px !important;
-            }
-            div[data-testid="stHorizontalBlock"]:has(.prod-marker) > div[data-testid="column"] {
-                width: calc(33.33% - 6px) !important;
-                min-width: calc(33.33% - 6px) !important;
-                flex: 1 1 calc(33.33% - 6px) !important;
-                padding: 0 !important;
-            }
-            
-            /* COMPACT PRODUCT CARD DESIGN */
-            div[data-testid="column"]:has(.prod-marker) div[data-testid="stContainer"] {
-                padding: 4px !important;
-                border-radius: 8px !important;
-                background: white !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.08) !important;
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-            }
-            div[data-testid="column"]:has(.prod-marker) img {
-                height: 90px !important;
-                width: 100% !important;
-                object-fit: cover !important;
-                border-radius: 6px !important;
-                margin-bottom: 2px;
-            }
-            
-            /* ULTRA COMPACT INPUTS & BUTTONS */
-            div[data-testid="column"]:has(.prod-marker) .stSelectbox > div > div {
-                min-height: 22px !important;
-                height: 22px !important;
-                font-size: 10px !important;
-                padding: 0 2px !important;
-            }
-            div[data-testid="column"]:has(.prod-marker) .stNumberInput > div > div > input {
-                min-height: 22px !important;
-                height: 22px !important;
-                font-size: 10px !important;
-                padding: 0 2px !important;
-                text-align: center !important;
-            }
-            div[data-testid="column"]:has(.prod-marker) .stNumberInput button {
-                display: none !important; /* Hide +/- to save space */
-            }
-            div[data-testid="column"]:has(.prod-marker) .stButton > button {
-                min-height: 26px !important;
-                height: 26px !important;
-                padding: 0px !important;
-                font-size: 13px !important;
-                font-weight: bold !important;
-                background-color: #25D366 !important;
+            div.stButton > button {
+                background-color: #2b6cb0;
                 color: white !important;
-                border-radius: 6px !important;
-                width: 100% !important;
-                margin-top: 2px !important;
+                border: none !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+                transition: background-color 0.2s;
+                padding: 10px !important;
+                min-height: 50px;
             }
-            
-            /* Box Design for Main Categories (4 Columns) */
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
+            div.stButton > button:hover { background-color: #2c5282; }
+            div.stButton > button:active { transform: scale(0.98); }
+
+            div[data-testid="stContainer"] {
+                background-color: #ffffff;
+                border-radius: 10px !important;
+                border: 1px solid #e2e8f0 !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                padding: 15px;
+                transition: box-shadow 0.2s;
             }
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
-            
-            div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                height: 80px !important; 
-                min-height: 80px !important; 
-                width: 100% !important; 
-                border-radius: 12px !important;
-                background: #ffffff !important; 
-                border: 2px solid #e2e8f0 !important;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
-                color: #1a202c !important; 
-                font-weight: 700 !important;
-                font-size: 12px !important; 
-                line-height: 1.2 !important; 
+            div[data-testid="stContainer"]:hover {
+                box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+                border-color: #cbd5e0 !important;
             }
+
+            div[data-testid="stExpander"] {
+                background-color: #ffffff;
+                border-radius: 8px;
+                border-left: 4px solid #2b6cb0 !important;
+                border-top: 1px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
+                border-bottom: 1px solid #e2e8f0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+
+            .swipe-gallery {
+                display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 5px;
+                -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            }
+            .swipe-gallery::-webkit-scrollbar { display: none; }
+            .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
+            .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}
+
+            .multi-upi-btn { transition: transform 0.1s; }
+            .multi-upi-btn:active { transform: scale(0.96); }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -439,7 +403,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Main_Category", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -448,8 +412,6 @@ def load_products():
         data = [doc.to_dict() for doc in docs]
         if data:
             df = pd.DataFrame(data)
-            if 'Main_Category' not in df.columns: df['Main_Category'] = '📦 Other (अन्य)'
-            df['Main_Category'].fillna('📦 Other (अन्य)', inplace=True)
             if 'Unit_Base' not in df.columns: df['Unit_Base'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T1' not in df.columns: df['Unit_T1'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T2' not in df.columns: df['Unit_T2'] = df.get('Unit_Type', 'Pcs')
@@ -530,15 +492,30 @@ if 'cart_loaded' not in st.session_state:
                             "qty": qty, "img_link": img_link,
                             "seller": str(row.get("Seller_Name", "")).strip(), "unit": unit
                         }
+                elif "-" in item:
+                    p_id, qty_str = item.split("-", 1)
+                    qty = safe_int(qty_str, 1)
+                    match = products_df[products_df['ID'].astype(str) == p_id]
+                    if not match.empty:
+                        row = match.iloc[0]
+                        retail_price = safe_float(row.get('Price'), 0.0)
+                        image_path_str = str(row.get("Image_Path", ""))
+                        paths = [p.strip() for p in image_path_str.split('|') if p.strip()]
+                        img_link = paths[0] if paths else ""
+                        if img_link and not img_link.startswith("http"):
+                            img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
+                        k_part = f"{p_id}|Pcs|{retail_price}"
+                        st.session_state.cart[k_part] = {
+                            "name": row.get('Name', 'Item'), "price": retail_price, "qty": qty, "img_link": img_link, "seller": str(row.get("Seller_Name", "")).strip(), "unit": "Pcs"
+                        }
             except Exception as e:
                 pass
     st.session_state.cart_loaded = True
 
-if "main_cat" in st.query_params: st.session_state.selected_main_cat = st.query_params["main_cat"]
-else: st.session_state.selected_main_cat = None
-
-if "sub_cat" in st.query_params: st.session_state.selected_sub_cat = st.query_params["sub_cat"]
-else: st.session_state.selected_sub_cat = None
+if "cat" in st.query_params:
+    st.session_state.selected_category = st.query_params["cat"]
+else:
+    st.session_state.selected_category = None
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'seller_logged_in' not in st.session_state: st.session_state.seller_logged_in = None
@@ -662,7 +639,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
                 st.markdown("**💰 Pricing Tiers (हर रेट के लिए अलग-अलग यूनिट और मात्रा सेट करें)**")
-                unit_options = ["Pcs", "Dozen", "Box", "Set"]
+                unit_options = ["Pcs (पीस)", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
                 
                 st.markdown("**(1) Base / Sample**")
                 c1, c2, c3 = st.columns([1, 1, 1])
@@ -683,31 +660,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with c9: new_t2_price = st.number_input("रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f", key="n_t2_p")
                 
                 st.markdown("---")
-                col_mc, col_sc = st.columns(2)
-                existing_main_cats = products_df['Main_Category'].dropna().unique().tolist() if not products_df.empty and 'Main_Category' in products_df.columns else []
-                m_cat_options = [t("Create New Main Category...", "नयी मेन केटेगरी बनाएं...")] + existing_main_cats
-                with col_mc:
-                    selected_main_cat = st.selectbox(t("Select Main Category", "मेन केटेगरी (उदा: 📱 Electronics)"), m_cat_options)
-                    if selected_main_cat == t("Create New Main Category...", "नयी मेन केटेगरी बनाएं..."):
-                        final_main_cat = st.text_input(t("Enter New Main Category Name", "नई मेन केटेगरी का नाम लिखें"))
-                    else:
-                        final_main_cat = selected_main_cat
-                
-                with col_sc:
-                    if selected_main_cat != t("Create New Main Category...", "नयी मेन केटेगरी बनाएं..."):
-                        existing_sub_cats = products_df[products_df['Main_Category'] == selected_main_cat]['Category'].dropna().unique().tolist()
-                    else:
-                        existing_sub_cats = []
-                    
-                    s_cat_options = [t("Create New Sub Category...", "नयी सब-केटेगरी बनाएं...")] + existing_sub_cats
-                    selected_sub_cat = st.selectbox(t("Select Sub Category", "सब-केटेगरी बॉक्स (उदा: 🔊 Speakers)"), s_cat_options)
-                    
-                    if selected_sub_cat == t("Create New Sub Category...", "नयी सब-केटेगरी बनाएं..."):
-                        final_sub_cat = st.text_input(t("Enter New Sub Category Name", "नई सब-केटेगरी का नाम लिखें"))
-                    else:
-                        final_sub_cat = selected_sub_cat
-                
-                st.markdown("---")
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
                     new_free_delivery = st.selectbox(t("Delivery", "डिलीवरी"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "कोरियर चार्ज एक्स्ट्रा")])
@@ -720,10 +672,18 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 else:
                     new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ नहीं दिखेगा)"))
                 
+                existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+                cat_options = [t("Create New Category...", "नयी केटेगरी बनाएं...")] + existing_cats
+                selected_cat = st.selectbox(t("Select Category (Box)", "केटेगरी (बॉक्स) चुनें"), cat_options)
+                if selected_cat == t("Create New Category...", "नयी केटेगरी बनाएं..."):
+                    final_cat = st.text_input(t("Enter New Category Name (Emojis allowed 👕👟)", "नई केटेगरी का नाम लिखें (इमोजी 👕👟 भी लगा सकते हैं)"))
+                else:
+                    final_cat = selected_cat
+                
                 uploaded_imgs = st.file_uploader(t("Upload Photos (Max 3)", "फोटो अपलोड करें (अधिकतम 3)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
                 submit_btn = st.form_submit_button(t("Save Product", "उत्पाद सेव करें"))
                 
-                if submit_btn and new_id and new_name and uploaded_imgs and final_main_cat and final_sub_cat:
+                if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
                     if len(uploaded_imgs) > 3: st.error(t("⚠️ Please select max 3 photos.", "⚠️ कृपया अधिकतम 3 फोटो ही चुनें।"))
                     else:
                         with st.spinner("Saving..."):
@@ -742,9 +702,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 "Retail_Qty": new_retail_qty, "Price": new_price, 
                                 "Tier1_Price": new_t1_price, "Tier1_Qty": new_t1_qty, 
                                 "Tier2_Price": new_t2_price, "Tier2_Qty": new_t2_qty,
-                                "Main_Category": final_main_cat,
-                                "Category": final_sub_cat,
-                                "Image_Path": final_path_str,
+                                "Category": final_cat, "Image_Path": final_path_str,
                                 "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock,
                                 "Unit_Base": new_u_base, "Unit_T1": new_u_t1, "Unit_T2": new_u_t2
                             }
@@ -859,43 +817,31 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             st.subheader("📦 Bulk Move / Rename Categories (पूरी केटेगरी शिफ्ट करें)")
             st.info("यहाँ से आप पूरी केटेगरी (बॉक्स) को किसी नए नाम से 'Move' कर सकते हैं या नाम बदल सकते हैं।")
             
-            mcats_list = products_df['Main_Category'].dropna().unique().tolist() if not products_df.empty and 'Main_Category' in products_df.columns else []
-            if mcats_list:
+            cats_list = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            if cats_list:
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    b_old_mcat = st.selectbox("Old Main Category (पुरानी)", mcats_list)
+                    b_old_cat = st.selectbox("Old Category (किसे मूव करना है)", cats_list)
                 with col_b2:
-                    scats_list = products_df[products_df['Main_Category'] == b_old_mcat]['Category'].dropna().unique().tolist()
-                    b_old_scat = st.selectbox("Old Sub Category to Move (किसे मूव करना है)", scats_list) if scats_list else None
-                
-                if b_old_scat:
-                    st.markdown("**👇 कहाँ ले जाना है? (Target)**")
-                    col_b3, col_b4 = st.columns(2)
-                    with col_b3:
-                        b_new_mcat_choice = st.selectbox("Move to Main Category", mcats_list + ["Create New..."])
-                        if b_new_mcat_choice == "Create New...":
-                            b_new_mcat = st.text_input("नई मेन केटेगरी का नाम:", value=b_old_mcat)
-                        else:
-                            b_new_mcat = b_new_mcat_choice
-                    with col_b4:
-                        b_new_scat = st.text_input("New Sub Category Name (नया नाम/इमोजी):", value=b_old_scat)
+                    b_new_cat_choice = st.selectbox("Move To (कहाँ ले जाना है)", cats_list + ["Create New..."])
+                    if b_new_cat_choice == "Create New...":
+                        b_new_cat = st.text_input("नया नाम/इमोजी टाइप करें:", value=b_old_cat)
+                    else:
+                        b_new_cat = b_new_cat_choice
 
-                    if st.button("🚀 Move / Update All Products", type="primary"):
-                        if b_new_mcat and b_new_scat:
-                            with st.spinner("शिफ्ट हो रहा है..."):
-                                prods_to_move = products_df[(products_df['Main_Category'] == b_old_mcat) & (products_df['Category'] == b_old_scat)]
-                                batch = db.batch()
-                                for idx, row in prods_to_move.iterrows():
-                                    doc_ref = db.collection('products').document(str(row['ID']))
-                                    batch.update(doc_ref, {
-                                        "Main_Category": b_new_mcat.strip(), 
-                                        "Category": b_new_scat.strip()
-                                    })
-                                batch.commit()
-                                load_products.clear()
-                                st.success(f"✅ सारे प्रोडक्ट्स सफलतापूर्वक '{b_new_mcat} ➡️ {b_new_scat}' में शिफ्ट हो गए!")
-                                time.sleep(2)
-                                st.rerun()
+                if st.button("🚀 Move / Update All Products", type="primary"):
+                    if b_new_cat:
+                        with st.spinner("शिफ्ट हो रहा है..."):
+                            prods_to_move = products_df[products_df['Category'] == b_old_cat]
+                            batch = db.batch()
+                            for idx, row in prods_to_move.iterrows():
+                                doc_ref = db.collection('products').document(str(row['ID']))
+                                batch.update(doc_ref, {"Category": b_new_cat.strip()})
+                            batch.commit()
+                            load_products.clear()
+                            st.success(f"✅ सारे प्रोडक्ट्स सफलतापूर्वक '{b_new_cat}' में शिफ्ट हो गए!")
+                            time.sleep(2)
+                            st.rerun()
 
             st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
@@ -1095,17 +1041,43 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
+def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
+    if not path_str: return []
+    paths = [p.strip() for p in path_str.split('|') if p.strip()]
+    if not paths: return []
+    
+    html_code = '<div style="position: relative;">'
+    
+    if wa_link or first_img_link:
+        html_code += '<div style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px;">'
+        if first_img_link:
+            html_code += f'<a href="{first_img_link}" download="oura_product.jpg" target="_blank" style="background-color: #1877F2; color: white; padding: 6px 12px; border-radius: 20px; text-decoration: none; font-size: 13px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">📥 Photo</a>'
+        if wa_link:
+            html_code += f'<a href="{wa_link}" target="_blank" style="background-color: #25D366; color: white; padding: 6px 12px; border-radius: 20px; text-decoration: none; font-size: 13px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">💬 WA</a>'
+        html_code += '</div>'
+        
+    html_code += '<div class="swipe-gallery">'
+    img_style = "" if is_in_stock else "filter: grayscale(100%) opacity(60%);"
+    for src in paths:
+        if not src.startswith("http"):
+            src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
+        html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" style="{img_style}" loading="lazy" alt="Product Image"></a>'
+    
+    html_code += '</div></div>'
+    html_code += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">{t("Click photo to zoom 🔍", "ज़ूम करने के लिए फोटो पर क्लिक करें 🔍")}</div>'
+    st.markdown(html_code, unsafe_allow_html=True)
+    return paths
+
 def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
-    
-    st.markdown('<div class="prod-marker"></div>', unsafe_allow_html=True)
 
     retail_qty = safe_int(row.get('Retail_Qty'), 1)
     retail_price = safe_float(row.get('Price'), 0.0)
     
     t1_qty_default = safe_int(row.get('Wholesale_Qty'), 1)
     t1_qty = safe_int(row.get('Tier1_Qty'), t1_qty_default)
+    
     t1_price_default = safe_float(row.get('Wholesale_Price'), retail_price)
     t1_price = safe_float(row.get('Tier1_Price'), t1_price_default)
     
@@ -1127,147 +1099,224 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
+    share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
+    share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
+    if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
+    if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
+    share_text += f"🔹 {retail_qty}+ {u_base}: ₹{retail_price}\n\n"
+    share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
+    
+    cat_url = urllib.parse.quote(str(row.get('Category', '')))
+    app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
+    
+    share_text += f"\n🛒 *{t('Book Order:', 'ऑर्डर बुक करें:')}* {app_link}\n"
+    if img_link_for_wa:
+        share_text += f"\n📷 *{t('Product Photo:', 'प्रोडक्ट फोटो:')}* {img_link_for_wa}"
+    
+    wa_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
+
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
         
-        # 1. Image
-        if img_link_for_wa:
-            st.image(img_link_for_wa, use_container_width=True)
-        else:
-            st.markdown("<div style='height:90px; display:flex; align-items:center; justify-content:center; background:#eee; border-radius:8px;'>📷</div>", unsafe_allow_html=True)
+        all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
+        
+        st.write(f"**{row.get('Name', 'Unknown')}**")
+        seller_val = row.get("Seller_Name")
+        if pd.notna(seller_val) and str(seller_val).strip() != "":
+            st.markdown(f"{t('🏪 Brand:', '🏪 सेलर / ब्रांड:')} <span style='color:#E65100; font-weight:bold;'>{str(seller_val).strip()}</span>", unsafe_allow_html=True)
+            
+        show_fd = current_config.get("free_delivery_tag", True)
+        val_fd = row.get("Free_Delivery")
+        if pd.notna(val_fd) and str(val_fd).strip() != "":
+            show_fd = str(val_fd).lower() in ['true', 'yes', '1']
+            
+        t_ex = t("(Extra Courier)", "(+ कोरियर चार्ज)")
+        t_fd = t("(Free Delivery)", "(फ्री डिलीवरी)")
+        del_tag = t_fd if show_fd else f"<span style='color:#d32f2f;font-size:11px;'>{t_ex}</span>"
 
-        # 2. Title (max 2 lines)
-        safe_name = str(row.get('Name', 'Unknown'))
-        st.markdown(f"<div style='font-size:11px; font-weight:700; color:#2d3748; height:32px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.2; margin-bottom:4px;'>{safe_name}</div>", unsafe_allow_html=True)
-
-        # 3. Rates (Super Compact)
-        rates_html = "<div style='font-size:10px; color:#4a5568; margin-bottom:6px; line-height:1.3;'>"
         if retail_price <= 0:
-            rates_html += "<span style='color:#c53030; font-weight:bold;'>Ask for Price</span>"
-        else:
-            if t2_qty > 0 and t2_price > 0: rates_html += f"{t2_qty}+ {u_t2}: <b>₹{t2_price}</b><br>"
-            if t1_qty > 0 and t1_price > 0: rates_html += f"{t1_qty}+ {u_t1}: <b>₹{t1_price}</b><br>"
-            rates_html += f"{retail_qty}+ {u_base}: <span style='color:#e53e3e; font-weight:800;'>₹{retail_price}</span>"
-        rates_html += "</div>"
-        st.markdown(rates_html, unsafe_allow_html=True)
-
-        # 4. Inputs & Button
-        if is_in_stock:
-            if retail_price <= 0:
-                ask_qty = st.number_input("Qty", min_value=1, value=1, key=f"ask_q_{prefix_idx}", label_visibility="collapsed")
+            st.markdown(f"""
+            <div style="background-color:#fff3cd; padding:10px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:10px; text-align:center;">
+                <span style="color:#856404; font-size:15px; font-weight:bold;">🚨 प्राइस जानने के लिए संपर्क करें</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if is_in_stock:
+                ask_qty = st.number_input(f"कितने {u_base} चाहिए?", min_value=1, value=1, key=f"ask_q_{prefix_idx}")
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
-                wa_msg = urllib.parse.quote(f"नमस्ते Oura Products,\nमुझे *{safe_name}* के {ask_qty} {u_base} की आवश्यकता है। कृपया मुझे इसका बेस्ट रेट बताएं।")
+                wa_msg = urllib.parse.quote(f"नमस्ते Oura Products,\nमुझे *{row.get('Name', 'इस प्रोडक्ट')}* के {ask_qty} {u_base} की आवश्यकता है। कृपया मुझे इसका बेस्ट रेट बताएं।")
                 wa_btn_link = f"https://wa.me/{admin_num}?text={wa_msg}"
-                st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background:#25D366; color:white; padding:4px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px; margin-top:4px;">💬 Ask</a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 {ask_qty} {u_base} का रेट WhatsApp पर पूछें</a>', unsafe_allow_html=True)
             else:
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
+        else:
+            if t2_qty > 0 and t2_price > 0: 
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t2_qty}+ {u_t2}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
+                </div>
+                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                """, unsafe_allow_html=True)
+            elif t1_qty > 0 and t1_price > 0: 
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                </div>
+                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                """, unsafe_allow_html=True)
+            else: 
+                st.markdown(f"""
+                <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
+                    <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
+                    <span style="font-size:12px;">🛵 {del_tag}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            if is_in_stock:
                 opts = {}
-                if retail_price > 0: opts[f"{u_base}"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty}
-                if t1_qty > 0 and t1_price > 0: opts[f"{u_t1}"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
-                if t2_qty > 0 and t2_price > 0: opts[f"{u_t2}"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty}
-
-                if len(opts) > 1:
-                    selected_opt = st.selectbox("Pack", list(opts.keys()), key=f"sel_{prefix_idx}", label_visibility="collapsed")
-                else:
-                    selected_opt = list(opts.keys())[0]
-
+                if retail_price > 0:
+                    opts[f"{retail_qty} {u_base} (रेट: ₹{retail_price} / {u_base})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty}
+                if t1_qty > 0 and t1_price > 0:
+                    opts[f"{t1_qty} {u_t1} (रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
+                if t2_qty > 0 and t2_price > 0:
+                    opts[f"{t2_qty} {u_t2} (रेट: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty}
+                    
+                selected_opt = st.selectbox("क्या खरीदना है? (पैकेज चुनें)", list(opts.keys()), key=f"sel_{prefix_idx}")
                 buy_price = opts[selected_opt]["price"]
                 buy_unit = opts[selected_opt]["unit"]
                 min_q = opts[selected_opt]["min_q"]
-
-                c_q, c_b = st.columns([3, 2])
-                with c_q:
-                    qty = st.number_input("Qty", min_value=min_q, value=min_q, key=f"q_{prefix_idx}", label_visibility="collapsed")
-                with c_b:
-                    if st.button("➕", key=f"b_{prefix_idx}", use_container_width=True):
-                        cart_key = f"{p_id}|{buy_unit}|{buy_price}"
-                        if cart_key in st.session_state.cart:
-                            st.session_state.cart[cart_key]["qty"] += qty
-                        else:
-                            st.session_state.cart[cart_key] = {
-                                "name": safe_name, 
-                                "price": buy_price, 
-                                "qty": qty, 
-                                "img_link": img_link_for_wa,
-                                "seller": str(row.get("Seller_Name", "")).strip() if pd.notna(row.get("Seller_Name")) else "",
-                                "unit": buy_unit
-                            }
-                        save_cart_to_url()
-                        st.toast("🛒 Added to Cart!")
-        else:
-            st.markdown("<div style='background:#fed7d7; color:#c53030; text-align:center; padding:4px; border-radius:6px; font-weight:bold; font-size:11px; margin-top:8px;'>Out of Stock</div>", unsafe_allow_html=True)
+                
+                qty = st.number_input(f"मात्रा ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
+                
+                if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
+                    cart_key = f"{p_id}|{buy_unit}|{buy_price}"
+                    
+                    if cart_key in st.session_state.cart:
+                        st.session_state.cart[cart_key]["qty"] += qty
+                    else:
+                        st.session_state.cart[cart_key] = {
+                            "name": row.get('Name', 'Item'), 
+                            "price": buy_price, 
+                            "qty": qty, 
+                            "img_link": img_link_for_wa,
+                            "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
+                            "unit": buy_unit
+                        }
+                    save_cart_to_url()
+                    st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
+            else:
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
         can_edit = False
         if st.session_state.admin_logged_in: can_edit = True
-        elif st.session_state.seller_logged_in and st.session_state.seller_logged_in == str(row.get("Seller_Name", "")).strip(): can_edit = True
+        elif st.session_state.seller_logged_in and st.session_state.seller_logged_in == str(seller_val).strip(): can_edit = True
+            
+        can_market = False
+        if st.session_state.admin_logged_in or st.session_state.seller_logged_in: can_market = True
+            
+        if can_edit or can_market: st.markdown("---")
 
         if can_edit:
-            with st.expander("⚙️ Edit"):
-                with st.form(f"edit_form_{prefix_idx}"):
-                    if st.session_state.admin_logged_in: e_name = st.text_input("Name", value=safe_name, key=f"enm_{prefix_idx}")
-                    else:
-                        st.text_input("Name - Read Only", value=safe_name, disabled=True, key=f"enm_ro_{prefix_idx}")
-                        e_name = safe_name
-                    
-                    # Edit Categories
-                    all_mcats = products_df['Main_Category'].dropna().unique().tolist() if not products_df.empty and 'Main_Category' in products_df.columns else []
-                    current_mcat = str(row.get("Main_Category", "📦 Other (अन्य)"))
-                    mcat_idx = all_mcats.index(current_mcat) if current_mcat in all_mcats else 0
-                    
-                    e_mcat_choice = st.selectbox("Main Category", all_mcats + ["Create New..."], index=mcat_idx, key=f"emcat_{prefix_idx}")
-                    if e_mcat_choice == "Create New...":
-                        e_mcat = st.text_input("New Main Category", value=current_mcat, key=f"emcat_text_{prefix_idx}")
-                    else:
-                        e_mcat = e_mcat_choice
-                    
-                    all_scats = products_df[products_df['Main_Category'] == e_mcat_choice]['Category'].dropna().unique().tolist() if e_mcat_choice != "Create New..." else []
-                    current_scat = str(row.get("Category", ""))
-                    scat_idx = all_scats.index(current_scat) if current_scat in all_scats else 0
-                    
-                    if all_scats:
-                        e_scat_choice = st.selectbox("Sub Category (Box)", all_scats + ["Create New..."], index=scat_idx, key=f"escat_{prefix_idx}")
-                        if e_scat_choice == "Create New...":
-                            e_scat = st.text_input("New Sub Category", value=current_scat, key=f"escat_text_{prefix_idx}")
-                        else:
-                            e_scat = e_scat_choice
-                    else:
-                        e_scat = st.text_input("New Sub Category", value=current_scat, key=f"escat_text_alt_{prefix_idx}")
+            col_t1, col_t2, col_t3, col_t4 = st.columns([3, 2, 4, 3])
+            with col_t1: st.markdown(f"**{t('Stock:', 'स्टॉक:')}**")
+            with col_t2: st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
+            with col_t3: st.markdown(f"**{t('Delivery:', 'डिलीवरी:')}**")
+            with col_t4: st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"), help=t("Turn on for Free Delivery", "फ्री डिलीवरी के लिए चालू करें"))
 
-                    unit_opts = ["Pcs", "Dozen", "Box", "Set"]
+        if can_market:
+            with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
+                fb_text_copy = share_text + "\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
+                st.info(t("💡 **Tip:** 1. Click '📥 Photo' on the image above to save it. \n2. Copy the text below. \n3. Paste on Facebook!", "💡 **टिप:** 1. ऊपर फोटो पर बने नीले '📥 Photo' बटन को दबाकर फोटो सेव करें। \n2. नीचे से टेक्स्ट Copy करें। \n3. फेसबुक पर जाकर पेस्ट कर दें!"))
+                st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
+
+        if can_edit:
+            # 🚀 BUG FIXED HERE (Added keys to all inputs)
+            with st.expander(t("✏️ Edit & Move Product (रेट बदलें या बॉक्स शिफ्ट करें)", "✏️ रेट बदलें या प्रोडक्ट दूसरे बॉक्स में शिफ्ट करें")):
+                with st.form(f"edit_form_{prefix_idx}"):
+                    if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")), key=f"enm_{prefix_idx}")
+                    else:
+                        st.text_input("Name (नाम) - Read Only", value=str(row.get("Name", "")), disabled=True, key=f"enm_ro_{prefix_idx}")
+                        e_name = str(row.get("Name", ""))
+                    
+                    st.markdown("**🔄 प्रोडक्ट को दूसरी केटेगरी (बॉक्स) में भेजें:**")
+                    all_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+                    current_cat = str(row.get("Category", ""))
+                    
+                    if all_cats:
+                        cat_idx = all_cats.index(current_cat) if current_cat in all_cats else 0
+                        e_cat_choice = st.selectbox("Category (बॉक्स)", all_cats + ["Create New..."], index=cat_idx, key=f"ec_{prefix_idx}")
+                        if e_cat_choice == "Create New...":
+                            e_cat = st.text_input("नया बॉक्स टाइप करें", value=current_cat, key=f"ec_text_{prefix_idx}")
+                        else:
+                            e_cat = e_cat_choice
+                    else:
+                        e_cat = st.text_input("नया बॉक्स टाइप करें", value=current_cat, key=f"ec_text_alt_{prefix_idx}")
+                        
+                    st.markdown("---")
+                    st.markdown("**💰 Pricing Tiers (यूनिट और रेट)**")
+                    unit_opts = ["Pcs (पीस)", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
+                    
                     idx_b = next((i for i, opt in enumerate(unit_opts) if u_base in opt), 0)
                     idx_t1 = next((i for i, opt in enumerate(unit_opts) if u_t1 in opt), 0)
                     idx_t2 = next((i for i, opt in enumerate(unit_opts) if u_t2 in opt), 0)
 
-                    e_u_base = st.selectbox("Base Unit", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
-                    e_retail_qty = st.number_input("Base Min Qty", value=retail_qty, key=f"erq_{prefix_idx}")
-                    e_price = st.number_input("Base Price (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_{prefix_idx}")
+                    st.markdown("**Tier 1 (Base):**")
+                    c_e01, c_e02, c_e03 = st.columns([2, 1, 1])
+                    with c_e01: e_u_base = st.selectbox("इकाई", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
+                    with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty, key=f"erq_{prefix_idx}")
+                    with c_e03: e_price = st.number_input("रेट (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_{prefix_idx}")
                     
-                    e_u_t1 = st.selectbox("Tier 1 Unit", unit_opts, index=idx_t1, key=f"eu_t1_{prefix_idx}")
-                    e_t1_qty = st.number_input("T1 Min Qty", value=t1_qty, key=f"et1q_{prefix_idx}")
-                    e_t1_price = st.number_input("T1 Price (₹)", value=float(t1_price), format="%.2f", step=0.50, key=f"et1p_{prefix_idx}")
+                    st.markdown("**Tier 2 (Bulk):**")
+                    c_e1, c_e2, c_e3 = st.columns([2, 1, 1])
+                    with c_e1: e_u_t1 = st.selectbox("इकाई", unit_opts, index=idx_t1, key=f"eu_t1_{prefix_idx}")
+                    with c_e2: e_t1_qty = st.number_input("कम से कम", value=t1_qty, key=f"et1q_{prefix_idx}")
+                    with c_e3: e_t1_price = st.number_input("रेट (₹)", value=float(t1_price), format="%.2f", step=0.50, key=f"et1p_{prefix_idx}")
                         
-                    e_u_t2 = st.selectbox("Tier 2 Unit", unit_opts, index=idx_t2, key=f"eu_t2_{prefix_idx}")
-                    e_t2_qty = st.number_input("T2 Min Qty", value=t2_qty, key=f"et2q_{prefix_idx}")
-                    e_t2_price = st.number_input("T2 Price (₹)", value=float(t2_price), format="%.2f", step=0.50, key=f"et2p_{prefix_idx}")
+                    st.markdown("**Tier 3 (Super Bulk):**")
+                    c_e4, c_e5, c_e6 = st.columns([2, 1, 1])
+                    with c_e4: e_u_t2 = st.selectbox("इकाई", unit_opts, index=idx_t2, key=f"eu_t2_{prefix_idx}")
+                    with c_e5: e_t2_qty = st.number_input("कम से कम (0=off)", value=t2_qty, key=f"et2q_{prefix_idx}")
+                    with c_e6: e_t2_price = st.number_input("रेट (₹)", value=float(t2_price), format="%.2f", step=0.50, key=f"et2p_{prefix_idx}")
                         
-                    e_is_stk = st.checkbox("In Stock", value=is_in_stock, key=f"estk_{prefix_idx}")
-                    update_btn = st.form_submit_button("✅ Save Changes")
+                    st.markdown("---")
+                    e_fd = st.selectbox(t("Delivery Option", "डिलीवरी ऑप्शन"), [t("Free Delivery", "फ्री डिलीवरी"), t("Extra Courier Charge", "एक्स्ट्रा कोरियर चार्ज")], index=0 if show_fd else 1, key=f"efd_{prefix_idx}")
+                            
+                    e_imgs = st.file_uploader(t("Upload New Photos (Optional)", "नयी फोटो डालें (अगर बदलनी हो)"), type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
+                    update_btn = st.form_submit_button("✅ Update & Save (सेव करें)")
                     
                 if update_btn:
                     target_id = str(row['ID'])
+                    is_free_val = True if e_fd in ["फ्री डिलीवरी", "Free Delivery"] else False
                     update_dict = {
                         "Retail_Qty": e_retail_qty, "Price": e_price, 
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
-                        "Main_Category": e_mcat.strip(),
-                        "Category": e_scat.strip(), "In_Stock": e_is_stk,
-                        "Unit_Base": e_u_base, "Unit_T1": e_u_t1, "Unit_T2": e_u_t2
+                        "Category": e_cat.strip(),
+                        "Unit_Base": e_u_base, "Unit_T1": e_u_t1, "Unit_T2": e_u_t2,
+                        "Free_Delivery": is_free_val
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
+                    if e_imgs:
+                        with st.spinner("Uploading new photos..."):
+                            image_paths = []
+                            for img in e_imgs:
+                                compressed_bytes, _ = compress_image(img.getvalue())
+                                img_url = upload_image_to_imgbb(compressed_bytes)
+                                if img_url: image_paths.append(img_url)
+                            if image_paths: update_dict["Image_Path"] = "|".join(image_paths)
+                                
                     db.collection('products').document(target_id).update(update_dict)
                     load_products.clear()
                     st.rerun()
 
-            if st.button("🗑️ Delete", key=f"del_p_{prefix_idx}"):
+            st.markdown("---")
+            if st.button(t("🗑️ Delete Product", "🗑️ यह उत्पाद हमेशा के लिए हटाएं (Delete)"), key=f"del_p_{prefix_idx}"):
                 db.collection('products').document(str(row['ID'])).delete()
                 load_products.clear()
                 st.rerun()
@@ -1278,86 +1327,108 @@ else:
     if search_query:
         st.subheader(t(f"Search results for '{search_query}':", f"'{search_query}' के सर्च रिजल्ट:"))
         filtered_df = products_df[products_df['Name'].str.contains(search_query, case=False, na=False)]
-        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद नहीं मिला।"))
+        if filtered_df.empty: st.warning(t("No product found with this name.", "इस नाम से कोई उत्पाद मिला।"))
         else:
-            for i in range(0, len(filtered_df), 3):
-                cols = st.columns(3)
-                for j in range(3):
-                    if i + j < len(filtered_df):
-                        row = filtered_df.iloc[i + j]
-                        with cols[j]:
-                            show_product_card(row, i+j, "search")
+            cols = st.columns(3)
+            for idx, row in filtered_df.reset_index().iterrows():
+                with cols[idx % 3]: show_product_card(row, idx, "search")
     
-    elif st.session_state.selected_main_cat is None:
-        st.subheader(t("🛍️ Shop by Department", "🛍️ मेन-कैटेगरीज (डिपार्टमेंट चुनें)"))
-        valid_main_categories = products_df['Main_Category'].dropna().unique().tolist()
+    elif st.session_state.selected_category is None:
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
+        valid_categories = products_df['Category'].dropna().unique().tolist()
         
-        if len(valid_main_categories) == 0: 
-            st.write(t("No main categories yet.", "अभी कोई मेन-कैटेगरी नहीं है।"))
+        if len(valid_categories) == 0: 
+            st.write(t("No categories yet.", "अभी कोई बॉक्स नहीं है।"))
         else:
             cat_container = st.container()
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
-                for idx, m_cat in enumerate(valid_main_categories):
-                    if st.button(m_cat, key=f"mcat_btn_{idx}"):
-                        st.session_state.selected_main_cat = m_cat
-                        st.query_params["main_cat"] = m_cat
-                        if "sub_cat" in st.query_params: del st.query_params["sub_cat"]
-                        st.session_state.selected_sub_cat = None
+                
+                # 4 बॉक्स वाला CSS (4 columns per row)
+                st.markdown("""
+                <style>
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
+                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
+                }
+                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
+                
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
+                    height: 90px !important; 
+                    min-height: 90px !important; 
+                    width: 100% !important; 
+                    border-radius: 12px !important;
+                    background: #ffffff !important; 
+                    border: 2px solid #e2e8f0 !important;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
+                    color: #1a202c !important; 
+                    font-weight: 700 !important;
+                    font-size: 13px !important; 
+                    white-space: normal !important; 
+                    word-wrap: break-word !important; 
+                    line-height: 1.2 !important; 
+                    padding: 4px !important; 
+                    transition: all 0.2s ease-in-out !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    text-align: center !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
+                </style>
+                """, unsafe_allow_html=True)
+
+                for idx, cat in enumerate(valid_categories):
+                    if st.button(cat, key=f"cat_btn_{idx}"):
+                        st.session_state.selected_category = cat
+                        st.query_params["cat"] = cat
+                        save_cart_to_url()
                         st.rerun()
-                        
-    elif st.session_state.selected_sub_cat is None:
-        if st.button("⬅️ " + t("Back to Departments", "वापस मेन पेज पर जाएं"), key="back_to_main_btn"):
-            st.session_state.selected_main_cat = None
-            if "main_cat" in st.query_params: del st.query_params["main_cat"]
+            
+    else:
+        st.subheader(f"📂 {st.session_state.selected_category}")
+        
+        if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
+            st.session_state.selected_category = None
+            if "cat" in st.query_params: del st.query_params["cat"]
+            save_cart_to_url()
             st.rerun()
             
-        st.subheader(f"📂 {st.session_state.selected_main_cat}")
-        st.markdown(f"**👇 {t('Select a Category (Box):', 'नीचे दिए गए बॉक्स में से चुनें:')}**")
-        
-        valid_sub_categories = products_df[products_df['Main_Category'] == st.session_state.selected_main_cat]['Category'].dropna().unique().tolist()
-        
-        if len(valid_sub_categories) == 0: 
-            st.write(t("No boxes here yet.", "अभी इस डिपार्टमेंट में कोई बॉक्स नहीं है।"))
+        float_js = """
+        <script>
+        const parentDoc = window.parent.document;
+        const buttons = parentDoc.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
+                btn.style.position = 'fixed';
+                btn.style.bottom = '120px';
+                btn.style.left = '15px';
+                btn.style.zIndex = '999999';
+                btn.style.background = '#2b6cb0'; 
+                btn.style.color = 'white';
+                btn.style.padding = '12px 18px';
+                btn.style.borderRadius = '50px';
+                btn.style.border = '2px solid white';
+                btn.style.fontWeight = 'bold';
+                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                btn.style.minHeight = 'auto'; 
+                btn.style.width = 'auto';
+                btn.style.animation = 'none';
+            }
+        });
+        </script>
+        """
+        st_components.html(float_js, height=0, width=0)
+
+        cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
+        if cat_products.empty: st.write(t("No products in this category yet.", "इस बॉक्स में अभी कोई उत्पाद नहीं है।"))
         else:
-            sub_cat_container = st.container()
-            with sub_cat_container:
-                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
-                for idx, s_cat in enumerate(valid_sub_categories):
-                    if st.button(s_cat, key=f"scat_btn_{idx}"):
-                        st.session_state.selected_sub_cat = s_cat
-                        st.query_params["sub_cat"] = s_cat
-                        st.rerun()
-                        
-    else:
-        col_nav1, col_nav2 = st.columns([1, 1])
-        with col_nav1:
-            if st.button("⬅️ " + t("Back to Boxes", "वापस पिछले बॉक्स पर जाएं"), key="back_to_sub_btn"):
-                st.session_state.selected_sub_cat = None
-                if "sub_cat" in st.query_params: del st.query_params["sub_cat"]
-                st.rerun()
-        with col_nav2:
-            if st.button("🏠 " + t("Home", "होम पेज पर जाएं"), key="back_home_btn"):
-                st.session_state.selected_main_cat = None
-                st.session_state.selected_sub_cat = None
-                st.query_params.clear()
-                st.rerun()
-                
-        st.subheader(f"🏷️ {st.session_state.selected_main_cat} ➡️ {st.session_state.selected_sub_cat}")
-        
-        cat_products = products_df[(products_df['Main_Category'] == st.session_state.selected_main_cat) & (products_df['Category'] == st.session_state.selected_sub_cat)]
-        
-        if cat_products.empty: 
-            st.write(t("No products in this box yet.", "इस बॉक्स में अभी कोई उत्पाद नहीं है।"))
-        else:
-            # 🚀 STRICT 3-COLUMN RENDER LOOP
-            for i in range(0, len(cat_products), 3):
-                cols = st.columns(3)
-                for j in range(3):
-                    if i + j < len(cat_products):
-                        row = cat_products.iloc[i + j]
-                        with cols[j]:
-                            show_product_card(row, i+j, "cat_view")
+            cols = st.columns(3)
+            for idx, row in cat_products.reset_index().iterrows():
+                with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
