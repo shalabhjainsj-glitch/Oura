@@ -102,7 +102,8 @@ def load_config():
         "admin_whatsapp": "919891587437", 
         "admin_gst": "07AKWPB1315K", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
-        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {}
+        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
+        "certificates": []
     }
 
 def save_config(config):
@@ -556,6 +557,20 @@ with col_login:
             st.session_state.show_login = False
             st.rerun()
 
+# --- 🏆 NEW CERTIFICATES DISPLAY SECTION 🏆 ---
+certs = current_config.get("certificates", [])
+if certs:
+    st.markdown("<div style='text-align: center; font-size: 15px; color: #2b6cb0; font-weight: bold; margin-top: 5px; margin-bottom: 8px;'>🏆 Our Certifications & Trust 🏆</div>", unsafe_allow_html=True)
+    cert_cols = st.columns(len(certs))
+    for i, c_url in enumerate(certs):
+        with cert_cols[i]:
+            st.markdown(f'''
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; transition: transform 0.2s;">
+                <img src="{c_url}" style="max-width: 100%; height: 60px; object-fit: contain; border-radius: 4px;" loading="lazy">
+            </div>
+            ''', unsafe_allow_html=True)
+# --- END CERTIFICATES DISPLAY SECTION ---
+
 hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
 en_marquee = "🏭 Are you a manufacturer or wholesaler? Let's take your business to new heights with Oura! 🚀"
 multi_color_marquee = f"""
@@ -730,6 +745,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["banner_url"] = ""
                     save_config(current_config)
                     st.rerun()
+            
             st.markdown("---")
             st.subheader("📱 App Logo")
             new_logo = st.file_uploader("Choose Logo", type=["jpg", "png", "jpeg"], key="logo_upload")
@@ -747,7 +763,41 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["logo_url"] = ""
                     save_config(current_config)
                     st.rerun()
-        
+
+            # --- 🏆 NEW CERTIFICATES UPLOAD SECTION 🏆 ---
+            st.markdown("---")
+            st.subheader("📜 Trust Certificates (सर्टिफिकेट - Max 4)")
+            new_certs = st.file_uploader("Upload Certificates", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="certs_upload")
+            if st.button("Save Certificates") and new_certs:
+                if len(new_certs) > 4:
+                    st.error("⚠️ You can upload maximum 4 certificates only (आप अधिकतम 4 सर्टिफिकेट ही डाल सकते हैं).")
+                else:
+                    with st.spinner("Uploading certificates..."):
+                        cert_urls = []
+                        for c_file in new_certs:
+                            comp_bytes, _ = compress_image(c_file.getvalue())
+                            c_url = upload_image_to_imgbb(comp_bytes)
+                            if c_url: cert_urls.append(c_url)
+                        
+                        if cert_urls:
+                            current_config["certificates"] = cert_urls
+                            save_config(current_config)
+                            st.success("✅ Certificates Saved!")
+                            time.sleep(1)
+                            st.rerun()
+
+            if current_config.get("certificates"):
+                st.markdown("**Current Certificates:**")
+                c_cols = st.columns(len(current_config["certificates"]))
+                for i, c_url in enumerate(current_config["certificates"]):
+                    with c_cols[i]:
+                        st.image(c_url, use_container_width=True)
+                if st.button("❌ Remove All Certificates"):
+                    current_config["certificates"] = []
+                    save_config(current_config)
+                    st.rerun()
+            # --- END CERTIFICATES UPLOAD SECTION ---
+
         with tab_settings:
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
             col_s1, col_s2, col_s3 = st.columns(3)
@@ -1506,7 +1556,6 @@ if st.session_state.cart:
             
             amount_paid = st.number_input(t("💸 Amount Paid Now (अभी कितने पैसे दिए / ₹)", "💸 अभी कितने पैसे जमा किए (Cash/Online)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
             
-            # 💡 नया फीचर यहाँ जोड़ा गया है
             save_to_ledger = st.checkbox(t("✅ Save to Party Ledger", "✅ इस बिल को पार्टी के खाते (Ledger) में जोड़ें"), value=False, help=t("Tick this only for regular parties.", "इसे सिर्फ पक्के ग्राहकों (Parties) के लिए टिक करें। कैश ग्राहकों के लिए इसे खाली छोड़ें ताकि फालतू खाते न बनें।"))
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill", "✅ बिल तैयार करें"))
@@ -1567,7 +1616,6 @@ if st.session_state.cart:
                 current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
-                # 💡 नया लॉजिक: केवल तभी खाता बनेगा जब यूज़र ने टिक किया हो
                 if safe_name and save_to_ledger:
                     batch = db.batch()
                     parent_ref = db.collection('ledgers').document(safe_name)
@@ -1734,7 +1782,7 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
                 reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
             } 
             else if(t.includes("seller") || t.includes("सेलर") || t.includes("अकाउंट") || t.includes("दुकान") || t.includes("बेचना")) {
-                reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेनाজীবী होना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
+                reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
             } 
             else if(t.includes("hi") || t.includes("hello") || t.includes("नमस्ते")) {
                 reply = "हेलो जी! 🙋‍♀️ बताइए मैं आपको कौन से प्रोडक्ट या रेट की जानकारी दूँ?";
