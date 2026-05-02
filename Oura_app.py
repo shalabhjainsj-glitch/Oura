@@ -557,18 +557,24 @@ with col_login:
             st.session_state.show_login = False
             st.rerun()
 
-# --- 🏆 NEW CERTIFICATES DISPLAY SECTION 🏆 ---
+# --- 🏆 NEW BEAUTIFUL CERTIFICATES DISPLAY SECTION 🏆 ---
+# यह कोड सर्टिफिकेट को मोबाइल पर हॉरिजॉन्टल (Horizontal) रखेगा और ज़ूम करने की सुविधा देगा।
 certs = current_config.get("certificates", [])
 if certs:
-    st.markdown("<div style='text-align: center; font-size: 15px; color: #2b6cb0; font-weight: bold; margin-top: 5px; margin-bottom: 8px;'>🏆 Our Certifications & Trust 🏆</div>", unsafe_allow_html=True)
-    cert_cols = st.columns(len(certs))
-    for i, c_url in enumerate(certs):
-        with cert_cols[i]:
-            st.markdown(f'''
-            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; transition: transform 0.2s;">
-                <img src="{c_url}" style="max-width: 100%; height: 60px; object-fit: contain; border-radius: 4px;" loading="lazy">
+    st.markdown(f"<div style='text-align: center; font-size: 15px; color: #2b6cb0; font-weight: bold; margin-top: 10px; margin-bottom: 5px;'>🏆 {t('Our Certifications & Trust', 'हमारे प्रमाण पत्र और आपका भरोसा')} 🏆</div>", unsafe_allow_html=True)
+    
+    cert_html = '<div style="display: flex; flex-direction: row; justify-content: center; gap: 15px; margin-bottom: 5px;">'
+    for c_url in certs[:3]: # अधिकतम 3 सर्टिफिकेट दिखाएगा
+        cert_html += f'''
+        <a href="{c_url}" target="_blank" style="text-decoration: none; width: 28%; max-width: 110px;">
+            <div style="border: 2px solid #e2e8f0; border-radius: 12px; padding: 6px; background-color: #ffffff; box-shadow: 0 4px 8px rgba(0,0,0,0.06); height: 80px; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">
+                <img src="{c_url}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;" loading="lazy">
             </div>
-            ''', unsafe_allow_html=True)
+        </a>
+        '''
+    cert_html += '</div>'
+    cert_html += f'<div style="text-align:center; font-size:11px; color:gray; margin-top:0px; margin-bottom:15px;">🔍 {t("Click certificate to zoom", "सर्टिफिकेट ज़ूम करने के लिए उस पर क्लिक करें")}</div>'
+    st.markdown(cert_html, unsafe_allow_html=True)
 # --- END CERTIFICATES DISPLAY SECTION ---
 
 hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
@@ -764,13 +770,13 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     save_config(current_config)
                     st.rerun()
 
-            # --- 🏆 NEW CERTIFICATES UPLOAD SECTION 🏆 ---
+            # --- 🏆 NEW CERTIFICATES UPLOAD SECTION (Max 3) 🏆 ---
             st.markdown("---")
-            st.subheader("📜 Trust Certificates (सर्टिफिकेट - Max 4)")
+            st.subheader("📜 Trust Certificates (सर्टिफिकेट - Max 3)")
             new_certs = st.file_uploader("Upload Certificates", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="certs_upload")
             if st.button("Save Certificates") and new_certs:
-                if len(new_certs) > 4:
-                    st.error("⚠️ You can upload maximum 4 certificates only (आप अधिकतम 4 सर्टिफिकेट ही डाल सकते हैं).")
+                if len(new_certs) > 3:
+                    st.error("⚠️ You can upload maximum 3 certificates only (आप अधिकतम 3 सर्टिफिकेट ही डाल सकते हैं).")
                 else:
                     with st.spinner("Uploading certificates..."):
                         cert_urls = []
@@ -901,7 +907,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             
             if st.button("🚀 फाइलें क्लाउड पर सेव करें"):
                 if uploaded_csvs:
-                    with st.spinner("खाते क्लाउड पर शिफ्ट हो रहे हैं... कृपया रुकें..."):
+                    with st.spinner("खाते क्लाउड पर शिफ्ट চরম हो रहे हैं... कृपया रुकें..."):
                         for file in uploaded_csvs:
                             cust_name = file.name.replace("_ledger.csv", "").replace(".csv", "")
                             try:
