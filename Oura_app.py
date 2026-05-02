@@ -1236,7 +1236,6 @@ def show_product_card(row, idx, prefix):
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
-            # 🚀 BUG FIXED HERE (Added keys to all inputs)
             with st.expander(t("✏️ Edit & Move Product (रेट बदलें या बॉक्स शिफ्ट करें)", "✏️ रेट बदलें या प्रोडक्ट दूसरे बॉक्स में शिफ्ट करें")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")), key=f"enm_{prefix_idx}")
@@ -1506,6 +1505,9 @@ if st.session_state.cart:
             shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
             
             amount_paid = st.number_input(t("💸 Amount Paid Now (अभी कितने पैसे दिए / ₹)", "💸 अभी कितने पैसे जमा किए (Cash/Online)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
+            
+            # 💡 नया फीचर यहाँ जोड़ा गया है
+            save_to_ledger = st.checkbox(t("✅ Save to Party Ledger", "✅ इस बिल को पार्टी के खाते (Ledger) में जोड़ें"), value=False, help=t("Tick this only for regular parties.", "इसे सिर्फ पक्के ग्राहकों (Parties) के लिए टिक करें। कैश ग्राहकों के लिए इसे खाली छोड़ें ताकि फालतू खाते न बनें।"))
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill", "✅ बिल तैयार करें"))
 
@@ -1565,7 +1567,8 @@ if st.session_state.cart:
                 current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
-                if safe_name:
+                # 💡 नया लॉजिक: केवल तभी खाता बनेगा जब यूज़र ने टिक किया हो
+                if safe_name and save_to_ledger:
                     batch = db.batch()
                     parent_ref = db.collection('ledgers').document(safe_name)
                     batch.set(parent_ref, {"active": True}, merge=True)
@@ -1731,7 +1734,7 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
                 reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
             } 
             else if(t.includes("seller") || t.includes("सेलर") || t.includes("अकाउंट") || t.includes("दुकान") || t.includes("बेचना")) {
-                reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
+                reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेनाজীবী होना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
             } 
             else if(t.includes("hi") || t.includes("hello") || t.includes("नमस्ते")) {
                 reply = "हेलो जी! 🙋‍♀️ बताइए मैं आपको कौन से प्रोडक्ट या रेट की जानकारी दूँ?";
