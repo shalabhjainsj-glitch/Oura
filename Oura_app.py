@@ -557,23 +557,51 @@ with col_login:
             st.session_state.show_login = False
             st.rerun()
 
-# --- 🏆 NEW BEAUTIFUL CERTIFICATES DISPLAY SECTION 🏆 ---
-# यह कोड सर्टिफिकेट को मोबाइल पर हॉरिजॉन्टल (Horizontal) रखेगा और ज़ूम करने की सुविधा देगा।
+# --- 🏆 NEW BEAUTIFUL CERTIFICATES DISPLAY SECTION (CSS GRID) 🏆 ---
 certs = current_config.get("certificates", [])
 if certs:
-    st.markdown(f"<div style='text-align: center; font-size: 15px; color: #2b6cb0; font-weight: bold; margin-top: 10px; margin-bottom: 5px;'>🏆 {t('Our Certifications & Trust', 'हमारे प्रमाण पत्र और आपका भरोसा')} 🏆</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align: center; font-size: 14px; color: #2b6cb0; font-weight: bold; margin-top: 5px; margin-bottom: 5px;'>🏆 {t('100% Verified & Trusted', '100% प्रमाणित और भरोसेमंद')} 🏆</div>", unsafe_allow_html=True)
     
-    cert_html = '<div style="display: flex; flex-direction: row; justify-content: center; gap: 15px; margin-bottom: 5px;">'
-    for c_url in certs[:3]: # अधिकतम 3 सर्टिफिकेट दिखाएगा
-        cert_html += f'''
-        <a href="{c_url}" target="_blank" style="text-decoration: none; width: 28%; max-width: 110px;">
-            <div style="border: 2px solid #e2e8f0; border-radius: 12px; padding: 6px; background-color: #ffffff; box-shadow: 0 4px 8px rgba(0,0,0,0.06); height: 80px; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">
-                <img src="{c_url}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;" loading="lazy">
-            </div>
-        </a>
-        '''
+    cert_html = '''
+    <style>
+    .cert-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        padding: 5px 0px;
+        margin-bottom: 15px;
+    }
+    .cert-box {
+        background-color: #ffffff;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        height: 85px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 5px;
+        transition: all 0.2s ease-in-out;
+        text-decoration: none;
+    }
+    .cert-box:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2);
+        border-color: #2b6cb0;
+    }
+    .cert-box img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        border-radius: 6px;
+    }
+    </style>
+    <div class="cert-grid">
+    '''
+    for c_url in certs[:3]:
+        cert_html += f'<a href="{c_url}" target="_blank" class="cert-box"><img src="{c_url}" loading="lazy"></a>'
     cert_html += '</div>'
-    cert_html += f'<div style="text-align:center; font-size:11px; color:gray; margin-top:0px; margin-bottom:15px;">🔍 {t("Click certificate to zoom", "सर्टिफिकेट ज़ूम करने के लिए उस पर क्लिक करें")}</div>'
+    cert_html += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-10px; margin-bottom:10px;">🔍 {t("Click certificate to zoom", "सर्टिफिकेट ज़ूम करने के लिए उस पर क्लिक करें")}</div>'
     st.markdown(cert_html, unsafe_allow_html=True)
 # --- END CERTIFICATES DISPLAY SECTION ---
 
@@ -635,7 +663,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             t("➕ Add Product", "➕ नया उत्पाद"), 
             t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
             t("⚙️ Settings", "⚙️ सेटिंग्स"),
-            t("📒 Ledger / Invoices", "📒 खाता और बिल (Ledger)")
+            t("📒 Customer Ledger", "📒 कस्टमर खाते (Ledger)")
         ])
     else:
         st.success(t(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)", f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)"))
@@ -907,7 +935,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             
             if st.button("🚀 फाइलें क्लाउड पर सेव करें"):
                 if uploaded_csvs:
-                    with st.spinner("खाते क्लाउड पर शिफ्ट চরম हो रहे हैं... कृपया रुकें..."):
+                    with st.spinner("खाते क्लाउड पर शिफ्ट हो रहे हैं... कृपया रुकें..."):
                         for file in uploaded_csvs:
                             cust_name = file.name.replace("_ledger.csv", "").replace(".csv", "")
                             try:
