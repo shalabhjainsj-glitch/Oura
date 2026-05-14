@@ -898,36 +898,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.rerun()
 
             st.markdown("---")
-            st.subheader("📦 Bulk Move / Rename Categories (पूरी केटेगरी शिफ्ट करें)")
-            st.info("यहाँ से आप पूरी केटेगरी (बॉक्स) को किसी नए नाम से 'Move' कर सकते हैं या नाम बदल सकते हैं।")
-            
-            cats_list = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-            if cats_list:
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    b_old_cat = st.selectbox("Old Category (किसे मूव करना है)", cats_list)
-                with col_b2:
-                    b_new_cat_choice = st.selectbox("Move To (कहाँ ले जाना है)", cats_list + ["Create New..."])
-                    if b_new_cat_choice == "Create New...":
-                        b_new_cat = st.text_input("नया नाम/इमोजी टाइप करें:", value=b_old_cat)
-                    else:
-                        b_new_cat = b_new_cat_choice
-
-                if st.button("🚀 Move / Update All Products", type="primary"):
-                    if b_new_cat:
-                        with st.spinner("शिफ्ट हो रहा है..."):
-                            prods_to_move = products_df[products_df['Category'] == b_old_cat]
-                            batch = db.batch()
-                            for idx, row in prods_to_move.iterrows():
-                                doc_ref = db.collection('products').document(str(row['ID']))
-                                batch.update(doc_ref, {"Category": b_new_cat.strip()})
-                            batch.commit()
-                            load_products.clear()
-                            st.success(f"✅ सारे प्रोडक्ट्स सफलतापूर्वक '{b_new_cat}' में शिफ्ट हो गए!")
-                            time.sleep(2)
-                            st.rerun()
-
-            st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
             st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
             
@@ -1474,6 +1444,28 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
+        # --- NEW RENAME LOGIC ---
+        if st.session_state.admin_logged_in:
+            with st.expander(t("✏️ Rename Category", "✏️ इस बॉक्स (कैटेगरी) का नाम बदलें")):
+                col_rc1, col_rc2 = st.columns([3, 1])
+                with col_rc1:
+                    new_cat_name = st.text_input("New Name", value=st.session_state.selected_category, label_visibility="collapsed")
+                with col_rc2:
+                    if st.button("✅ Update", use_container_width=True):
+                        if new_cat_name and new_cat_name.strip() != st.session_state.selected_category:
+                            with st.spinner("Updating..."):
+                                prods_to_rename = products_df[products_df['Category'] == st.session_state.selected_category]
+                                batch = db.batch()
+                                for idx, row in prods_to_rename.iterrows():
+                                    doc_ref = db.collection('products').document(str(row['ID']))
+                                    batch.update(doc_ref, {"Category": new_cat_name.strip()})
+                                batch.commit()
+                                load_products.clear()
+                                st.session_state.selected_category = new_cat_name.strip()
+                                st.query_params["cat"] = new_cat_name.strip()
+                                st.rerun()
+        # --- END NEW RENAME LOGIC ---
+
         if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params: del st.query_params["cat"]
