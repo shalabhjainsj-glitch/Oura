@@ -103,7 +103,8 @@ def load_config():
         "admin_gst": "07AKWPB1315K", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
-        "certificates": []
+        "certificates": [],
+        "category_images": {}
     }
 
 def save_config(config):
@@ -617,7 +618,6 @@ multi_color_marquee = f"""
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
-# --- 🟢 NEW: SHOPKEEPER / WHOLESALER TOGGLE BUTTON ---
 with st.container(border=True):
     col_sk1, col_sk2 = st.columns([7, 3])
     with col_sk1:
@@ -626,7 +626,6 @@ with st.container(border=True):
         st.toggle(t("Show Bulk Rates", "होलसेल रेट दिखाएं"), key="shopkeeper_mode")
 
 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-# --- END TOGGLE BUTTON ---
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -841,6 +840,47 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["certificates"] = []
                     save_config(current_config)
                     st.rerun()
+
+            # --- 🟢 NEW: CATEGORY PHOTOS UPLOAD SECTION ---
+            st.markdown("---")
+            st.subheader("📂 Category Photos (कैटेगरी की फोटो)")
+            st.info("यहाँ से आप हर केटेगरी (बॉक्स) के लिए एक छोटी फोटो लगा सकते हैं, जो होम पेज पर बॉक्स में नाम के साथ दिखेगी।")
+            
+            if "category_images" not in current_config:
+                current_config["category_images"] = {}
+
+            all_cats_for_img = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            if all_cats_for_img:
+                col_ci1, col_ci2 = st.columns(2)
+                with col_ci1:
+                    sel_cat_for_img = st.selectbox("कैटेगरी चुनें", all_cats_for_img, key="sel_cat_img")
+                with col_ci2:
+                    cat_img_upload = st.file_uploader(f"Upload photo for '{sel_cat_for_img}'", type=["jpg", "png", "jpeg"], key="cat_img_upl")
+                
+                if st.button("💾 Save Category Photo") and cat_img_upload:
+                    with st.spinner("Uploading..."):
+                        comp_bytes, _ = compress_image(cat_img_upload.getvalue())
+                        img_url = upload_image_to_imgbb(comp_bytes)
+                        if img_url:
+                            current_config["category_images"][sel_cat_for_img] = img_url
+                            save_config(current_config)
+                            st.success(f"✅ Photo saved for {sel_cat_for_img}!")
+                            time.sleep(1)
+                            st.rerun()
+                
+                curr_cat_imgs = current_config.get("category_images", {})
+                if curr_cat_imgs:
+                    st.markdown("**Current Assigned Photos:**")
+                    for c_name, c_url in curr_cat_imgs.items():
+                        c1, c2, c3 = st.columns([1, 6, 2])
+                        with c1: st.image(c_url, width=40)
+                        with c2: st.write(f"**{c_name}**")
+                        with c3:
+                            if st.button("❌ Remove", key=f"rm_cat_img_{c_name}"):
+                                del current_config["category_images"][c_name]
+                                save_config(current_config)
+                                st.rerun()
+            # --- END CATEGORY PHOTOS ---
 
         with tab_settings:
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
@@ -1163,13 +1203,11 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
-    # 🟢 SHOPKEEPER MODE CHECK
     is_sk = st.session_state.get('shopkeeper_mode', False)
 
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
     
-    # Hide Wholesale Rates in WhatsApp sharing if not shopkeeper
     if is_sk:
         if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
         if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
@@ -1221,7 +1259,6 @@ def show_product_card(row, idx, prefix):
             else:
                 st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
-            # 🟢 DYNAMIC PRICING VIEW BASED ON SHOPKEEPER MODE
             if is_sk:
                 if t2_qty > 0 and t2_price > 0: 
                     st.markdown(f"""
@@ -1251,7 +1288,6 @@ def show_product_card(row, idx, prefix):
                     </div>
                     """, unsafe_allow_html=True)
             else:
-                # 🟢 ONLY RETAIL PRICE FOR NORMAL USERS
                 st.markdown(f"""
                 <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
                     <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
@@ -1264,7 +1300,6 @@ def show_product_card(row, idx, prefix):
                 if retail_price > 0:
                     opts[f"{retail_qty} {u_base} (रेट: ₹{retail_price} / {u_base})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty}
                 
-                # 🟢 ONLY SHOW WHOLESALE CART OPTIONS IF SHOPKEEPER MODE IS ON
                 if is_sk:
                     if t1_qty > 0 and t1_price > 0:
                         opts[f"{t1_qty} {u_t1} (रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
@@ -1427,6 +1462,7 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
+                # --- 🟢 CSS FOR CATEGORY BUTTONS (TO HOLD IMAGE) ---
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
@@ -1437,8 +1473,8 @@ else:
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
                 
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 90px !important; 
-                    min-height: 90px !important; 
+                    height: 105px !important; 
+                    min-height: 105px !important; 
                     width: 100% !important; 
                     border-radius: 12px !important;
                     background: #ffffff !important; 
@@ -1446,13 +1482,14 @@ else:
                     box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
                     color: #1a202c !important; 
                     font-weight: 700 !important;
-                    font-size: 13px !important; 
+                    font-size: 12px !important; 
                     white-space: normal !important; 
                     word-wrap: break-word !important; 
                     line-height: 1.2 !important; 
                     padding: 4px !important; 
                     transition: all 0.2s ease-in-out !important;
                     display: flex !important;
+                    flex-direction: column !important;
                     align-items: center !important;
                     justify-content: center !important;
                     text-align: center !important;
@@ -1468,6 +1505,41 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
+
+                # --- 🟢 JAVASCRIPT TO INJECT CATEGORY IMAGES FAST ---
+                cat_images_dict = current_config.get("category_images", {})
+                cat_images_json = json.dumps(cat_images_dict)
+                
+                inject_js = f"""
+                <script>
+                const catImages = {cat_images_json};
+                const parentDoc = window.parent.document;
+                
+                setInterval(() => {{
+                    const gridBlock = parentDoc.getElementById('safe-cat-grid')?.parentElement;
+                    if(gridBlock) {{
+                        const buttons = gridBlock.querySelectorAll('button');
+                        buttons.forEach(btn => {{
+                            let textEl = btn.querySelector('p') || btn.querySelector('span') || btn;
+                            let catName = textEl.innerText.trim();
+                            
+                            if (catImages[catName] && !btn.querySelector('.cat-img')) {{
+                                const img = parentDoc.createElement('img');
+                                img.src = catImages[catName];
+                                img.className = 'cat-img';
+                                img.style.width = '45px';
+                                img.style.height = '45px';
+                                img.style.objectFit = 'contain';
+                                img.style.marginBottom = '5px';
+                                img.style.borderRadius = '5px';
+                                btn.insertBefore(img, btn.firstChild);
+                            }}
+                        }});
+                    }}
+                }}, 400);
+                </script>
+                """
+                st_components.html(inject_js, height=0, width=0)
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
