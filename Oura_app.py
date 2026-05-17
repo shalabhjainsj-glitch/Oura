@@ -389,6 +389,9 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
 if 'lang' not in st.session_state:
     st.session_state.lang = 'hi'
 
+if 'shopkeeper_mode' not in st.session_state:
+    st.session_state.shopkeeper_mode = False
+
 def t(en_text, hi_text):
     return en_text if st.session_state.lang == 'en' else hi_text
 
@@ -557,7 +560,6 @@ with col_login:
             st.session_state.show_login = False
             st.rerun()
 
-# --- 🏆 NEW BEAUTIFUL CERTIFICATES DISPLAY SECTION (CSS GRID) 🏆 ---
 certs = current_config.get("certificates", [])
 if certs:
     st.markdown(f"<div style='text-align: center; font-size: 14px; color: #2b6cb0; font-weight: bold; margin-top: 5px; margin-bottom: 5px;'>🏆 {t('100% Verified & Trusted', '100% प्रमाणित और भरोसेमंद')} 🏆</div>", unsafe_allow_html=True)
@@ -603,18 +605,28 @@ if certs:
     cert_html += '</div>'
     cert_html += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-10px; margin-bottom:10px;">🔍 {t("Click certificate to zoom", "सर्टिफिकेट ज़ूम करने के लिए उस पर क्लिक करें")}</div>'
     st.markdown(cert_html, unsafe_allow_html=True)
-# --- END CERTIFICATES DISPLAY SECTION ---
 
 hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
 en_marquee = "🏭 Are you a manufacturer or wholesaler? Let's take your business to new heights with Oura! 🚀"
 multi_color_marquee = f"""
-<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
+<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 10px; margin-top: 5px; border: 1px solid #bbdefb;">
     <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
         {t(en_marquee, hi_marquee)}
     </marquee>
 </div>
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
+
+# --- 🟢 NEW: SHOPKEEPER / WHOLESALER TOGGLE BUTTON ---
+with st.container(border=True):
+    col_sk1, col_sk2 = st.columns([7, 3])
+    with col_sk1:
+        st.markdown(f"<span style='color: #E65100; font-size: 16px; font-weight: bold;'>🏬 {t('Are you a Shopkeeper / Wholesaler?', 'क्या आप एक दुकानदार / होलसेलर हैं?')}</span><br><span style='font-size: 12px; color: gray;'>{t('Turn ON to see hidden bulk rates', 'होलसेल के छिपे हुए रेट देखने के लिए इसे चालू करें 👉')}</span>", unsafe_allow_html=True)
+    with col_sk2:
+        st.toggle(t("Show Bulk Rates", "होलसेल रेट दिखाएं"), key="shopkeeper_mode")
+
+st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+# --- END TOGGLE BUTTON ---
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -798,7 +810,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     save_config(current_config)
                     st.rerun()
 
-            # --- 🏆 NEW CERTIFICATES UPLOAD SECTION (Max 3) 🏆 ---
             st.markdown("---")
             st.subheader("📜 Trust Certificates (सर्टिफिकेट - Max 3)")
             new_certs = st.file_uploader("Upload Certificates", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="certs_upload")
@@ -830,7 +841,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["certificates"] = []
                     save_config(current_config)
                     st.rerun()
-            # --- END CERTIFICATES UPLOAD SECTION ---
 
         with tab_settings:
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
@@ -1153,10 +1163,17 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
+    # 🟢 SHOPKEEPER MODE CHECK
+    is_sk = st.session_state.get('shopkeeper_mode', False)
+
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
-    if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
-    if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
+    
+    # Hide Wholesale Rates in WhatsApp sharing if not shopkeeper
+    if is_sk:
+        if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
+        if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
+    
     share_text += f"🔹 {retail_qty}+ {u_base}: ₹{retail_price}\n\n"
     share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
     
@@ -1204,27 +1221,37 @@ def show_product_card(row, idx, prefix):
             else:
                 st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
-            if t2_qty > 0 and t2_price > 0: 
-                st.markdown(f"""
-                <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
-                    <div style="border-left:1px solid #ccc; height:30px;"></div>
-                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
-                    <div style="border-left:1px solid #ccc; height:30px;"></div>
-                    <div style="text-align:center; flex:1;"><b>{t2_qty}+ {u_t2}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
-                </div>
-                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
-                """, unsafe_allow_html=True)
-            elif t1_qty > 0 and t1_price > 0: 
-                st.markdown(f"""
-                <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
-                    <div style="border-left:1px solid #ccc; height:30px;"></div>
-                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
-                </div>
-                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
-                """, unsafe_allow_html=True)
-            else: 
+            # 🟢 DYNAMIC PRICING VIEW BASED ON SHOPKEEPER MODE
+            if is_sk:
+                if t2_qty > 0 and t2_price > 0: 
+                    st.markdown(f"""
+                    <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                        <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                        <div style="border-left:1px solid #ccc; height:30px;"></div>
+                        <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                        <div style="border-left:1px solid #ccc; height:30px;"></div>
+                        <div style="text-align:center; flex:1;"><b>{t2_qty}+ {u_t2}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
+                    </div>
+                    <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                    """, unsafe_allow_html=True)
+                elif t1_qty > 0 and t1_price > 0: 
+                    st.markdown(f"""
+                    <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                        <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
+                        <div style="border-left:1px solid #ccc; height:30px;"></div>
+                        <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                    </div>
+                    <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                    """, unsafe_allow_html=True)
+                else: 
+                    st.markdown(f"""
+                    <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
+                        <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
+                        <span style="font-size:12px;">🛵 {del_tag}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                # 🟢 ONLY RETAIL PRICE FOR NORMAL USERS
                 st.markdown(f"""
                 <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
                     <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
@@ -1236,10 +1263,13 @@ def show_product_card(row, idx, prefix):
                 opts = {}
                 if retail_price > 0:
                     opts[f"{retail_qty} {u_base} (रेट: ₹{retail_price} / {u_base})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty}
-                if t1_qty > 0 and t1_price > 0:
-                    opts[f"{t1_qty} {u_t1} (रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
-                if t2_qty > 0 and t2_price > 0:
-                    opts[f"{t2_qty} {u_t2} (रेट: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty}
+                
+                # 🟢 ONLY SHOW WHOLESALE CART OPTIONS IF SHOPKEEPER MODE IS ON
+                if is_sk:
+                    if t1_qty > 0 and t1_price > 0:
+                        opts[f"{t1_qty} {u_t1} (रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
+                    if t2_qty > 0 and t2_price > 0:
+                        opts[f"{t2_qty} {u_t2} (रेट: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty}
                     
                 selected_opt = st.selectbox("क्या खरीदना है? (पैकेज चुनें)", list(opts.keys()), key=f"sel_{prefix_idx}")
                 buy_price = opts[selected_opt]["price"]
@@ -1397,13 +1427,11 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
-                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
                     display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
                 }
-                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
@@ -1444,7 +1472,6 @@ else:
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        # --- NEW RENAME LOGIC ---
         if st.session_state.admin_logged_in:
             with st.expander(t("✏️ Rename Category", "✏️ इस बॉक्स (कैटेगरी) का नाम बदलें")):
                 col_rc1, col_rc2 = st.columns([3, 1])
@@ -1464,7 +1491,6 @@ else:
                                 st.session_state.selected_category = new_cat_name.strip()
                                 st.query_params["cat"] = new_cat_name.strip()
                                 st.rerun()
-        # --- END NEW RENAME LOGIC ---
 
         if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
             st.session_state.selected_category = None
