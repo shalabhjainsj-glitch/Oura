@@ -462,6 +462,13 @@ def save_cart_to_url():
         if "cart" in st.query_params:
             del st.query_params["cart"]
 
+if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
+if 'seller_logged_in' not in st.session_state: st.session_state.seller_logged_in = None
+if 'show_login' not in st.session_state: st.session_state.show_login = False
+if 'share_msg' not in st.session_state: st.session_state.share_msg = None
+if 'share_img_path' not in st.session_state: st.session_state.share_img_path = None
+if 'wholesale_mode' not in st.session_state: st.session_state.wholesale_mode = False
+
 if 'cart_loaded' not in st.session_state:
     st.session_state.cart = {}
     if "cart" in st.query_params and not products_df.empty:
@@ -522,12 +529,6 @@ if "cat" in st.query_params:
     st.session_state.selected_category = st.query_params["cat"]
 else:
     st.session_state.selected_category = None
-
-if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
-if 'seller_logged_in' not in st.session_state: st.session_state.seller_logged_in = None
-if 'show_login' not in st.session_state: st.session_state.show_login = False
-if 'share_msg' not in st.session_state: st.session_state.share_msg = None
-if 'share_img_path' not in st.session_state: st.session_state.share_img_path = None
 
 if st.session_state.seller_logged_in:
     seller_name = st.session_state.seller_logged_in
@@ -1046,7 +1047,14 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
+st.markdown("---")
+
+col_search, col_toggle = st.columns([7, 3])
+with col_search:
+    search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
+with col_toggle:
+    st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
+    st.session_state.wholesale_mode = st.toggle(t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), value=st.session_state.wholesale_mode)
 
 def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
     if not path_str: return []
@@ -1107,10 +1115,13 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
+    show_wholesale = st.session_state.wholesale_mode
+
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
-    if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
-    if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
+    if show_wholesale:
+        if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
+        if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
     share_text += f"🔹 {retail_qty}+ {u_base}: Cash ₹{cash_price} | Online ₹{retail_price}\n\n"
     share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
     
@@ -1156,9 +1167,9 @@ def show_product_card(row, idx, prefix):
                 wa_btn_link = f"https://wa.me/{admin_num}?text={wa_msg}"
                 st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 {ask_qty} {u_base} का रेट WhatsApp पर पूछें</a>', unsafe_allow_html=True)
             else:
-                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ઓફ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
-            if t2_qty > 0 and t2_price > 0: 
+            if show_wholesale and t2_qty > 0 and t2_price > 0: 
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
                     <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#e65100; font-size:12px;">💵 Cash: ₹{cash_price}</span><br><span style="color:#2b6cb0; font-size:14px; font-weight:bold;">💳 Online: ₹{retail_price}</span></div>
@@ -1169,7 +1180,7 @@ def show_product_card(row, idx, prefix):
                 </div>
                 <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
                 """, unsafe_allow_html=True)
-            elif t1_qty > 0 and t1_price > 0: 
+            elif show_wholesale and t1_qty > 0 and t1_price > 0: 
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
                     <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#e65100; font-size:12px;">💵 Cash: ₹{cash_price}</span><br><span style="color:#2b6cb0; font-size:14px; font-weight:bold;">💳 Online: ₹{retail_price}</span></div>
@@ -1194,10 +1205,11 @@ def show_product_card(row, idx, prefix):
                 if cash_price > 0:
                     opts[f"{retail_qty} {u_base} (💵 Cash / Offline - ₹{cash_price})"] = {"price": cash_price, "unit": u_base, "min_q": retail_qty, "type": "Cash"}
                 
-                if t1_qty > 0 and t1_price > 0:
-                    opts[f"{t1_qty} {u_t1} (थोक रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty, "type": "Wholesale"}
-                if t2_qty > 0 and t2_price > 0:
-                    opts[f"{t2_qty} {u_t2} (सुपर बल्क: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
+                if show_wholesale:
+                    if t1_qty > 0 and t1_price > 0:
+                        opts[f"{t1_qty} {u_t1} (थोक रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty, "type": "Wholesale"}
+                    if t2_qty > 0 and t2_price > 0:
+                        opts[f"{t2_qty} {u_t2} (सुपर बल्क: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
                     
                 selected_opt = st.selectbox("पेमेंट का तरीका और पैकेज चुनें:", list(opts.keys()), key=f"sel_{prefix_idx}")
                 buy_price = opts[selected_opt]["price"]
