@@ -1295,7 +1295,7 @@ def show_product_card(row, idx, prefix):
                     st.markdown("**Tier 1 (Base):**")
                     c_e01, c_e02, c_e03, c_e04 = st.columns([1, 1, 1, 1])
                     with c_e01: e_u_base = st.selectbox("इकाई", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
-                    with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty, key=f"erq_{prefix_idx}")
+                    with c_e02: e_retail_qty = st.number_input("कम से کم", value=retail_qty, key=f"erq_{prefix_idx}")
                     with c_e03: e_online_price = st.number_input("💳 Online (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_on_{prefix_idx}")
                     cash_val = safe_float(row.get('Cash_Price'), float(retail_price)) 
                     with c_e04: e_cash_price = st.number_input("💵 Cash (₹)", value=cash_val, format="%.2f", step=0.50, key=f"ep_ca_{prefix_idx}")
@@ -1497,7 +1497,21 @@ if st.session_state.cart:
 
     if available_upis:
         st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
-        with st.expander(t("Pay by Scanning (QR Code)", "स्कैन करके पेमेंट करें (QR Code)")):
+        
+        first_upi_id = list(available_upis.values())[0]["id"]
+        merchant_name = urllib.parse.quote("Oura Products")
+        pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
+        
+        st.markdown(f'''
+        <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
+            ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
+        </a>
+        <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
+            {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
+        </div>
+        ''', unsafe_allow_html=True)
+
+        with st.expander(t("💻 Pay by Scanning QR (If using Laptop/PC)", "💻 QR Code स्कैन करें (अगर आप कंप्यूटर पर हैं)")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
