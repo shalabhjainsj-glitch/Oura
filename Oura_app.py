@@ -403,7 +403,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -475,7 +475,6 @@ if 'cart_loaded' not in st.session_state:
                     p_id = parts[0]
                     unit = parts[1] if len(parts) > 1 else "Pcs"
                     price = float(parts[2]) if len(parts) > 2 else 0.0
-                    p_type = parts[3] if len(parts) > 3 else ""
                     qty = safe_int(qty_str, 1)
                     
                     match = products_df[products_df['ID'].astype(str) == p_id]
@@ -487,11 +486,8 @@ if 'cart_loaded' not in st.session_state:
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
                             
-                        base_name = row.get('Name', 'Item')
-                        final_name = f"{base_name} ({p_type})" if p_type in ["Online", "Cash"] else base_name
-                            
                         st.session_state.cart[k_part] = {
-                            "name": final_name,
+                            "name": row.get('Name', 'Item'),
                             "price": price if price > 0 else safe_float(row.get('Price'), 0.0),
                             "qty": qty, "img_link": img_link,
                             "seller": str(row.get("Seller_Name", "")).strip(), "unit": unit
@@ -508,11 +504,9 @@ if 'cart_loaded' not in st.session_state:
                         img_link = paths[0] if paths else ""
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
-                        k_part = f"{p_id}|Pcs|{retail_price}|Online"
-                        
-                        base_name = row.get('Name', 'Item')
+                        k_part = f"{p_id}|Pcs|{retail_price}"
                         st.session_state.cart[k_part] = {
-                            "name": f"{base_name} (Online)", "price": retail_price, "qty": qty, "img_link": img_link, "seller": str(row.get("Seller_Name", "")).strip(), "unit": "Pcs"
+                            "name": row.get('Name', 'Item'), "price": retail_price, "qty": qty, "img_link": img_link, "seller": str(row.get("Seller_Name", "")).strip(), "unit": "Pcs"
                         }
             except Exception as e:
                 pass
@@ -647,12 +641,11 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.markdown("**💰 Pricing Tiers (हर रेट के लिए अलग-अलग यूनिट और मात्रा सेट करें)**")
                 unit_options = ["Pcs (पीस)", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
                 
-                st.markdown("**(1) Base / Sample (Online vs Cash)**")
-                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+                st.markdown("**(1) Base / Sample**")
+                c1, c2, c3 = st.columns([1, 1, 1])
                 with c1: new_u_base = st.selectbox("इकाई (Unit)", unit_options, key="ub")
                 with c2: new_retail_qty = st.number_input("कम से कम मात्रा", min_value=1, value=1, key="n_r_q")
-                with c3: new_online_price = st.number_input("💳 Online रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
-                with c4: new_cash_price = st.number_input("💵 Cash रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
+                with c3: new_price = st.number_input("रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
                 
                 st.markdown("**(2) Tier 1 (Bulk) - Optional**")
                 c4, c5, c6 = st.columns([1, 1, 1])
@@ -706,7 +699,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             
                             data = {
                                 "ID": new_id, "Name": new_name, 
-                                "Retail_Qty": new_retail_qty, "Price": new_online_price, "Cash_Price": new_cash_price,
+                                "Retail_Qty": new_retail_qty, "Price": new_price, 
                                 "Tier1_Price": new_t1_price, "Tier1_Qty": new_t1_qty, 
                                 "Tier2_Price": new_t2_price, "Tier2_Qty": new_t2_qty,
                                 "Category": final_cat, "Image_Path": final_path_str,
@@ -1081,7 +1074,6 @@ def show_product_card(row, idx, prefix):
 
     retail_qty = safe_int(row.get('Retail_Qty'), 1)
     retail_price = safe_float(row.get('Price'), 0.0)
-    cash_price = safe_float(row.get('Cash_Price'), retail_price)
     
     t1_qty_default = safe_int(row.get('Wholesale_Qty'), 1)
     t1_qty = safe_int(row.get('Tier1_Qty'), t1_qty_default)
@@ -1111,7 +1103,7 @@ def show_product_card(row, idx, prefix):
     share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
     if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
     if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
-    share_text += f"🔹 {retail_qty}+ {u_base}: Cash ₹{cash_price} | Online ₹{retail_price}\n\n"
+    share_text += f"🔹 {retail_qty}+ {u_base}: ₹{retail_price}\n\n"
     share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
     
     cat_url = urllib.parse.quote(str(row.get('Category', '')))
@@ -1161,7 +1153,7 @@ def show_product_card(row, idx, prefix):
             if t2_qty > 0 and t2_price > 0: 
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#e65100; font-size:12px;">💵 Cash: ₹{cash_price}</span><br><span style="color:#2b6cb0; font-size:14px; font-weight:bold;">💳 Online: ₹{retail_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
                     <div style="border-left:1px solid #ccc; height:30px;"></div>
                     <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
                     <div style="border-left:1px solid #ccc; height:30px;"></div>
@@ -1172,7 +1164,7 @@ def show_product_card(row, idx, prefix):
             elif t1_qty > 0 and t1_price > 0: 
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#e65100; font-size:12px;">💵 Cash: ₹{cash_price}</span><br><span style="color:#2b6cb0; font-size:14px; font-weight:bold;">💳 Online: ₹{retail_price}</span></div>
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
                     <div style="border-left:1px solid #ccc; height:30px;"></div>
                     <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
                 </div>
@@ -1181,8 +1173,7 @@ def show_product_card(row, idx, prefix):
             else: 
                 st.markdown(f"""
                 <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
-                    <b>{retail_qty}+ {u_base} रेट:</b><br>
-                    <span style="color:#e65100; font-size:14px;">💵 Cash: ₹{cash_price}</span> | <span style="color:#2b6cb0; font-size:15px; font-weight:bold;">💳 Online: ₹{retail_price}</span> <br>
+                    <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
                     <span style="font-size:12px;">🛵 {del_tag}</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1190,33 +1181,27 @@ def show_product_card(row, idx, prefix):
             if is_in_stock:
                 opts = {}
                 if retail_price > 0:
-                    opts[f"{retail_qty} {u_base} (💳 Online Payment - ₹{retail_price})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty, "type": "Online"}
-                if cash_price > 0:
-                    opts[f"{retail_qty} {u_base} (💵 Cash / Offline - ₹{cash_price})"] = {"price": cash_price, "unit": u_base, "min_q": retail_qty, "type": "Cash"}
-                
+                    opts[f"{retail_qty} {u_base} (रेट: ₹{retail_price} / {u_base})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty}
                 if t1_qty > 0 and t1_price > 0:
-                    opts[f"{t1_qty} {u_t1} (थोक रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty, "type": "Wholesale"}
+                    opts[f"{t1_qty} {u_t1} (रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
                 if t2_qty > 0 and t2_price > 0:
-                    opts[f"{t2_qty} {u_t2} (सुपर बल्क: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
+                    opts[f"{t2_qty} {u_t2} (रेट: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty}
                     
-                selected_opt = st.selectbox("पेमेंट का तरीका और पैकेज चुनें:", list(opts.keys()), key=f"sel_{prefix_idx}")
+                selected_opt = st.selectbox("क्या खरीदना है? (पैकेज चुनें)", list(opts.keys()), key=f"sel_{prefix_idx}")
                 buy_price = opts[selected_opt]["price"]
                 buy_unit = opts[selected_opt]["unit"]
                 min_q = opts[selected_opt]["min_q"]
-                buy_type = opts[selected_opt]["type"]
                 
                 qty = st.number_input(f"मात्रा ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
                 if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
-                    cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}"
+                    cart_key = f"{p_id}|{buy_unit}|{buy_price}"
                     
                     if cart_key in st.session_state.cart:
                         st.session_state.cart[cart_key]["qty"] += qty
                     else:
-                        base_nm = row.get('Name', 'Item')
-                        final_nm = f"{base_nm} ({buy_type})" if buy_type in ["Online", "Cash"] else base_nm
                         st.session_state.cart[cart_key] = {
-                            "name": final_nm, 
+                            "name": row.get('Name', 'Item'), 
                             "price": buy_price, 
                             "qty": qty, 
                             "img_link": img_link_for_wa,
@@ -1251,6 +1236,7 @@ def show_product_card(row, idx, prefix):
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
+            # 🚀 BUG FIXED HERE (Added keys to all inputs)
             with st.expander(t("✏️ Edit & Move Product (रेट बदलें या बॉक्स शिफ्ट करें)", "✏️ रेट बदलें या प्रोडक्ट दूसरे बॉक्स में शिफ्ट करें")):
                 with st.form(f"edit_form_{prefix_idx}"):
                     if st.session_state.admin_logged_in: e_name = st.text_input("Name (नाम)", value=str(row.get("Name", "")), key=f"enm_{prefix_idx}")
@@ -1281,12 +1267,10 @@ def show_product_card(row, idx, prefix):
                     idx_t2 = next((i for i, opt in enumerate(unit_opts) if u_t2 in opt), 0)
 
                     st.markdown("**Tier 1 (Base):**")
-                    c_e01, c_e02, c_e03, c_e04 = st.columns([1, 1, 1, 1])
+                    c_e01, c_e02, c_e03 = st.columns([2, 1, 1])
                     with c_e01: e_u_base = st.selectbox("इकाई", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
                     with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty, key=f"erq_{prefix_idx}")
-                    with c_e03: e_online_price = st.number_input("💳 Online (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_on_{prefix_idx}")
-                    cash_val = safe_float(row.get('Cash_Price'), float(retail_price)) 
-                    with c_e04: e_cash_price = st.number_input("💵 Cash (₹)", value=cash_val, format="%.2f", step=0.50, key=f"ep_ca_{prefix_idx}")
+                    with c_e03: e_price = st.number_input("रेट (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_{prefix_idx}")
                     
                     st.markdown("**Tier 2 (Bulk):**")
                     c_e1, c_e2, c_e3 = st.columns([2, 1, 1])
@@ -1310,7 +1294,7 @@ def show_product_card(row, idx, prefix):
                     target_id = str(row['ID'])
                     is_free_val = True if e_fd in ["फ्री डिलीवरी", "Free Delivery"] else False
                     update_dict = {
-                        "Retail_Qty": e_retail_qty, "Price": e_online_price, "Cash_Price": e_cash_price,
+                        "Retail_Qty": e_retail_qty, "Price": e_price, 
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
                         "Category": e_cat.strip(),
@@ -1780,3 +1764,4 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
 """.replace("__ADMIN_WA__", str(admin_wa_number))
 
 st_components.html(ai_js_code, height=0, width=0)
+
