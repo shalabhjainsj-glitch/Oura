@@ -102,9 +102,7 @@ def load_config():
         "admin_whatsapp": "919891587437", 
         "admin_gst": "07AKWPB1315K", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
-        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
-        "certificates": [],
-        "category_images": {}
+        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {}
     }
 
 def save_config(config):
@@ -390,9 +388,6 @@ if current_config.get("has_logo", False) and app_icon_url != "🛍️":
 if 'lang' not in st.session_state:
     st.session_state.lang = 'hi'
 
-if 'shopkeeper_mode' not in st.session_state:
-    st.session_state.shopkeeper_mode = False
-
 def t(en_text, hi_text):
     return en_text if st.session_state.lang == 'en' else hi_text
 
@@ -408,7 +403,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -480,6 +475,7 @@ if 'cart_loaded' not in st.session_state:
                     p_id = parts[0]
                     unit = parts[1] if len(parts) > 1 else "Pcs"
                     price = float(parts[2]) if len(parts) > 2 else 0.0
+                    p_type = parts[3] if len(parts) > 3 else ""
                     qty = safe_int(qty_str, 1)
                     
                     match = products_df[products_df['ID'].astype(str) == p_id]
@@ -491,8 +487,11 @@ if 'cart_loaded' not in st.session_state:
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
                             
+                        base_name = row.get('Name', 'Item')
+                        final_name = f"{base_name} ({p_type})" if p_type in ["Online", "Cash"] else base_name
+                            
                         st.session_state.cart[k_part] = {
-                            "name": row.get('Name', 'Item'),
+                            "name": final_name,
                             "price": price if price > 0 else safe_float(row.get('Price'), 0.0),
                             "qty": qty, "img_link": img_link,
                             "seller": str(row.get("Seller_Name", "")).strip(), "unit": unit
@@ -509,9 +508,11 @@ if 'cart_loaded' not in st.session_state:
                         img_link = paths[0] if paths else ""
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
-                        k_part = f"{p_id}|Pcs|{retail_price}"
+                        k_part = f"{p_id}|Pcs|{retail_price}|Online"
+                        
+                        base_name = row.get('Name', 'Item')
                         st.session_state.cart[k_part] = {
-                            "name": row.get('Name', 'Item'), "price": retail_price, "qty": qty, "img_link": img_link, "seller": str(row.get("Seller_Name", "")).strip(), "unit": "Pcs"
+                            "name": f"{base_name} (Online)", "price": retail_price, "qty": qty, "img_link": img_link, "seller": str(row.get("Seller_Name", "")).strip(), "unit": "Pcs"
                         }
             except Exception as e:
                 pass
@@ -561,71 +562,16 @@ with col_login:
             st.session_state.show_login = False
             st.rerun()
 
-certs = current_config.get("certificates", [])
-if certs:
-    st.markdown(f"<div style='text-align: center; font-size: 14px; color: #2b6cb0; font-weight: bold; margin-top: 5px; margin-bottom: 5px;'>🏆 {t('100% Verified & Trusted', '100% प्रमाणित और भरोसेमंद')} 🏆</div>", unsafe_allow_html=True)
-    
-    cert_html = '''
-    <style>
-    .cert-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-        padding: 5px 0px;
-        margin-bottom: 15px;
-    }
-    .cert-box {
-        background-color: #ffffff;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-        height: 85px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 5px;
-        transition: all 0.2s ease-in-out;
-        text-decoration: none;
-    }
-    .cert-box:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2);
-        border-color: #2b6cb0;
-    }
-    .cert-box img {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-        border-radius: 6px;
-    }
-    </style>
-    <div class="cert-grid">
-    '''
-    for c_url in certs[:3]:
-        cert_html += f'<a href="{c_url}" target="_blank" class="cert-box"><img src="{c_url}" loading="lazy"></a>'
-    cert_html += '</div>'
-    cert_html += f'<div style="text-align:center; font-size:12px; color:gray; margin-top:-10px; margin-bottom:10px;">🔍 {t("Click certificate to zoom", "सर्टिफिकेट ज़ूम करने के लिए उस पर क्लिक करें")}</div>'
-    st.markdown(cert_html, unsafe_allow_html=True)
-
 hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
 en_marquee = "🏭 Are you a manufacturer or wholesaler? Let's take your business to new heights with Oura! 🚀"
 multi_color_marquee = f"""
-<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 10px; margin-top: 5px; border: 1px solid #bbdefb;">
+<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
     <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
         {t(en_marquee, hi_marquee)}
     </marquee>
 </div>
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
-
-with st.container(border=True):
-    col_sk1, col_sk2 = st.columns([7, 3])
-    with col_sk1:
-        st.markdown(f"<span style='color: #E65100; font-size: 16px; font-weight: bold;'>🏬 {t('Are you a Shopkeeper / Wholesaler?', 'क्या आप एक दुकानदार / होलसेलर हैं?')}</span><br><span style='font-size: 12px; color: gray;'>{t('Turn ON to see hidden bulk rates', 'होलसेल के छिपे हुए रेट देखने के लिए इसे चालू करें 👉')}</span>", unsafe_allow_html=True)
-    with col_sk2:
-        st.toggle(t("Show Bulk Rates", "होलसेल रेट दिखाएं"), key="shopkeeper_mode")
-
-st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -674,7 +620,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             t("➕ Add Product", "➕ नया उत्पाद"), 
             t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
             t("⚙️ Settings", "⚙️ सेटिंग्स"),
-            t("📒 Customer Ledger", "📒 कस्टमर खाते (Ledger)")
+            t("📒 Ledger / Invoices", "📒 खाता और बिल (Ledger)")
         ])
     else:
         st.success(t(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)", f"🏪 स्वागत है: {st.session_state.seller_logged_in} (Seller)"))
@@ -701,11 +647,12 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.markdown("**💰 Pricing Tiers (हर रेट के लिए अलग-अलग यूनिट और मात्रा सेट करें)**")
                 unit_options = ["Pcs (पीस)", "Dozen (दर्जन)", "Box (बॉक्स)", "Set (सेट)"]
                 
-                st.markdown("**(1) Base / Sample**")
-                c1, c2, c3 = st.columns([1, 1, 1])
+                st.markdown("**(1) Base / Sample (Online vs Cash)**")
+                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
                 with c1: new_u_base = st.selectbox("इकाई (Unit)", unit_options, key="ub")
                 with c2: new_retail_qty = st.number_input("कम से कम मात्रा", min_value=1, value=1, key="n_r_q")
-                with c3: new_price = st.number_input("रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
+                with c3: new_online_price = st.number_input("💳 Online रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
+                with c4: new_cash_price = st.number_input("💵 Cash रेट (₹)", min_value=0.0, value=0.0, step=0.50, format="%.2f")
                 
                 st.markdown("**(2) Tier 1 (Bulk) - Optional**")
                 c4, c5, c6 = st.columns([1, 1, 1])
@@ -759,7 +706,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             
                             data = {
                                 "ID": new_id, "Name": new_name, 
-                                "Retail_Qty": new_retail_qty, "Price": new_price, 
+                                "Retail_Qty": new_retail_qty, "Price": new_online_price, "Cash_Price": new_cash_price,
                                 "Tier1_Price": new_t1_price, "Tier1_Qty": new_t1_qty, 
                                 "Tier2_Price": new_t2_price, "Tier2_Qty": new_t2_qty,
                                 "Category": final_cat, "Image_Path": final_path_str,
@@ -790,7 +737,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["banner_url"] = ""
                     save_config(current_config)
                     st.rerun()
-            
             st.markdown("---")
             st.subheader("📱 App Logo")
             new_logo = st.file_uploader("Choose Logo", type=["jpg", "png", "jpeg"], key="logo_upload")
@@ -808,80 +754,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["logo_url"] = ""
                     save_config(current_config)
                     st.rerun()
-
-            st.markdown("---")
-            st.subheader("📜 Trust Certificates (सर्टिफिकेट - Max 3)")
-            new_certs = st.file_uploader("Upload Certificates", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="certs_upload")
-            if st.button("Save Certificates") and new_certs:
-                if len(new_certs) > 3:
-                    st.error("⚠️ You can upload maximum 3 certificates only (आप अधिकतम 3 सर्टिफिकेट ही डाल सकते हैं).")
-                else:
-                    with st.spinner("Uploading certificates..."):
-                        cert_urls = []
-                        for c_file in new_certs:
-                            comp_bytes, _ = compress_image(c_file.getvalue())
-                            c_url = upload_image_to_imgbb(comp_bytes)
-                            if c_url: cert_urls.append(c_url)
-                        
-                        if cert_urls:
-                            current_config["certificates"] = cert_urls
-                            save_config(current_config)
-                            st.success("✅ Certificates Saved!")
-                            time.sleep(1)
-                            st.rerun()
-
-            if current_config.get("certificates"):
-                st.markdown("**Current Certificates:**")
-                c_cols = st.columns(len(current_config["certificates"]))
-                for i, c_url in enumerate(current_config["certificates"]):
-                    with c_cols[i]:
-                        st.image(c_url, use_container_width=True)
-                if st.button("❌ Remove All Certificates"):
-                    current_config["certificates"] = []
-                    save_config(current_config)
-                    st.rerun()
-
-            # --- 🟢 NEW: CATEGORY PHOTOS UPLOAD SECTION ---
-            st.markdown("---")
-            st.subheader("📂 Category Photos (कैटेगरी की फोटो)")
-            st.info("यहाँ से आप हर केटेगरी (बॉक्स) के लिए एक छोटी फोटो लगा सकते हैं, जो होम पेज पर बॉक्स में नाम के साथ दिखेगी।")
-            
-            if "category_images" not in current_config:
-                current_config["category_images"] = {}
-
-            all_cats_for_img = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-            if all_cats_for_img:
-                col_ci1, col_ci2 = st.columns(2)
-                with col_ci1:
-                    sel_cat_for_img = st.selectbox("कैटेगरी चुनें", all_cats_for_img, key="sel_cat_img")
-                with col_ci2:
-                    cat_img_upload = st.file_uploader(f"Upload photo for '{sel_cat_for_img}'", type=["jpg", "png", "jpeg"], key="cat_img_upl")
-                
-                if st.button("💾 Save Category Photo") and cat_img_upload:
-                    with st.spinner("Uploading..."):
-                        comp_bytes, _ = compress_image(cat_img_upload.getvalue())
-                        img_url = upload_image_to_imgbb(comp_bytes)
-                        if img_url:
-                            current_config["category_images"][sel_cat_for_img] = img_url
-                            save_config(current_config)
-                            st.success(f"✅ Photo saved for {sel_cat_for_img}!")
-                            time.sleep(1)
-                            st.rerun()
-                
-                curr_cat_imgs = current_config.get("category_images", {})
-                if curr_cat_imgs:
-                    st.markdown("**Current Assigned Photos:**")
-                    for c_name, c_url in curr_cat_imgs.items():
-                        c1, c2, c3 = st.columns([1, 6, 2])
-                        with c1: st.image(c_url, width=40)
-                        with c2: st.write(f"**{c_name}**")
-                        with c3:
-                            if st.button("❌ Remove", key=f"rm_cat_img_{c_name}"):
-                                del current_config["category_images"][c_name]
-                                save_config(current_config)
-                                st.rerun()
-            # --- END CATEGORY PHOTOS ---
-
+        
         with tab_settings:
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
             col_s1, col_s2, col_s3 = st.columns(3)
@@ -946,6 +819,36 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 st.success("✅ Saved!")
                 time.sleep(1)
                 st.rerun()
+
+            st.markdown("---")
+            st.subheader("📦 Bulk Move / Rename Categories (पूरी केटेगरी शिफ्ट करें)")
+            st.info("यहाँ से आप पूरी केटेगरी (बॉक्स) को किसी नए नाम से 'Move' कर सकते हैं या नाम बदल सकते हैं।")
+            
+            cats_list = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            if cats_list:
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    b_old_cat = st.selectbox("Old Category (किसे मूव करना है)", cats_list)
+                with col_b2:
+                    b_new_cat_choice = st.selectbox("Move To (कहाँ ले जाना है)", cats_list + ["Create New..."])
+                    if b_new_cat_choice == "Create New...":
+                        b_new_cat = st.text_input("नया नाम/इमोजी टाइप करें:", value=b_old_cat)
+                    else:
+                        b_new_cat = b_new_cat_choice
+
+                if st.button("🚀 Move / Update All Products", type="primary"):
+                    if b_new_cat:
+                        with st.spinner("शिफ्ट हो रहा है..."):
+                            prods_to_move = products_df[products_df['Category'] == b_old_cat]
+                            batch = db.batch()
+                            for idx, row in prods_to_move.iterrows():
+                                doc_ref = db.collection('products').document(str(row['ID']))
+                                batch.update(doc_ref, {"Category": b_new_cat.strip()})
+                            batch.commit()
+                            load_products.clear()
+                            st.success(f"✅ सारे प्रोडक्ट्स सफलतापूर्वक '{b_new_cat}' में शिफ्ट हो गए!")
+                            time.sleep(2)
+                            st.rerun()
 
             st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
@@ -1178,6 +1081,7 @@ def show_product_card(row, idx, prefix):
 
     retail_qty = safe_int(row.get('Retail_Qty'), 1)
     retail_price = safe_float(row.get('Price'), 0.0)
+    cash_price = safe_float(row.get('Cash_Price'), retail_price)
     
     t1_qty_default = safe_int(row.get('Wholesale_Qty'), 1)
     t1_qty = safe_int(row.get('Tier1_Qty'), t1_qty_default)
@@ -1203,16 +1107,11 @@ def show_product_card(row, idx, prefix):
         if not img_link_for_wa.startswith("http"):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
-    is_sk = st.session_state.get('shopkeeper_mode', False)
-
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     share_text += f"📦 *{t('Rates:', 'रेट लिस्ट:')}*\n"
-    
-    if is_sk:
-        if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
-        if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
-    
-    share_text += f"🔹 {retail_qty}+ {u_base}: ₹{retail_price}\n\n"
+    if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{t2_price}\n"
+    if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{t1_price}\n"
+    share_text += f"🔹 {retail_qty}+ {u_base}: Cash ₹{cash_price} | Online ₹{retail_price}\n\n"
     share_text += f"🏭 *{t('Dispatch:', 'डिस्पैच:')}* Delhi (Oura Warehouse)\n"
     
     cat_url = urllib.parse.quote(str(row.get('Category', '')))
@@ -1259,38 +1158,31 @@ def show_product_card(row, idx, prefix):
             else:
                 st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
-            if is_sk:
-                if t2_qty > 0 and t2_price > 0: 
-                    st.markdown(f"""
-                    <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                        <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
-                        <div style="border-left:1px solid #ccc; height:30px;"></div>
-                        <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
-                        <div style="border-left:1px solid #ccc; height:30px;"></div>
-                        <div style="text-align:center; flex:1;"><b>{t2_qty}+ {u_t2}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
-                    </div>
-                    <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
-                    """, unsafe_allow_html=True)
-                elif t1_qty > 0 and t1_price > 0: 
-                    st.markdown(f"""
-                    <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
-                        <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#2b6cb0; font-size:16px; font-weight:bold;">₹{retail_price}</span></div>
-                        <div style="border-left:1px solid #ccc; height:30px;"></div>
-                        <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
-                    </div>
-                    <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
-                    """, unsafe_allow_html=True)
-                else: 
-                    st.markdown(f"""
-                    <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
-                        <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
-                        <span style="font-size:12px;">🛵 {del_tag}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
+            if t2_qty > 0 and t2_price > 0: 
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#e65100; font-size:12px;">💵 Cash: ₹{cash_price}</span><br><span style="color:#2b6cb0; font-size:14px; font-weight:bold;">💳 Online: ₹{retail_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t2_qty}+ {u_t2}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t2_price}</span></div>
+                </div>
+                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                """, unsafe_allow_html=True)
+            elif t1_qty > 0 and t1_price > 0: 
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-around; align-items:center; background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px;">
+                    <div style="text-align:center; flex:1;"><b>{retail_qty}+ {u_base}</b><br><span style="color:#e65100; font-size:12px;">💵 Cash: ₹{cash_price}</span><br><span style="color:#2b6cb0; font-size:14px; font-weight:bold;">💳 Online: ₹{retail_price}</span></div>
+                    <div style="border-left:1px solid #ccc; height:30px;"></div>
+                    <div style="text-align:center; flex:1;"><b>{t1_qty}+ {u_t1}</b><br><span style="color:#d32f2f; font-size:16px; font-weight:bold;">₹{t1_price}</span></div>
+                </div>
+                <div style="text-align:center; font-size:12px; margin-top:-5px; margin-bottom:10px;">🛵 {del_tag}</div>
+                """, unsafe_allow_html=True)
+            else: 
                 st.markdown(f"""
                 <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
-                    <b>{retail_qty}+ {u_base} रेट:</b> <span style="color:#2b6cb0; font-size:18px; font-weight:bold;">₹{retail_price}</span> <br>
+                    <b>{retail_qty}+ {u_base} रेट:</b><br>
+                    <span style="color:#e65100; font-size:14px;">💵 Cash: ₹{cash_price}</span> | <span style="color:#2b6cb0; font-size:15px; font-weight:bold;">💳 Online: ₹{retail_price}</span> <br>
                     <span style="font-size:12px;">🛵 {del_tag}</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1298,29 +1190,33 @@ def show_product_card(row, idx, prefix):
             if is_in_stock:
                 opts = {}
                 if retail_price > 0:
-                    opts[f"{retail_qty} {u_base} (रेट: ₹{retail_price} / {u_base})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty}
+                    opts[f"{retail_qty} {u_base} (💳 Online Payment - ₹{retail_price})"] = {"price": retail_price, "unit": u_base, "min_q": retail_qty, "type": "Online"}
+                if cash_price > 0:
+                    opts[f"{retail_qty} {u_base} (💵 Cash / Offline - ₹{cash_price})"] = {"price": cash_price, "unit": u_base, "min_q": retail_qty, "type": "Cash"}
                 
-                if is_sk:
-                    if t1_qty > 0 and t1_price > 0:
-                        opts[f"{t1_qty} {u_t1} (रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty}
-                    if t2_qty > 0 and t2_price > 0:
-                        opts[f"{t2_qty} {u_t2} (रेट: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty}
+                if t1_qty > 0 and t1_price > 0:
+                    opts[f"{t1_qty} {u_t1} (थोक रेट: ₹{t1_price} / {u_t1})"] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty, "type": "Wholesale"}
+                if t2_qty > 0 and t2_price > 0:
+                    opts[f"{t2_qty} {u_t2} (सुपर बल्क: ₹{t2_price} / {u_t2})"] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
                     
-                selected_opt = st.selectbox("क्या खरीदना है? (पैकेज चुनें)", list(opts.keys()), key=f"sel_{prefix_idx}")
+                selected_opt = st.selectbox("पेमेंट का तरीका और पैकेज चुनें:", list(opts.keys()), key=f"sel_{prefix_idx}")
                 buy_price = opts[selected_opt]["price"]
                 buy_unit = opts[selected_opt]["unit"]
                 min_q = opts[selected_opt]["min_q"]
+                buy_type = opts[selected_opt]["type"]
                 
                 qty = st.number_input(f"मात्रा ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
                 if st.button(t("🛒 Add to Cart", "🛒 कार्ट में डालें"), key=f"b_{prefix_idx}"):
-                    cart_key = f"{p_id}|{buy_unit}|{buy_price}"
+                    cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}"
                     
                     if cart_key in st.session_state.cart:
                         st.session_state.cart[cart_key]["qty"] += qty
                     else:
+                        base_nm = row.get('Name', 'Item')
+                        final_nm = f"{base_nm} ({buy_type})" if buy_type in ["Online", "Cash"] else base_nm
                         st.session_state.cart[cart_key] = {
-                            "name": row.get('Name', 'Item'), 
+                            "name": final_nm, 
                             "price": buy_price, 
                             "qty": qty, 
                             "img_link": img_link_for_wa,
@@ -1385,10 +1281,12 @@ def show_product_card(row, idx, prefix):
                     idx_t2 = next((i for i, opt in enumerate(unit_opts) if u_t2 in opt), 0)
 
                     st.markdown("**Tier 1 (Base):**")
-                    c_e01, c_e02, c_e03 = st.columns([2, 1, 1])
+                    c_e01, c_e02, c_e03, c_e04 = st.columns([1, 1, 1, 1])
                     with c_e01: e_u_base = st.selectbox("इकाई", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
                     with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty, key=f"erq_{prefix_idx}")
-                    with c_e03: e_price = st.number_input("रेट (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_{prefix_idx}")
+                    with c_e03: e_online_price = st.number_input("💳 Online (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_on_{prefix_idx}")
+                    cash_val = safe_float(row.get('Cash_Price'), float(retail_price)) 
+                    with c_e04: e_cash_price = st.number_input("💵 Cash (₹)", value=cash_val, format="%.2f", step=0.50, key=f"ep_ca_{prefix_idx}")
                     
                     st.markdown("**Tier 2 (Bulk):**")
                     c_e1, c_e2, c_e3 = st.columns([2, 1, 1])
@@ -1412,7 +1310,7 @@ def show_product_card(row, idx, prefix):
                     target_id = str(row['ID'])
                     is_free_val = True if e_fd in ["फ्री डिलीवरी", "Free Delivery"] else False
                     update_dict = {
-                        "Retail_Qty": e_retail_qty, "Price": e_price, 
+                        "Retail_Qty": e_retail_qty, "Price": e_online_price, "Cash_Price": e_cash_price,
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
                         "Category": e_cat.strip(),
@@ -1462,19 +1360,20 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
-                # --- 🟢 CSS FOR CATEGORY BUTTONS (TO HOLD IMAGE) ---
+                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
                     display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
                 }
+                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
                 
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 105px !important; 
-                    min-height: 105px !important; 
+                    height: 90px !important; 
+                    min-height: 90px !important; 
                     width: 100% !important; 
                     border-radius: 12px !important;
                     background: #ffffff !important; 
@@ -1482,14 +1381,13 @@ else:
                     box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
                     color: #1a202c !important; 
                     font-weight: 700 !important;
-                    font-size: 12px !important; 
+                    font-size: 13px !important; 
                     white-space: normal !important; 
                     word-wrap: break-word !important; 
                     line-height: 1.2 !important; 
                     padding: 4px !important; 
                     transition: all 0.2s ease-in-out !important;
                     display: flex !important;
-                    flex-direction: column !important;
                     align-items: center !important;
                     justify-content: center !important;
                     text-align: center !important;
@@ -1505,65 +1403,10 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
-
-                # --- 🟢 JAVASCRIPT TO INJECT CATEGORY IMAGES FAST ---
-                cat_images_dict = current_config.get("category_images", {})
-                cat_images_json = json.dumps(cat_images_dict)
-                
-                inject_js = f"""
-                <script>
-                const catImages = {cat_images_json};
-                const parentDoc = window.parent.document;
-                
-                setInterval(() => {{
-                    const gridBlock = parentDoc.getElementById('safe-cat-grid')?.parentElement;
-                    if(gridBlock) {{
-                        const buttons = gridBlock.querySelectorAll('button');
-                        buttons.forEach(btn => {{
-                            let textEl = btn.querySelector('p') || btn.querySelector('span') || btn;
-                            let catName = textEl.innerText.trim();
-                            
-                            if (catImages[catName] && !btn.querySelector('.cat-img')) {{
-                                const img = parentDoc.createElement('img');
-                                img.src = catImages[catName];
-                                img.className = 'cat-img';
-                                img.style.width = '45px';
-                                img.style.height = '45px';
-                                img.style.objectFit = 'contain';
-                                img.style.marginBottom = '5px';
-                                img.style.borderRadius = '5px';
-                                btn.insertBefore(img, btn.firstChild);
-                            }}
-                        }});
-                    }}
-                }}, 400);
-                </script>
-                """
-                st_components.html(inject_js, height=0, width=0)
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
-        if st.session_state.admin_logged_in:
-            with st.expander(t("✏️ Rename Category", "✏️ इस बॉक्स (कैटेगरी) का नाम बदलें")):
-                col_rc1, col_rc2 = st.columns([3, 1])
-                with col_rc1:
-                    new_cat_name = st.text_input("New Name", value=st.session_state.selected_category, label_visibility="collapsed")
-                with col_rc2:
-                    if st.button("✅ Update", use_container_width=True):
-                        if new_cat_name and new_cat_name.strip() != st.session_state.selected_category:
-                            with st.spinner("Updating..."):
-                                prods_to_rename = products_df[products_df['Category'] == st.session_state.selected_category]
-                                batch = db.batch()
-                                for idx, row in prods_to_rename.iterrows():
-                                    doc_ref = db.collection('products').document(str(row['ID']))
-                                    batch.update(doc_ref, {"Category": new_cat_name.strip()})
-                                batch.commit()
-                                load_products.clear()
-                                st.session_state.selected_category = new_cat_name.strip()
-                                st.query_params["cat"] = new_cat_name.strip()
-                                st.rerun()
-
         if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params: del st.query_params["cat"]
@@ -1679,8 +1522,6 @@ if st.session_state.cart:
             shipping_cost = st.number_input(t("🚚 Courier / Packing Charge (₹)", "🚚 कोरियर / पैकिंग चार्ज (₹)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
             
             amount_paid = st.number_input(t("💸 Amount Paid Now (अभी कितने पैसे दिए / ₹)", "💸 अभी कितने पैसे जमा किए (Cash/Online)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
-            
-            save_to_ledger = st.checkbox(t("✅ Save to Party Ledger", "✅ इस बिल को पार्टी के खाते (Ledger) में जोड़ें"), value=False, help=t("Tick this only for regular parties.", "इसे सिर्फ पक्के ग्राहकों (Parties) के लिए टिक करें। कैश ग्राहकों के लिए इसे खाली छोड़ें ताकि फालतू खाते न बनें।"))
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill", "✅ बिल तैयार करें"))
 
@@ -1740,7 +1581,7 @@ if st.session_state.cart:
                 current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
-                if safe_name and save_to_ledger:
+                if safe_name:
                     batch = db.batch()
                     parent_ref = db.collection('ledgers').document(safe_name)
                     batch.set(parent_ref, {"active": True}, merge=True)
