@@ -102,7 +102,8 @@ def load_config():
         "admin_whatsapp": "919891587437", 
         "admin_gst": "07AKWPB1315K", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
-        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {}
+        "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
+        "cert1_url": "", "cert2_url": "", "cert3_url": ""
     }
 
 def save_config(config):
@@ -566,13 +567,32 @@ with col_login:
 hi_marquee = "🏭 क्या आप भी एक मैन्युफैक्चरर या होलसेलर हैं? आइए, Oura के साथ मिलकर अपने बिज़नेस को नई ऊंचाइयों पर ले जाएं! 🚀"
 en_marquee = "🏭 Are you a manufacturer or wholesaler? Let's take your business to new heights with Oura! 🚀"
 multi_color_marquee = f"""
-<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; margin-top: 10px; border: 1px solid #bbdefb;">
+<div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 10px; margin-top: 10px; border: 1px solid #bbdefb;">
     <marquee behavior="scroll" direction="left" scrollamount="6" style="color: #0d47a1; font-size: 16px; font-weight: bold; font-family: sans-serif;">
         {t(en_marquee, hi_marquee)}
     </marquee>
 </div>
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
+
+# --- 🏆 TRUST CERTIFICATES DISPLAY SECTION ---
+c1_url = current_config.get("cert1_url", "")
+c2_url = current_config.get("cert2_url", "")
+c3_url = current_config.get("cert3_url", "")
+
+if c1_url or c2_url or c3_url:
+    st.markdown(f"#### 🏆 {t('100% Verified & Trusted Business', '100% वेरिफाइड और भरोसेमंद')}")
+    cert_cols = st.columns(3)
+    cert_list = [
+        {"url": c1_url, "label": "GST Verified"},
+        {"url": c2_url, "label": "Udyog Aadhaar"},
+        {"url": c3_url, "label": "ISO/ISI Certified"}
+    ]
+    for idx, c_data in enumerate(cert_list):
+        if c_data["url"]:
+            with cert_cols[idx % 3]:
+                st.image(c_data["url"], caption=c_data["label"], use_container_width=True)
+    st.markdown("---")
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -755,6 +775,65 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["logo_url"] = ""
                     save_config(current_config)
                     st.rerun()
+                    
+            st.markdown("---")
+            st.subheader("📜 Trust Certificates (GST, Udyog Aadhaar, ISO)")
+            st.info("यहाँ आप अपने 3 सर्टिफिकेट्स (GST, Udyog Aadhaar, ISO/ISI) अपलोड कर सकते हैं, जो ग्राहकों को ऐप खोलते ही सबसे ऊपर दिखेंगे।")
+            
+            c_cert1, c_cert2, c_cert3 = st.columns(3)
+            with c_cert1:
+                st.markdown("**1. GST Certificate**")
+                if current_config.get("cert1_url"):
+                    st.image(current_config["cert1_url"], width=100)
+                    if st.button("❌ Remove GST", key="rm_c1"):
+                        current_config["cert1_url"] = ""
+                        save_config(current_config)
+                        st.rerun()
+                else:
+                    new_c1 = st.file_uploader("Upload GST", type=["jpg", "png", "jpeg"], key="up_c1")
+                    if st.button("Save GST", key="sv_c1") and new_c1:
+                        c_bytes, _ = compress_image(new_c1.getvalue())
+                        c_url = upload_image_to_imgbb(c_bytes)
+                        if c_url:
+                            current_config["cert1_url"] = c_url
+                            save_config(current_config)
+                            st.rerun()
+
+            with c_cert2:
+                st.markdown("**2. Udyog Aadhaar**")
+                if current_config.get("cert2_url"):
+                    st.image(current_config["cert2_url"], width=100)
+                    if st.button("❌ Remove Aadhaar", key="rm_c2"):
+                        current_config["cert2_url"] = ""
+                        save_config(current_config)
+                        st.rerun()
+                else:
+                    new_c2 = st.file_uploader("Upload Aadhaar", type=["jpg", "png", "jpeg"], key="up_c2")
+                    if st.button("Save Aadhaar", key="sv_c2") and new_c2:
+                        c_bytes, _ = compress_image(new_c2.getvalue())
+                        c_url = upload_image_to_imgbb(c_bytes)
+                        if c_url:
+                            current_config["cert2_url"] = c_url
+                            save_config(current_config)
+                            st.rerun()
+
+            with c_cert3:
+                st.markdown("**3. ISO/ISI Certificate**")
+                if current_config.get("cert3_url"):
+                    st.image(current_config["cert3_url"], width=100)
+                    if st.button("❌ Remove ISO", key="rm_c3"):
+                        current_config["cert3_url"] = ""
+                        save_config(current_config)
+                        st.rerun()
+                else:
+                    new_c3 = st.file_uploader("Upload ISO/ISI", type=["jpg", "png", "jpeg"], key="up_c3")
+                    if st.button("Save ISO", key="sv_c3") and new_c3:
+                        c_bytes, _ = compress_image(new_c3.getvalue())
+                        c_url = upload_image_to_imgbb(c_bytes)
+                        if c_url:
+                            current_config["cert3_url"] = c_url
+                            save_config(current_config)
+                            st.rerun()
         
         with tab_settings:
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
@@ -1295,7 +1374,7 @@ def show_product_card(row, idx, prefix):
                     st.markdown("**Tier 1 (Base):**")
                     c_e01, c_e02, c_e03, c_e04 = st.columns([1, 1, 1, 1])
                     with c_e01: e_u_base = st.selectbox("इकाई", unit_opts, index=idx_b, key=f"eu_b_{prefix_idx}")
-                    with c_e02: e_retail_qty = st.number_input("कम से کم", value=retail_qty, key=f"erq_{prefix_idx}")
+                    with c_e02: e_retail_qty = st.number_input("कम से कम", value=retail_qty, key=f"erq_{prefix_idx}")
                     with c_e03: e_online_price = st.number_input("💳 Online (₹)", value=float(retail_price), format="%.2f", step=0.50, key=f"ep_on_{prefix_idx}")
                     cash_val = safe_float(row.get('Cash_Price'), float(retail_price)) 
                     with c_e04: e_cash_price = st.number_input("💵 Cash (₹)", value=cash_val, format="%.2f", step=0.50, key=f"ep_ca_{prefix_idx}")
@@ -1651,7 +1730,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
