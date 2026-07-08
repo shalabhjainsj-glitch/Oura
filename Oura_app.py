@@ -1117,36 +1117,22 @@ with col_toggle:
     st.session_state.wholesale_mode = st.toggle(t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), value=st.session_state.wholesale_mode)
 
 
-# --- 🏆 TRUST CERTIFICATES DISPLAY SECTION (3 COLUMNS + CLICK TO ZOOM) ---
+# --- 🏆 TRUST CERTIFICATES DISPLAY SECTION (TINY BADGES) ---
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
 c3_url = current_config.get("cert3_url", "")
 
 if c1_url or c2_url or c3_url:
-    st.markdown(f"<h5 style='text-align: center; color: #2b6cb0; margin-top: 10px; margin-bottom: 15px;'>🏆 {t('100% Verified & Trusted Business', '100% वेरिफाइड और भरोसेमंद')}</h5>", unsafe_allow_html=True)
-    
-    cert_cols = st.columns(3)
-    
+    cert_html = '<div style="display: flex; justify-content: center; gap: 10px; align-items: center; margin-top: 5px; margin-bottom: 15px;">'
+    cert_html += f'<div style="font-size:12px; font-weight:bold; color:#2b6cb0;">🏆 {t("Verified:", "वेरिफाइड:")}</div>'
     if c1_url:
-        with cert_cols[0]:
-            with st.container(border=True):
-                st.markdown(f"<div style='text-align:center; font-size:12px; font-weight:bold; color:gray; margin-bottom:5px;'>GST Verified</div>", unsafe_allow_html=True)
-                st.image(c1_url, use_container_width=True)
-    
+        cert_html += f'<img src="{c1_url}" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'
     if c2_url:
-        with cert_cols[1]:
-            with st.container(border=True):
-                st.markdown(f"<div style='text-align:center; font-size:12px; font-weight:bold; color:gray; margin-bottom:5px;'>Udyog Aadhaar</div>", unsafe_allow_html=True)
-                st.image(c2_url, use_container_width=True)
-
+        cert_html += f'<img src="{c2_url}" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'
     if c3_url:
-        with cert_cols[2]:
-            with st.container(border=True):
-                st.markdown(f"<div style='text-align:center; font-size:12px; font-weight:bold; color:gray; margin-bottom:5px;'>ISO/ISI Certified</div>", unsafe_allow_html=True)
-                st.image(c3_url, use_container_width=True)
-                
-    st.markdown("<div style='text-align:center; font-size:11px; color:gray; margin-top:-10px; margin-bottom:10px;'>👆 ज़ूम (Zoom) करने के लिए फोटो पर टच करें</div>", unsafe_allow_html=True)
-    st.markdown("---")
+        cert_html += f'<img src="{c3_url}" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'
+    cert_html += '</div>'
+    st.markdown(cert_html, unsafe_allow_html=True)
 
 
 def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
