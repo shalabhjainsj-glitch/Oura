@@ -575,25 +575,6 @@ multi_color_marquee = f"""
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
-# --- 🏆 TRUST CERTIFICATES DISPLAY SECTION ---
-c1_url = current_config.get("cert1_url", "")
-c2_url = current_config.get("cert2_url", "")
-c3_url = current_config.get("cert3_url", "")
-
-if c1_url or c2_url or c3_url:
-    st.markdown(f"#### 🏆 {t('100% Verified & Trusted Business', '100% वेरिफाइड और भरोसेमंद')}")
-    cert_cols = st.columns(3)
-    cert_list = [
-        {"url": c1_url, "label": "GST Verified"},
-        {"url": c2_url, "label": "Udyog Aadhaar"},
-        {"url": c3_url, "label": "ISO/ISI Certified"}
-    ]
-    for idx, c_data in enumerate(cert_list):
-        if c_data["url"]:
-            with cert_cols[idx % 3]:
-                st.image(c_data["url"], caption=c_data["label"], use_container_width=True)
-    st.markdown("---")
-
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
         st.subheader(t("Store Login", "दुकान में लॉगिन करें"))
@@ -1134,6 +1115,26 @@ with col_search:
 with col_toggle:
     st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
     st.session_state.wholesale_mode = st.toggle(t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), value=st.session_state.wholesale_mode)
+
+# --- 🏆 TRUST CERTIFICATES DISPLAY SECTION (MOVED HERE) ---
+c1_url = current_config.get("cert1_url", "")
+c2_url = current_config.get("cert2_url", "")
+c3_url = current_config.get("cert3_url", "")
+
+if c1_url or c2_url or c3_url:
+    st.markdown(f"<h5 style='text-align: center; color: #2b6cb0; margin-top: 10px; font-size: 16px;'>🏆 {t('100% Verified & Trusted Business', '100% वेरिफाइड और भरोसेमंद')}</h5>", unsafe_allow_html=True)
+    cert_cols = st.columns(3)
+    cert_list = [
+        {"url": c1_url},
+        {"url": c2_url},
+        {"url": c3_url}
+    ]
+    for idx, c_data in enumerate(cert_list):
+        if c_data["url"]:
+            with cert_cols[idx % 3]:
+                st.image(c_data["url"], use_container_width=True)
+    st.markdown("---")
+
 
 def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
     if not path_str: return []
@@ -1730,7 +1731,7 @@ if st.session_state.cart:
         st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर ऑर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill", "बिल भेजो")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
