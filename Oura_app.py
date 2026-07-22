@@ -679,7 +679,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     st.info(f"🏪 {t('Your Brand/Seller Name', 'आपका ब्रांड/सेलर नाम')}: **{st.session_state.seller_logged_in}**")
                     new_seller_name = st.session_state.seller_logged_in
                 else:
-                    new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (اگر खाली छोड़ेंगे तो कुछ नहीं दिखेगा)"))
+                    new_seller_name = st.text_input(t("Seller/Brand Name (Leave blank to hide)", "सेलर / ब्रांड का नाम (अगर खाली छोड़ेंगे तो कुछ नहीं दिखेगा)"))
                 
                 existing_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
                 cat_options = [t("Create New Category...", "नयी केटेगरी बनाएं...")] + existing_cats
@@ -1317,7 +1317,7 @@ def show_product_card(row, idx, prefix):
                     save_cart_to_url()
                     st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
             else:
-                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ઓફ स्टॉक')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
         can_edit = False
         if st.session_state.admin_logged_in: can_edit = True
@@ -1451,11 +1451,13 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
+                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
                     display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
                 }
+                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
@@ -1626,7 +1628,7 @@ if st.session_state.cart:
             
             amount_paid = st.number_input(t("💸 Amount Paid Now (अभी कितने पैसे दिए / ₹)", "💸 अभी कितने पैसे जमा किए (Cash/Online)"), min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
-        submit_billing = st.form_submit_button(t("✅ Prepare Bill & Order", "✅ बिल तैयार करें व ऑर्डर कन्फर्म करें"))
+        submit_billing = st.form_submit_button(t("✅ Order Confirm / WhatsApp Bill", "✅ आर्डर कन्फर्म करे और WhatsApp पर भेजें"))
 
     if submit_billing:
         is_valid = True
@@ -1676,7 +1678,7 @@ if st.session_state.cart:
                 taxable_amount = 0
                 for k, item in st.session_state.cart.items():
                     item_unit = item.get('unit', 'Pcs')
-                    item_details_list.append(f"• {item['name']} - {item['qty']} {item_unit} @ ₹{item['price']} = ₹{item['qty'] * item['price']:.2f}")
+                    item_details_list.append(f"• {item['name']} - {item['qty']} {item_unit} (₹{item['price']} each)")
                     taxable_amount += (item['qty'] * item['price'])
                 
                 taxable_amount += shipping_cost
@@ -1712,26 +1714,16 @@ if st.session_state.cart:
                     batch.commit()
                     load_ledger_data.clear()
 
-                # WhatsApp पर भेजने के लिए विस्तृत मैसेज
-                items_text_wa = "\n".join(item_details_list)
-                order_msg_text = f"🛍️ *नया आर्डर प्राप्त हुआ (NEW ORDER)* 🛍️\n\n👤 *ग्राहक का नाम:* {cust_name if cust_name else 'Cash Customer'}\n📞 *मोबाइल नंबर:* {cust_mobile if cust_mobile else 'N/A'}\n📍 *पता:* {cust_address if cust_address else 'N/A'}\n\n📦 *खरीदा गया सामान:*\n{items_text_wa}\n\n💰 *कुल आर्डर राशि (Grand Total):* ₹{current_bill_total:.2f}\n💸 *जमा राशि (Paid):* ₹{amount_paid:.2f}\n"
-                st.session_state.ready_msg_for_admin = order_msg_text
-                st.session_state.order_confirmed_display = order_msg_text
+                items_text = "\n".join(item_details_list)
+                whatsapp_message = f"🧾 *नया ऑर्डर कन्फर्म हुआ (Oura Products)* 🧾\n\n👤 *ग्राहक का नाम:* {cust_name if cust_name else 'N/A'}\n📞 *मोबाइल:* {cust_mobile if cust_mobile else 'N/A'}\n📍 *पता:* {cust_address if cust_address else 'N/A'}\n\n🛒 *ऑर्डर विवरण:*\n{items_text}\n\n📦 *कुल आर्डर Amount:* ₹{current_bill_total:.2f}\n"
+                if amount_paid > 0:
+                    whatsapp_message += f"💸 *भुगतान किया गया:* ₹{amount_paid:.2f}\n"
+                
+                st.session_state.ready_msg_for_admin = whatsapp_message
+                st.session_state.auto_trigger_wa = True
 
     if 'ready_pdf' in st.session_state:
-        st.success("✅ बिल तैयार है! नीचे दिए गए बटन से PDF डाउनलोड करें या सीधे WhatsApp पर आर्डर भेजें:")
-        
-        # यहाँ ग्राहक के लिए आर्डर कन्फर्मेशन बॉक्स दिखाया गया है
-        if 'order_confirmed_display' in st.session_state:
-            st.markdown(f"""
-            <div style="background-color:#e6fffa; border:2px solid #319795; padding:20px; border-radius:12px; margin-bottom:15px;">
-                <h3 style="color:#234e52; margin-top:0;">🎉 आपका आर्डर सफलतापूर्वक कन्फर्म हो गया है!</h3>
-                <p style="color:#2d3748; font-size:15px;">नीचे आपके आर्डर की डिटेल दी गई है। कृपया <b>'🛍️ आर्डर करें'</b> बटन दबाकर इसे व्हाट्सएप पर भेजें ताकि आपकी पैकिंग शुरू की जा सके:</p>
-                <hr style="border-color:#b2f5ea;">
-                <pre style="background:white; padding:12px; border-radius:8px; font-family:inherit; white-space:pre-wrap; color:#1a202c;">{st.session_state.order_confirmed_display}</pre>
-            </div>
-            """, unsafe_allow_html=True)
-
+        st.success("✅ आर्डर सफलतापूर्वक कन्फर्म हो गया है! आप नीचे से PDF डाउनलोड कर सकते हैं या WhatsApp पर भेज सकते हैं:")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1740,16 +1732,25 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t('Send Order on WhatsApp', 'WhatsApp पर आर्डर भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">🛍️ आर्डर करें (Send Order on WhatsApp)</a>''', unsafe_allow_html=True)
+        
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ आर्डर कन्फर्म और WhatsApp पर भेजें</a>''', unsafe_allow_html=True)
+
+        if st.session_state.get('auto_trigger_wa', False):
+            auto_js = f"""
+            <script>
+            window.open("{wa_link}", "_blank");
+            </script>
+            """
+            st_components.html(auto_js, height=0, width=0)
+            st.session_state.auto_trigger_wa = False
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
         if 'ready_pdf' in st.session_state: del st.session_state.ready_pdf
         if 'ready_msg_for_admin' in st.session_state: del st.session_state.ready_msg_for_admin
-        if 'order_confirmed_display' in st.session_state: del st.session_state.order_confirmed_display
+        if 'auto_trigger_wa' in st.session_state: del st.session_state.auto_trigger_wa
         save_cart_to_url()
         st.rerun()
 
@@ -1857,7 +1858,7 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
             let t = text.toLowerCase();
             
             if(msgCount >= 4 || t.includes("call") || t.includes("admin") || t.includes("owner") || t.includes("मालिक") || t.includes("whatsapp") || t.includes("bat") || t.includes("बात") || t.includes("number") || t.includes("संपर्क") || t.includes("contact")) {
-                reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए。<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
+                reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए।<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
             } 
             else if(t.includes("rate") || t.includes("price") || t.includes("रेट") || t.includes("प्राइस") || t.includes("कितने")) {
                 reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने आप लग जाएगा! 🛍️";
