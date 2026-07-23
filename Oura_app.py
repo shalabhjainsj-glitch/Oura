@@ -815,7 +815,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with c_cert1:
                 st.markdown("**1. GST Certificate**")
                 if current_config.get("cert1_url"):
-                    st.image(current_config["cert1_url"], wpdf200)
+                    st.image(current_config["cert1_url"], wpdf 400)
                     if st.button("❌ Remove GST", key="rm_c1"):
                         current_config["cert1_url"] = ""
                         save_config(current_config)
