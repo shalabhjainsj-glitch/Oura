@@ -1246,7 +1246,7 @@ def show_product_card(row, idx, prefix):
                 wa_btn_link = f"https://wa.me/{admin_num}?text={wa_msg}"
                 st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 {ask_qty} {u_base} का रेट WhatsApp पर पूछें</a>', unsafe_allow_html=True)
             else:
-                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ઓફ स्टॉक')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
         else:
             if show_wholesale and t2_qty > 0 and t2_price > 0: 
                 st.markdown(f"""
@@ -1317,7 +1317,7 @@ def show_product_card(row, idx, prefix):
                     save_cart_to_url()
                     st.success(t("Added to Cart! 🛒", "कार्ट में जुड़ गया! 🛒"))
             else:
-                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ઓફ स्टॉक')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 {t('Out of Stock', 'आउट ऑफ स्टॉक')}</div>", unsafe_allow_html=True)
             
         can_edit = False
         if st.session_state.admin_logged_in: can_edit = True
@@ -1597,10 +1597,6 @@ if st.session_state.cart:
                     qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total:.2f}&cu=INR"
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
-
-    st.markdown("---")
-    st.markdown(f"### 🤝 {t('100% Customer Satisfaction', '100% ग्राहक संतुष्टि (Customer Trust)')}")
-    st.success(t("✅ **Live Packing Proof:** Video & photo of your package will be sent to WhatsApp before dispatch.", "✅ **लाइव पैकिंग प्रूफ:** आपकी पूरी संतुष्टि और भरोसे के लिए, आपके माल की **पैकिंग की लाइव वीडियो और फोटो** डिस्पैच (Dispatch) से पहले सीधे आपके WhatsApp पर भेजी जाएगी।"))
 
     st.markdown("---")
     st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
@@ -1883,13 +1879,13 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
             let t = text.toLowerCase();
             
             if(msgCount >= 4 || t.includes("call") || t.includes("admin") || t.includes("owner") || t.includes("मालिक") || t.includes("whatsapp") || t.includes("bat") || t.includes("बात") || t.includes("number") || t.includes("संपर्क") || t.includes("contact")) {
-                reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए।<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
+                reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए。<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
             } 
             else if(t.includes("rate") || t.includes("price") || t.includes("रेट") || t.includes("प्राइस") || t.includes("कितने")) {
                 reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने आप लग जाएगा! 🛍️";
             } 
             else if(t.includes("delivery") || t.includes("डिलीवरी") || t.includes("shipping") || t.includes("पहुंचेगा") || t.includes("चार्ज")) {
-                reply = "छोटे आर्डर पर कुछ接收PRODUCTS पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
+                reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
             } 
             else if(t.includes("seller") || t.includes("सेलर") || t.includes("अकाउंट") || t.includes("दुकान") || t.includes("बेचना")) {
                 reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
