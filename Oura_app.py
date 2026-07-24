@@ -1544,17 +1544,54 @@ else:
                         save_cart_to_url()
                         st.rerun()
             
-    else:
-        st.subheader(f"📂 {st.session_state.selected_category}")
-        
-        if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
-            st.session_state.selected_category = None
-            if "cat" in st.query_params: del st.query_params["cat"]
-            save_cart_to_url()
-            st.rerun()
-            
+    
+        <script>        # यह स्क्रिप्ट फ्लोटिंग बटन को स्टाइल करती है और मोबाइल के बैक बटन को कंट्रोल करती है
         float_js = """
         <script>
+        const parentWin = window.parent;
+        const parentDoc = window.parent.document;
+        
+        // 1. 'All Categories' बटन को स्क्रीन पर नीचे फिक्स (Float) करना
+        const buttons = parentDoc.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
+                btn.style.position = 'fixed';
+                btn.style.bottom = '120px';
+                btn.style.left = '15px';
+                btn.style.zIndex = '999999';
+                btn.style.background = '#2b6cb0'; 
+                btn.style.color = 'white';
+                btn.style.padding = '12px 18px';
+                btn.style.borderRadius = '50px';
+                btn.style.border = '2px solid white';
+                btn.style.fontWeight = 'bold';
+                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                btn.style.minHeight = 'auto'; 
+                btn.style.width = 'auto';
+                btn.style.animation = 'none';
+            }
+        });
+
+        // 2. मोबाइल के हार्डवेयर बैक बटन (Hardware Back Button) को हैंडल करना
+        // जब यूजर केटेगरी में आता है, तो हम ब्राउज़र की हिस्ट्री में एक नकली 'state' जोड़ देते हैं
+        if (!parentWin.history.state || parentWin.history.state.page !== 'category_view') {
+            parentWin.history.pushState({page: 'category_view'}, '');
+        }
+
+        // जब यूजर मोबाइल का बैक बटन दबाता है, तो यह इफ़ेक्ट ट्रिगर होता है
+        parentWin.onpopstate = function(event) {
+            // बैक बटन दबाते ही 'All Categories' वाले बटन को कोड के ज़रिए क्लिक करवा दें
+            const btns = parentDoc.querySelectorAll('button');
+            btns.forEach(btn => {
+                if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
+                    btn.click();
+                }
+            });
+        };
+        </script>
+        """
+        st_components.html(float_js, height=0, width=0)
+
         const parentDoc = window.parent.document;
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
