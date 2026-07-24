@@ -1586,9 +1586,7 @@ else:
         };
         </script>
         """
-        st_components.html(float_js, height=0, width=0)
-
-        const parentDoc = window.parent.document;
+ const parentDoc = window.parent.document;
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
