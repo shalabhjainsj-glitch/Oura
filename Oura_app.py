@@ -1765,8 +1765,6 @@ if st.session_state.cart:
 
                 # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
-                st.success(f"🎉 **ऑर्डर कन्फर्म!** कुल बिल **₹{current_bill_total:.2f}** तैयार है।")
-                
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
                 
@@ -1779,7 +1777,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 बिल डाउनलोड करें")
+        st.markdown("### 📥 डाउनलोड")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
