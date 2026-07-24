@@ -102,6 +102,7 @@ def load_config():
         "admin_whatsapp": "919891587437", 
         "admin_gst": "07AKWPB1315K", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
+        "telegram_bot_token": "", "telegram_chat_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
         "cert1_url": "", "cert2_url": "", "cert3_url": ""
     }
@@ -575,11 +576,7 @@ multi_color_marquee = f"""
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
-# ---> यहाँ पर थोक (Wholesale) रेट वाले बटन को बैनर के नीचे सेट किया गया है <---
-st.session_state.wholesale_mode = st.toggle(
-    t("📦  Wholesale ", "📦 थोक "), 
-    value=st.session_state.wholesale_mode
-)
+st.session_state.wholesale_mode = st.toggle(t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), value=st.session_state.wholesale_mode)
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -860,6 +857,15 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             st.rerun()
 
             st.markdown("---")
+            st.subheader("🤖 Telegram Bot Settings (बैकग्राउंड अलर्ट)")
+            st.info("💡 Telegram पर @BotFather से Token बनाएं। अपनी Chat ID जानने के लिए Telegram पर @userinfobot का इस्तेमाल करें।")
+            col_tg1, col_tg2 = st.columns(2)
+            with col_tg1:
+                new_tg_token = st.text_input("Telegram Bot Token", value=current_config.get("telegram_bot_token", ""))
+            with col_tg2:
+                new_tg_chat_id = st.text_input("Telegram Chat ID", value=current_config.get("telegram_chat_id", ""))
+
+            st.markdown("---")
             st.subheader("📱 Business Settings")
             new_wa = st.text_input("Admin WhatsApp Number", value=current_config.get("admin_whatsapp", "919891587437"))
             new_admin_gst = st.text_input("Admin GST Number", value=current_config.get("admin_gst", "07AKWPB1315K"))
@@ -874,9 +880,12 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             with col_u2:
                 new_gpay = st.text_input("GPay UPI ID", value=current_config.get("gpay_upi", ""))
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
+            
             if st.button("⚙️ Save All Settings"):
                 current_config["admin_whatsapp"] = new_wa
                 current_config["admin_gst"] = new_admin_gst
+                current_config["telegram_bot_token"] = new_tg_token
+                current_config["telegram_chat_id"] = new_tg_chat_id
                 current_config["free_delivery_tag"] = show_free_delivery
                 current_config["phonepe_upi"] = new_phonepe
                 current_config["paytm_upi"] = new_paytm
@@ -1115,7 +1124,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 st.markdown("---")
 
-# ---> सर्च बार अब पूरी चौड़ाई (Full Width) लेगा क्योंकि टॉगल ऊपर जा चुका है <---
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
 
@@ -1443,6 +1451,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1609,7 +1618,7 @@ if st.session_state.cart:
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ {t("Pay Instantly via UPI App", "UPI Pay")} ⚡
+            ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
         </a>
         <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
             {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
@@ -1625,6 +1634,7 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
@@ -1740,7 +1750,7 @@ if st.session_state.cart:
                     batch.commit()
                     load_ledger_data.clear()
 
-                # --- 📝 WhatsApp के लिए फुल डिटेल मेसेज ---
+                # --- 📝 WhatsApp और Telegram के लिए फुल डिटेल मेसेज ---
                 msg = f"🛍️ *OURA PRODUCTS - NEW ORDER RECEIVED* 🛍️\n"
                 msg += f"------------------------------------\n"
                 msg += f"👤 *पार्टी/दुकान का नाम:* {cust_name if cust_name else 'Walk-in Customer'}\n"
@@ -1763,13 +1773,36 @@ if st.session_state.cart:
                 
                 st.session_state.ready_msg_for_admin = msg
 
+                # ----------------------------------------------------
+                # 🚀 नया TELEGRAM बैकग्राउंड नोटिफिकेशन सिस्टम 🚀
+                # ----------------------------------------------------
+                tg_token = current_config.get("telegram_bot_token", "").strip()
+                tg_chat_id = current_config.get("telegram_chat_id", "").strip()
+                
+                if tg_token and tg_chat_id:
+                    try:
+                        # 1. टेक्स्ट मैसेज भेजना
+                        req_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+                        req_data = {"chat_id": tg_chat_id, "text": msg}
+                        requests.post(req_url, json=req_data, timeout=5)
+                        
+                        # 2. PDF बिल सेंड करना
+                        req_url_doc = f"https://api.telegram.org/bot{tg_token}/sendDocument"
+                        files = {"document": (st.session_state.ready_filename, pdf_bytes, "application/pdf")}
+                        data_tg = {"chat_id": tg_chat_id}
+                        requests.post(req_url_doc, data=data_tg, files=files, timeout=10)
+                    except Exception as e:
+                        pass # अगर इंटरनेट स्लो है, तो ऐप क्रैश नहीं होगा
+                # ----------------------------------------------------
+
                 # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
+                st.success(f"🎉 **ऑर्डर कन्फर्म!** आपका कुल बिल **₹{current_bill_total:.2f}** का तैयार हो चुका है।")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
                 
-                # ऑटोमेटिकली नए टैब में WhatsApp खोलने का जावास्क्रिप्ट कोड
+                # ऑटोमेटिकली नए टैब में WhatsApp खोलने का जावास्क्रिप्ट कोड (Optionally keep it for customers)
                 js_redirect = f"""
                 <script>
                 window.open("{wa_link_auto}", "_blank");
@@ -1778,6 +1811,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
+        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
