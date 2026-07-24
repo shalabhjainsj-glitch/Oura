@@ -1624,7 +1624,7 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
+    st.markdown(f"### 📍 
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
