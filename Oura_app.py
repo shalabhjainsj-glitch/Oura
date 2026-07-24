@@ -1543,7 +1543,6 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
-           else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
         if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
