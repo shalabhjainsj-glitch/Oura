@@ -1543,8 +1543,7 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
-    float_js = """
-        <script>
+    <script>
         const parentWin = window.parent;
         const parentDoc = window.parent.document;
         
