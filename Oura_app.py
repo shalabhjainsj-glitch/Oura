@@ -1591,9 +1591,7 @@ else:
             });
         };
         </script>
-        """
-        st_components.html(float_js, height=0, width=0)
-
+        """   
                 btn.style.position = 'fixed';
                 btn.style.bottom = '120px';
                 btn.style.left = '15px';
