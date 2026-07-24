@@ -1443,7 +1443,6 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1610,7 +1609,7 @@ if st.session_state.cart:
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
+            ⚡ {t("Pay Instantly via UPI App", "UPI Pay")} ⚡
         </a>
         <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
             {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
@@ -1626,7 +1625,6 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
@@ -1767,7 +1765,6 @@ if st.session_state.cart:
 
                 # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
-                st.success(f"🎉 **ऑर्डर कन्फर्म!** आपका कुल बिल **₹{current_bill_total:.2f}** का तैयार हो चुका है।")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -1781,7 +1778,6 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
