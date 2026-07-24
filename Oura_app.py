@@ -595,7 +595,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
+    t("📦 Wholesale ", "📦 थोक "), 
     value=st.session_state.wholesale_mode
 )
 
@@ -1471,7 +1471,6 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1630,13 +1629,12 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
+        st.markdown(f"### 💳 {t(' Online Payment', ' online ')}")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
         pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
         
-        st.info("💡 **टिप:** अगर आप मोबाइल से ऑर्डर कर रहे हैं, तो नीचे वाले हरे बटन पर क्लिक करके डायरेक्ट पेमेंट कर सकते हैं। उसके बाद नीचे फॉर्म भरकर ऑर्डर सबमिट कर दें।")
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
@@ -1656,7 +1654,6 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
@@ -1688,12 +1685,12 @@ if st.session_state.cart:
         
         # 1. मोबाईल नंबर चेक (अनिवार्य)
         if not cust_mobile or not str(cust_mobile).strip().isdigit() or len(str(cust_mobile).strip()) != 10:
-            st.error(t("⚠️ Please enter a valid 10-digit mobile number.", "⚠️ कृपया अपना 10-अंकों का मोबाइल नंबर दर्ज करें! (बिना इसके ऑर्डर बुक नहीं होगा)"))
+            st.error(t("⚠️  mobile number.", "⚠️  मोबाइल नंबर दर्ज करें! "))
             is_valid = False
             
         # 2. एड्रेस चेक (अनिवार्य)
         if not cust_address or len(str(cust_address).strip()) < 3:
-            st.error(t("⚠️ Please enter your full delivery address.", "⚠️ कृपया डिलीवरी के लिए अपना पूरा पता (Address) दर्ज करें!"))
+            st.error(t("⚠️ address."))
             is_valid = False
 
         if is_valid:
@@ -1830,7 +1827,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 आपका बिल डाउनलोड करें")
+        st.markdown("### 📥 ")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1839,7 +1836,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t('Resend Order on WhatsApp', 'WhatsApp पर दोबारा भेजें')}")
+        st.markdown(f"### 📲 {t(' WhatsApp')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill Details on WhatsApp", "WhatsApp पर पूरी डिटेल भेजें")}</a>''', unsafe_allow_html=True)
