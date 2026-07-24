@@ -1543,15 +1543,20 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
-   float_js = """
-   <script>
+      float_js = """
+       <script>
         const parentWin = window.parent;
         const parentDoc = window.parent.document;
         
         // 1. 'All Categories' बटन को स्क्रीन पर नीचे फिक्स (Float) करना
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
-            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
+            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {  btn.click();
+                }
+            });
+        };
+        </script>
+        """
                 btn.style.position = 'fixed';
                 btn.style.bottom = '120px';
                 btn.style.left = '15px';
