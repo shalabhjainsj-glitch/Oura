@@ -1543,8 +1543,7 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
-     <script>        # यह स्क्रिप्ट फ्लोटिंग बटन को स्टाइल करती है और मोबाइल के बैक बटन को कंट्रोल करती है
-        float_js = """
+    float_js = """
         <script>
         const parentWin = window.parent;
         const parentDoc = window.parent.document;
