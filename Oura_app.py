@@ -102,9 +102,9 @@ def load_config():
         "admin_whatsapp": "919891587437", 
         "admin_gst": "07AKWPB1315K", 
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
-        "telegram_bot_token": "", "telegram_chat_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
-        "cert1_url": "", "cert2_url": "", "cert3_url": ""
+        "cert1_url": "", "cert2_url": "", "cert3_url": "",
+        "telegram_token": "", "telegram_chat_id": ""
     }
 
 def save_config(config):
@@ -122,6 +122,24 @@ else:
             migrated = True
     if migrated:
         save_config(current_config)
+
+# --- Telegram Bot Function ---
+def send_telegram_alert(token, chat_id, text_msg, pdf_bytes=None, pdf_name="Invoice.pdf"):
+    if not token or not chat_id:
+        return False
+    try:
+        if pdf_bytes:
+            url = f"https://api.telegram.org/bot{token}/sendDocument"
+            files = {'document': (pdf_name, pdf_bytes, 'application/pdf')}
+            data = {'chat_id': chat_id, 'caption': text_msg[:1000]} # Telegram caption limit
+            res = requests.post(url, data=data, files=files)
+        else:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            data = {'chat_id': chat_id, 'text': text_msg, 'parse_mode': 'Markdown'}
+            res = requests.post(url, data=data)
+        return res.status_code == 200
+    except Exception as e:
+        return False
 
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date):
     pdf = FPDF()
@@ -576,7 +594,10 @@ multi_color_marquee = f"""
 """
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
-st.session_state.wholesale_mode = st.toggle(t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), value=st.session_state.wholesale_mode)
+st.session_state.wholesale_mode = st.toggle(
+    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
+    value=st.session_state.wholesale_mode
+)
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
     with st.container(border=True):
@@ -820,6 +841,15 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             st.rerun()
         
         with tab_settings:
+            st.subheader("🤖 Telegram Bot Settings (ऑटोमैटिक मैसेज)")
+            st.info("यहाँ अपना टेलीग्राम बॉट टोकन और चैट आईडी डालें, ताकि जैसे ही कोई ऑर्डर आए, आपके टेलीग्राम पर PDF बिल के साथ तुरंत मैसेज आ जाए।")
+            col_tg1, col_tg2 = st.columns(2)
+            with col_tg1:
+                new_tg_token = st.text_input("Telegram Bot Token", value=current_config.get("telegram_token", ""))
+            with col_tg2:
+                new_tg_chat = st.text_input("Telegram Chat ID", value=current_config.get("telegram_chat_id", ""))
+            
+            st.markdown("---")
             st.subheader("👥 Seller Management (सेलर मैनेजमेंट)")
             col_s1, col_s2, col_s3 = st.columns(3)
             with col_s1:
@@ -857,15 +887,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             st.rerun()
 
             st.markdown("---")
-            st.subheader("🤖 Telegram Bot Settings (बैकग्राउंड अलर्ट)")
-            st.info("💡 Telegram पर @BotFather से Token बनाएं। अपनी Chat ID जानने के लिए Telegram पर @userinfobot का इस्तेमाल करें।")
-            col_tg1, col_tg2 = st.columns(2)
-            with col_tg1:
-                new_tg_token = st.text_input("Telegram Bot Token", value=current_config.get("telegram_bot_token", ""))
-            with col_tg2:
-                new_tg_chat_id = st.text_input("Telegram Chat ID", value=current_config.get("telegram_chat_id", ""))
-
-            st.markdown("---")
             st.subheader("📱 Business Settings")
             new_wa = st.text_input("Admin WhatsApp Number", value=current_config.get("admin_whatsapp", "919891587437"))
             new_admin_gst = st.text_input("Admin GST Number", value=current_config.get("admin_gst", "07AKWPB1315K"))
@@ -884,13 +905,13 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             if st.button("⚙️ Save All Settings"):
                 current_config["admin_whatsapp"] = new_wa
                 current_config["admin_gst"] = new_admin_gst
-                current_config["telegram_bot_token"] = new_tg_token
-                current_config["telegram_chat_id"] = new_tg_chat_id
                 current_config["free_delivery_tag"] = show_free_delivery
                 current_config["phonepe_upi"] = new_phonepe
                 current_config["paytm_upi"] = new_paytm
                 current_config["gpay_upi"] = new_gpay
                 current_config["bhim_upi"] = new_bhim
+                current_config["telegram_token"] = new_tg_token
+                current_config["telegram_chat_id"] = new_tg_chat
                 save_config(current_config)
                 st.success("✅ Saved!")
                 time.sleep(1)
@@ -1125,7 +1146,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 st.markdown("---")
 
 search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
-
 
 # --- 🏆 TRUST CERTIFICATES DISPLAY SECTION (TINY BADGES) ---
 c1_url = current_config.get("cert1_url", "")
@@ -1616,6 +1636,8 @@ if st.session_state.cart:
         merchant_name = urllib.parse.quote("Oura Products")
         pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
         
+        st.info("💡 **टिप:** अगर आप मोबाइल से ऑर्डर कर रहे हैं, तो नीचे वाले हरे बटन पर क्लिक करके डायरेक्ट पेमेंट कर सकते हैं। उसके बाद नीचे फॉर्म भरकर ऑर्डर सबमिट कर दें।")
+        
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
             ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
@@ -1765,35 +1787,25 @@ if st.session_state.cart:
                 if gst_percent > 0:
                     msg += f"📊 *GST ({gst_percent}%):* ₹{gst_amt:.2f}\n"
                 msg += f"💰 *कुल बिल अमाउंट (Total Bill): ₹{current_bill_total:.2f}*\n"
+                
+                # Payment Highlight for Telegram
                 if amount_paid > 0:
-                    msg += f"💵 *अभी जमा किया (Paid Now):* ₹{amount_paid:.2f}\n"
+                    msg += f"\n✅ *अभी जमा किया (Paid Now/Online):* ₹{amount_paid:.2f} 💸\n"
                     msg += f"🔴 *बकाया (Net Balance Due):* ₹{current_bill_total - amount_paid:.2f}\n"
+                else:
+                    msg += f"\n❌ *कोई एडवांस पेमेंट नहीं आई है।* (₹0.00)\n"
+                
                 msg += f"------------------------------------\n"
                 msg += f"📱 *आदेश की तारीख:* {bill_date.strftime('%d-%m-%Y')}\n"
                 
                 st.session_state.ready_msg_for_admin = msg
 
-                # ----------------------------------------------------
-                # 🚀 नया TELEGRAM बैकग्राउंड नोटिफिकेशन सिस्टम 🚀
-                # ----------------------------------------------------
-                tg_token = current_config.get("telegram_bot_token", "").strip()
-                tg_chat_id = current_config.get("telegram_chat_id", "").strip()
-                
-                if tg_token and tg_chat_id:
-                    try:
-                        # 1. टेक्स्ट मैसेज भेजना
-                        req_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
-                        req_data = {"chat_id": tg_chat_id, "text": msg}
-                        requests.post(req_url, json=req_data, timeout=5)
-                        
-                        # 2. PDF बिल सेंड करना
-                        req_url_doc = f"https://api.telegram.org/bot{tg_token}/sendDocument"
-                        files = {"document": (st.session_state.ready_filename, pdf_bytes, "application/pdf")}
-                        data_tg = {"chat_id": tg_chat_id}
-                        requests.post(req_url_doc, data=data_tg, files=files, timeout=10)
-                    except Exception as e:
-                        pass # अगर इंटरनेट स्लो है, तो ऐप क्रैश नहीं होगा
-                # ----------------------------------------------------
+                # --- 🚀 TELEGRAM NOTIFICATION SEND KAREN ---
+                tg_token = current_config.get("telegram_token", "")
+                tg_chat = current_config.get("telegram_chat_id", "")
+                if tg_token and tg_chat:
+                    # PDF के साथ मैसेज भेजेगा
+                    send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
@@ -1802,7 +1814,7 @@ if st.session_state.cart:
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
                 
-                # ऑटोमेटिकली नए टैब में WhatsApp खोलने का जावास्क्रिप्ट कोड (Optionally keep it for customers)
+                # ऑटोमेटिकली नए टैब में WhatsApp खोलने का जावास्क्रिप्ट कोड
                 js_redirect = f"""
                 <script>
                 window.open("{wa_link_auto}", "_blank");
@@ -1939,7 +1951,7 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
                 reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए。<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
             } 
             else if(t.includes("rate") || t.includes("price") || t.includes("रेट") || t.includes("प्राइस") || t.includes("कितने")) {
-                reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने চরম लग जाएगा! 🛍️";
+                reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने चरम लग जाएगा! 🛍️";
             } 
             else if(t.includes("delivery") || t.includes("डिलीवरी") || t.includes("shipping") || t.includes("पहुंचेगा") || t.includes("चार्ज")) {
                 reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
