@@ -1,4 +1,4 @@
-import streamlit as st
+Import streamlit as st
 import streamlit.components.v1 as st_components
 import pandas as pd
 import urllib.parse
@@ -359,53 +359,6 @@ hide_streamlit_style = """
 
             .multi-upi-btn { transition: transform 0.1s; }
             .multi-upi-btn:active { transform: scale(0.96); }
-            
-            /* ---- MOBILE RESPONSIVE FIX FOR TOP BUTTONS ---- */
-            @media (max-width: 768px) {
-                div[data-testid="stVerticalBlock"] > div:has(#top-bar-anchor) {
-                    display: none !important;
-                }
-                
-                div[data-testid="stVerticalBlock"] > div:has(#top-bar-anchor) + div[data-testid="stHorizontalBlock"] {
-                    display: flex !important;
-                    flex-wrap: wrap !important;
-                    gap: 0 !important; 
-                }
-                
-                /* Logo takes full width on Mobile */
-                div[data-testid="stVerticalBlock"] > div:has(#top-bar-anchor) + div[data-testid="stHorizontalBlock"] > div:nth-child(1) {
-                    width: 100% !important;
-                    flex: 0 0 100% !important;
-                    min-width: 100% !important;
-                    margin-bottom: 10px !important;
-                }
-                
-                /* Lang Button takes 48% */
-                div[data-testid="stVerticalBlock"] > div:has(#top-bar-anchor) + div[data-testid="stHorizontalBlock"] > div:nth-child(2) {
-                    width: 48% !important;
-                    flex: 0 0 48% !important;
-                    min-width: 48% !important;
-                    margin-right: 4% !important;
-                }
-                
-                /* Login Button takes 48% */
-                div[data-testid="stVerticalBlock"] > div:has(#top-bar-anchor) + div[data-testid="stHorizontalBlock"] > div:nth-child(3) {
-                    width: 48% !important;
-                    flex: 0 0 48% !important;
-                    min-width: 48% !important;
-                }
-                
-                /* Adjust Button Padding & Font Size for Mobile */
-                div[data-testid="stVerticalBlock"] > div:has(#top-bar-anchor) + div[data-testid="stHorizontalBlock"] button {
-                    width: 100% !important;
-                    padding: 8px 2px !important;
-                    font-size: 13px !important;
-                    text-align: center !important;
-                    display: flex !important;
-                    justify-content: center !important;
-                    align-items: center !important;
-                }
-            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -587,10 +540,7 @@ if st.session_state.seller_logged_in:
         time.sleep(2)
         st.rerun()
 
-# --- TOP HEADER ANCHOR (For CSS target) ---
-st.markdown('<div id="top-bar-anchor"></div>', unsafe_allow_html=True)
 col_logo, col_lang, col_login = st.columns([6, 2, 2])
-
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
         try: st.image(current_config["banner_url"], use_container_width=True)
@@ -1491,7 +1441,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1507,6 +1457,7 @@ else:
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
                     display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
                 }
+                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
@@ -1543,6 +1494,8 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
+            
+    else:
         st.subheader(f"📂 {st.session_state.selected_category}")
         
         if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
@@ -1551,82 +1504,9 @@ else:
             save_cart_to_url()
             st.rerun()
             
-        # यहाँ ध्यान दें: float_js ठीक 'if st.button' के 'i' की सीध में होना चाहिए
         float_js = """
         <script>
-        const parentWin = window.parent;
         const parentDoc = window.parent.document;
-        
-        const buttons = parentDoc.querySelectorAll('button');
-        buttons.forEach(btn => {
-            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
-                btn.style.position = 'fixed';
-                btn.style.bottom = '120px';
-                btn.style.left = '15px';
-                btn.style.zIndex = '999999';
-                btn.style.background = '#2b6cb0'; 
-                btn.style.color = 'white';
-                btn.style.padding = '12px 18px';
-                btn.style.borderRadius = '50px';
-                btn.style.border = '2px solid white';
-                btn.style.fontWeight = 'bold';
-                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                btn.style.minHeight = 'auto'; 
-                btn.style.width = 'auto';
-                btn.style.animation = 'none';
-            }
-        });
-
-        if (!parentWin.history.state || parentWin.history.state.page !== 'category_view') {
-            parentWin.history.pushState({page: 'category_view'}, '');
-        }
-
-        parentWin.onpopstate = function(event) {
-            const btns = parentDoc.querySelectorAll('button');
-            btns.forEach(btn => {
-                if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
-                    btn.click();
-                }
-            });
-        };
-        </script>
-        """   
-                btn.style.position = 'fixed';
-                btn.style.bottom = '120px';
-                btn.style.left = '15px';
-                btn.style.zIndex = '999999';
-                btn.style.background = '#2b6cb0'; 
-                btn.style.color = 'white';
-                btn.style.padding = '12px 18px';
-                btn.style.borderRadius = '50px';
-                btn.style.border = '2px solid white';
-                btn.style.fontWeight = 'bold';
-                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                btn.style.minHeight = 'auto'; 
-                btn.style.width = 'auto';
-                btn.style.animation = 'none';
-            }
-        });
-
-        // 2. मोबाइल के हार्डवेयर बैक बटन (Hardware Back Button) को हैंडल करना
-        // जब यूजर केटेगरी में आता है, तो हम ब्राउज़र की हिस्ट्री में एक नकली 'state' जोड़ देते हैं
-        if (!parentWin.history.state || parentWin.history.state.page !== 'category_view') {
-            parentWin.history.pushState({page: 'category_view'}, '');
-        }
-
-        // जब यूजर मोबाइल का बैक बटन दबाता है, तो यह इफ़ेक्ट ट्रिगर होता है
-        parentWin.onpopstate = function(event) {
-            // बैक बटन दबाते ही 'All Categories' वाले बटन को कोड के ज़रिए क्लिक करवा दें
-            const btns = parentDoc.querySelectorAll('button');
-            btns.forEach(btn => {
-                if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
-                    btn.click();
-                }
-            });
-        };
-        </script>
-        """
- const parentDoc = window.parent.document;
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
@@ -1719,6 +1599,7 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
@@ -2001,7 +1882,7 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
                 reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए。<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
             } 
             else if(t.includes("rate") || t.includes("price") || t.includes("रेट") || t.includes("प्राइस") || t.includes("कितने")) {
-                reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने चरम लग जाएगा! 🛍️";
+                reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने চরম लग जाएगा! 🛍️";
             } 
             else if(t.includes("delivery") || t.includes("डिलीवरी") || t.includes("shipping") || t.includes("पहुंचेगा") || t.includes("चार्ज")) {
                 reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
