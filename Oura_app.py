@@ -1624,8 +1624,6 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    
-    
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
