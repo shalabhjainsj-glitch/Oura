@@ -1543,16 +1543,42 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
-      float_js = """
-      <script>
+        float_js = """
+        <script>
         const parentWin = window.parent;
         const parentDoc = window.parent.document;
         
         // 1. 'All Categories' बटन को स्क्रीन पर नीचे फिक्स (Float) करना
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
-            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) 
-            {  btn.click();
+            if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
+                btn.style.position = 'fixed';
+                btn.style.bottom = '120px';
+                btn.style.left = '15px';
+                btn.style.zIndex = '999999';
+                btn.style.background = '#2b6cb0'; 
+                btn.style.color = 'white';
+                btn.style.padding = '12px 18px';
+                btn.style.borderRadius = '50px';
+                btn.style.border = '2px solid white';
+                btn.style.fontWeight = 'bold';
+                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                btn.style.minHeight = 'auto'; 
+                btn.style.width = 'auto';
+                btn.style.animation = 'none';
+            }
+        });
+
+        // 2. मोबाइल के हार्डवेयर बैक बटन (Hardware Back Button) को हैंडल करना
+        if (!parentWin.history.state || parentWin.history.state.page !== 'category_view') {
+            parentWin.history.pushState({page: 'category_view'}, '');
+        }
+
+        parentWin.onpopstate = function(event) {
+            const btns = parentDoc.querySelectorAll('button');
+            btns.forEach(btn => {
+                if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
+                    btn.click();
                 }
             });
         };
