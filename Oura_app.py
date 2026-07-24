@@ -1543,12 +1543,21 @@ else:
                         st.query_params["cat"] = cat
                         save_cart_to_url()
                         st.rerun()
+           else:
+        st.subheader(f"📂 {st.session_state.selected_category}")
+        
+        if st.button(t("🏠 All Categories", "🏠 वापस सारे बॉक्स पर जाएं"), key="float_back_btn"):
+            st.session_state.selected_category = None
+            if "cat" in st.query_params: del st.query_params["cat"]
+            save_cart_to_url()
+            st.rerun()
+            
+        # यहाँ ध्यान दें: float_js ठीक 'if st.button' के 'i' की सीध में होना चाहिए
         float_js = """
         <script>
         const parentWin = window.parent;
         const parentDoc = window.parent.document;
         
-        // 1. 'All Categories' बटन को स्क्रीन पर नीचे फिक्स (Float) करना
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
@@ -1569,7 +1578,6 @@ else:
             }
         });
 
-        // 2. मोबाइल के हार्डवेयर बैक बटन (Hardware Back Button) को हैंडल करना
         if (!parentWin.history.state || parentWin.history.state.page !== 'category_view') {
             parentWin.history.pushState({page: 'category_view'}, '');
         }
@@ -1584,6 +1592,8 @@ else:
         };
         </script>
         """
+        st_components.html(float_js, height=0, width=0)
+
                 btn.style.position = 'fixed';
                 btn.style.bottom = '120px';
                 btn.style.left = '15px';
