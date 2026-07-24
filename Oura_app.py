@@ -595,7 +595,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Wholesale ", "📦 थोक"), 
+    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
     value=st.session_state.wholesale_mode
 )
 
@@ -949,7 +949,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
-            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
+            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर ক্ষমতায় है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
             
             uploaded_csvs = st.file_uploader("अपनी पुरानी CSV फाइलें चुनें (Select old _ledger.csv files)", type=["csv"], accept_multiple_files=True)
             
@@ -1621,6 +1621,7 @@ if st.session_state.cart:
         st.markdown("---")
         count += 1
     
+    st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total:.2f}")
     
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
@@ -1662,8 +1663,8 @@ if st.session_state.cart:
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
             st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने आप निकाल लेगा!"))
-            cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)"))
-            cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
+            cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)*"))
+            cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)*"))
         with col_d2:
             bill_date = st.date_input(t("Invoice Date", "बिल की तारीख"), datetime.date.today())
             gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
@@ -1684,8 +1685,15 @@ if st.session_state.cart:
 
     if submit_billing:
         is_valid = True
-        if cust_mobile and (not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10):
-            st.warning(t("⚠️ Enter valid 10 digit mobile.", "⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।"))
+        
+        # 1. मोबाईल नंबर चेक (अनिवार्य)
+        if not cust_mobile or not str(cust_mobile).strip().isdigit() or len(str(cust_mobile).strip()) != 10:
+            st.error(t("⚠️ Please enter a valid 10-digit mobile number.", "⚠️ कृपया अपना 10-अंकों का मोबाइल नंबर दर्ज करें! (बिना इसके ऑर्डर बुक नहीं होगा)"))
+            is_valid = False
+            
+        # 2. एड्रेस चेक (अनिवार्य)
+        if not cust_address or len(str(cust_address).strip()) < 3:
+            st.error(t("⚠️ Please enter your full delivery address.", "⚠️ कृपया डिलीवरी के लिए अपना पूरा पता (Address) दर्ज करें!"))
             is_valid = False
 
         if is_valid:
@@ -1822,7 +1830,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 ")
+        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
