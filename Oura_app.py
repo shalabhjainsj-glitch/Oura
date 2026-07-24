@@ -913,7 +913,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
-            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
+            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, float_js इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
             
             uploaded_csvs = st.file_uploader("अपनी पुरानी CSV फाइलें चुनें (Select old _ledger.csv files)", type=["csv"], accept_multiple_files=True)
             
@@ -1506,7 +1506,10 @@ else:
             
         float_js = """
         <script>
+        const parentWin = window.parent;
         const parentDoc = window.parent.document;
+        
+        // 1. फ्लोटिंग बैक बटन (Floating Back Button)
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
@@ -1526,6 +1529,28 @@ else:
                 btn.style.animation = 'none';
             }
         });
+
+        // 2. मोबाईल बैक बटन (Hardware Mobile Back) के साथ सिंक
+        if (!parentWin.ouraMobileBackConfigured) {
+            parentWin.ouraMobileBackConfigured = true;
+            
+            // यह कोड सुनता है कि क्या ग्राहक ने अपने फोन का बैक बटन दबाया
+            parentWin.addEventListener('popstate', function(event) {
+                const btns = parentWin.document.querySelectorAll('button');
+                btns.forEach(b => {
+                    // अगर बैक बटन दबता है, तो हम अपने आप "वापस सारे बॉक्स" वाला बटन दबा देंगे
+                    if (b.innerText && (b.innerText.includes('वापस सारे बॉक्स') || b.innerText.includes('All Categories'))) {
+                        b.click(); 
+                    }
+                });
+            });
+        }
+
+        // जब ग्राहक किसी कैटेगरी में आता है तो हम उसे ब्राउज़र हिस्ट्री में सेव कर देते हैं
+        // ताकि बैक बटन दबाने पर ऐप बंद न हो जाए। 
+        if (!parentWin.history.state || parentWin.history.state.oura !== 'in_category') {
+            parentWin.history.pushState({ oura: 'in_category' }, "Category", parentWin.location.href);
+        }
         </script>
         """
         st_components.html(float_js, height=0, width=0)
