@@ -577,7 +577,7 @@ st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 # ---> यहाँ पर थोक (Wholesale) रेट वाले बटन को बैनर के नीचे सेट किया गया है <---
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
+    t("📦  Wholesale ", "📦 थोक "), 
     value=st.session_state.wholesale_mode
 )
 
