@@ -1,4 +1,4 @@
-Import streamlit as st
+import streamlit as st
 import streamlit.components.v1 as st_components
 import pandas as pd
 import urllib.parse
