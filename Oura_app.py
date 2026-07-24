@@ -595,7 +595,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
+    t("📦 Wholesale ", "📦 थोक"), 
     value=st.session_state.wholesale_mode
 )
 
@@ -1621,7 +1621,6 @@ if st.session_state.cart:
         st.markdown("---")
         count += 1
     
-    st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total:.2f}")
     
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
@@ -1823,7 +1822,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 आपका बिल डाउनलोड करें")
+        st.markdown("### 📥 ")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
