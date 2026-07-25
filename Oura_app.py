@@ -595,7 +595,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
+    t("📦 Wholesale ", "📦 थोक "), 
     value=st.session_state.wholesale_mode
 )
 
@@ -1471,7 +1471,6 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
