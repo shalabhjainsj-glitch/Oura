@@ -595,7 +595,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Wholesale ", "📦 थोक "), 
+    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
     value=st.session_state.wholesale_mode
 )
 
@@ -949,7 +949,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
             st.markdown("---")
             st.subheader("🔄 पुराने खातों को क्लाउड पर लाएं (Upload Old Ledgers)")
-            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर ক্ষমতায় है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
+            st.warning("चूंकि ऐप अब इंटरनेट (Cloud) पर है, इसलिए आपको अपने डिवाइस से अपनी पुरानी .csv फाइलें यहाँ अपलोड करनी होंगी।")
             
             uploaded_csvs = st.file_uploader("अपनी पुरानी CSV फाइलें चुनें (Select old _ledger.csv files)", type=["csv"], accept_multiple_files=True)
             
@@ -1471,6 +1471,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1629,12 +1630,13 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 {t(' Online Payment', ' online ')}")
+        st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
         pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
         
+        st.info("💡 **टिप:** अगर आप मोबाइल से ऑर्डर कर रहे हैं, तो नीचे वाले हरे बटन पर क्लिक करके डायरेक्ट पेमेंट कर सकते हैं। उसके बाद नीचे फॉर्म भरकर ऑर्डर सबमिट कर दें।")
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
@@ -1654,14 +1656,19 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
+    # ----------------------------------------------------
+    # यहाँ पर बिलिंग फॉर्म और वैलिडेशन की नई व्यवस्था है
+    # ----------------------------------------------------
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
             st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने आप निकाल लेगा!"))
-            cust_mobile = st.text_input(t("Mobile Number (10 digits)", "मोबाईल नंबर (10 अंक)*"))
-            cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)*"))
+            # मैंने यहाँ (*) लगा दिया है ताकि पता चले ये जरूरी है
+            cust_mobile = st.text_input(t("Mobile Number (10 digits)*", "मोबाईल नंबर (10 अंक)*"))
+            cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
             bill_date = st.date_input(t("Invoice Date", "बिल की तारीख"), datetime.date.today())
             gst_choice = st.selectbox(t("Select Bill Type:", "बिल का प्रकार चुनें:"), 
@@ -1680,17 +1687,88 @@ if st.session_state.cart:
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & Confirm Order", "✅ बिल तैयार करें और ऑर्डर कन्फर्म करें"))
 
+    # JAVASCRIPT: लाइव मोबाईल नंबर चेक करना, लाल बॉर्डर करना और बटन को बंद करना
+    mobile_validation_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    
+    function applyMobileValidation() {
+        const labels = parentDoc.querySelectorAll('label');
+        let mobileInput = null;
+        let formContainer = null;
+        
+        labels.forEach(label => {
+            if (label.innerText.includes('मोबाईल नंबर') || label.innerText.includes('Mobile Number')) {
+                const container = label.closest('div[data-testid="stTextInput"]');
+                if (container) {
+                    mobileInput = container.querySelector('input');
+                    formContainer = label.closest('div[data-testid="stForm"]');
+                }
+            }
+        });
+
+        if (mobileInput && formContainer) {
+            // ऑर्डर कन्फर्म करने वाला बटन ढूंढें
+            let submitBtn = formContainer.querySelector('button[data-testid="baseButton-formSubmit"]');
+            if (!submitBtn) {
+                const buttons = formContainer.querySelectorAll('button');
+                buttons.forEach(b => {
+                    if (b.innerText.includes('बिल तैयार करें') || b.innerText.includes('Prepare Bill')) {
+                        submitBtn = b;
+                    }
+                });
+            }
+            
+            function checkValid() {
+                const val = mobileInput.value.trim();
+                const isValid = /^\\d{10}$/.test(val); // चेक कर रहे हैं कि 10 अंक हैं या नहीं
+                
+                if (!isValid) {
+                    // जब नंबर गलत/खाली हो - लाल बॉक्स और बटन बंद
+                    mobileInput.style.border = '2px solid #ff4b4b'; 
+                    mobileInput.style.backgroundColor = '#fff0f0';
+                    mobileInput.style.boxShadow = '0 0 5px rgba(255, 75, 75, 0.5)';
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.4';
+                        submitBtn.style.pointerEvents = 'none'; // क्लिक नहीं होगा
+                    }
+                } else {
+                    // जब नंबर सही हो - हरा बॉक्स और बटन चालू
+                    mobileInput.style.border = '2px solid #28a745'; 
+                    mobileInput.style.backgroundColor = 'white';
+                    mobileInput.style.boxShadow = 'none';
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '1';
+                        submitBtn.style.pointerEvents = 'auto'; // अब क्लिक कर सकते हैं
+                    }
+                }
+            }
+            
+            if (!mobileInput.dataset.valAttached) {
+                mobileInput.addEventListener('input', checkValid);
+                mobileInput.dataset.valAttached = 'true';
+            }
+            // पेज लोड होते ही तुरंत चेक करें
+            checkValid();
+        }
+    }
+    
+    setTimeout(applyMobileValidation, 1000);
+    // अगर कुछ नया लोड हो, तो भी यह नजर रखेगा
+    const observer = new MutationObserver(applyMobileValidation);
+    observer.observe(parentDoc.body, { childList: true, subtree: true });
+    </script>
+    """
+    st_components.html(mobile_validation_js, height=0, width=0)
+
     if submit_billing:
         is_valid = True
         
-        # 1. मोबाईल नंबर चेक (अनिवार्य)
-        if not cust_mobile or not str(cust_mobile).strip().isdigit() or len(str(cust_mobile).strip()) != 10:
-            st.error(t("⚠️  mobile number.", "⚠️  मोबाइल नंबर दर्ज करें! "))
-            is_valid = False
-            
-        # 2. एड्रेस चेक (अनिवार्य)
-        if not cust_address or len(str(cust_address).strip()) < 3:
-            st.error(t("⚠️ address."))
+        # बैकएंड सुरक्षा: अगर गलती से कोई बटन दबा दे, तो पाइथन भी चेक करेगा
+        if not cust_mobile or not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10:
+            st.error(t("⚠️ Please enter a valid 10-digit mobile number.", "⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।"))
             is_valid = False
 
         if is_valid:
@@ -1827,7 +1905,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 ")
+        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1836,7 +1914,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t(' WhatsApp')}")
+        st.markdown(f"### 📲 {t('Resend Order on WhatsApp', 'WhatsApp पर दोबारा भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill Details on WhatsApp", "WhatsApp पर पूरी डिटेल भेजें")}</a>''', unsafe_allow_html=True)
