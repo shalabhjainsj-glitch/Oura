@@ -1477,53 +1477,83 @@ else:
         if len(valid_categories) == 0: 
             st.write(t("No categories yet.", "अभी कोई बॉक्स नहीं है।"))
         else:
-            cat_container = st.container()
-            with cat_container:
-                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
+            cart_qs = st.query_params.get("cart", "")
+            cart_param = f"&cart={cart_qs}" if cart_qs else ""
+            
+            grid_html = '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 5px;">'
+            
+            for cat in valid_categories:
+                # डिफ़ॉल्ट फोटो
+                cat_img = "https://via.placeholder.com/150?text=Oura+Product"
                 
-                # 4 बॉक्स वाला CSS (4 columns per row)
-                st.markdown("""
-                <style>
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
-                }
-                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
+                # केटेगरी के पहले प्रोडक्ट की फोटो खोजना
+                cat_prods = products_df[products_df['Category'] == cat]
+                for _, row in cat_prods.iterrows():
+                    img_str = str(row.get("Image_Path", ""))
+                    paths = [p.strip() for p in img_str.split('|') if p.strip()]
+                    if paths:
+                        cat_img = paths[0]
+                        if not cat_img.startswith("http"):
+                            cat_img = f"{GITHUB_RAW_URL}{urllib.parse.quote(cat_img.replace('\\', '/'), safe='/')}"
+                        break  # पहली फोटो मिलते ही लूप रोक दें
+                        
+                cat_url = urllib.parse.quote(cat)
+                full_link = f"?cat={cat_url}{cart_param}"
                 
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 90px !important; 
-                    min-height: 90px !important; 
-                    width: 100% !important; 
-                    border-radius: 12px !important;
-                    background: #ffffff !important; 
-                    border: 2px solid #e2e8f0 !important;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
-                    color: #1a202c !important; 
-                    font-weight: 700 !important;
-                    font-size: 13px !important; 
-                    white-space: normal !important; 
-                    word-wrap: break-word !important; 
-                    line-height: 1.2 !important; 
-                    padding: 4px !important; 
-                    transition: all 0.2s ease-in-out !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    text-align: center !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
-                </style>
-                """, unsafe_allow_html=True)
-
-                for idx, cat in enumerate(valid_categories):
-                    if st.button(cat, key=f"cat_btn_{idx}"):
-                        st.session_state.selected_category = cat
-                        st.query_params["cat"] = cat
-                        save_cart_to_url()
-                        st.rerun()
+                # HTML कार्ड बनाना 
+                grid_html += f'''
+                <a href="{full_link}" target="_self" class="oura-cat-card">
+                    <img src="{cat_img}" alt="{cat}">
+                    <span>{cat}</span>
+                </a>
+                '''
+            
+            grid_html += '</div>'
+            
+            # कार्ड का CSS 
+            st.markdown("""
+            <style>
+            .oura-cat-card {
+                text-decoration: none; 
+                text-align: center; 
+                background: white; 
+                border: 2px solid #e2e8f0; 
+                border-radius: 12px; 
+                padding: 8px; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+                transition: all 0.2s ease-in-out;
+            }
+            .oura-cat-card:hover { 
+                transform: translateY(-3px); 
+                box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2); 
+                border-color: #2b6cb0; 
+            }
+            .oura-cat-card:active { 
+                transform: scale(0.95); 
+            }
+            .oura-cat-card img {
+                width: 100%; 
+                aspect-ratio: 1; 
+                object-fit: cover; 
+                border-radius: 8px; 
+                margin-bottom: 8px; 
+                border: 1px solid #f1f5f9;
+            }
+            .oura-cat-card span {
+                font-size: 13px; 
+                font-weight: 700; 
+                color: #1a202c; 
+                line-height: 1.2; 
+                word-wrap: break-word; 
+                text-transform: capitalize;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(grid_html, unsafe_allow_html=True)
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
