@@ -595,7 +595,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Wholesale", "📦 थोक "), 
+    t("📦 Wholesale", "📦 थोक"), 
     value=st.session_state.wholesale_mode
 )
 
@@ -1471,6 +1471,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1620,6 +1621,7 @@ if st.session_state.cart:
         st.markdown("---")
         count += 1
     
+    st.subheader(f"{t('Total Amount: ₹', 'कुल माल: ₹')}{total:.2f}")
     
     available_upis = {}
     if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
@@ -1628,22 +1630,24 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 {t('Online ')}")
+        st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
         pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
         
+        st.info("💡 **टिप:** अगर आप मोबाइल से ऑर्डर कर रहे हैं, तो नीचे वाले हरे बटन पर क्लिक करके डायरेक्ट पेमेंट कर सकते हैं। उसके बाद नीचे फॉर्म भरकर ऑर्डर सबमिट कर दें।")
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ {t("Pay UPI ")} ⚡
+            ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
         </a>
         <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
             {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
         </div>
         ''', unsafe_allow_html=True)
 
+        with st.expander(t("💻 Pay by Scanning QR (If using Laptop/PC)", "💻 QR Code स्कैन करें (अगर आप कंप्यूटर पर हैं)")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
@@ -1652,6 +1656,7 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     # ----------------------------------------------------
     # यहाँ पर बिलिंग फॉर्म और वैलिडेशन की नई व्यवस्था है
@@ -1886,6 +1891,7 @@ if st.session_state.cart:
 
                 # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
+                st.success(f"🎉 **ऑर्डर कन्फर्म!** आपका कुल बिल **₹{current_bill_total:.2f}** का तैयार हो चुका है।")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -1899,7 +1905,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 ")
+        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1908,7 +1914,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t('WhatsApp')}")
+        st.markdown(f"### 📲 {t('Resend Order on WhatsApp', 'WhatsApp पर दोबारा भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill Details on WhatsApp", "WhatsApp पर पूरी डिटेल भेजें")}</a>''', unsafe_allow_html=True)
