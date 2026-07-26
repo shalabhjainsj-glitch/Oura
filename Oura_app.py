@@ -104,7 +104,8 @@ def load_config():
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
         "cert1_url": "", "cert2_url": "", "cert3_url": "",
-        "telegram_token": "", "telegram_chat_id": ""
+        "telegram_token": "", "telegram_chat_id": "",
+        "category_images": {}
     }
 
 def save_config(config):
@@ -839,6 +840,41 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             current_config["cert3_url"] = c_url
                             save_config(current_config)
                             st.rerun()
+
+            # --- NEW SECTION FOR CATEGORY IMAGES ---
+            st.markdown("---")
+            st.subheader("📦 Category Images (कैटेगरी के फोटो)")
+            st.info("यहाँ आप हर कैटेगरी (जैसे Tower, Speaker) के लिए एक छोटी फोटो लगा सकते हैं, जो ग्राहकों को होम पेज पर उस बॉक्स में दिखेगी।")
+            
+            if "category_images" not in current_config:
+                current_config["category_images"] = {}
+                
+            cats_list = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
+            if not cats_list:
+                st.write("अभी कोई कैटेगरी नहीं बनी है। पहले 'नया उत्पाद' जोड़ते समय कैटेगरी बनाएँ।")
+            else:
+                for cat in cats_list:
+                    cc1, cc2, cc3 = st.columns([2, 2, 2])
+                    with cc1:
+                        st.markdown(f"**{cat}**")
+                    with cc2:
+                        if current_config["category_images"].get(cat):
+                            st.image(current_config["category_images"][cat], width=60)
+                            if st.button("❌ Remove", key=f"rm_cat_{cat}"):
+                                current_config["category_images"][cat] = ""
+                                save_config(current_config)
+                                st.rerun()
+                        else:
+                            st.write("🖼️ No Image")
+                    with cc3:
+                        up_img = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], key=f"up_cat_{cat}", label_visibility="collapsed")
+                        if up_img and st.button("Save Image", key=f"sv_cat_{cat}"):
+                            c_bytes, _ = compress_image(up_img.getvalue())
+                            c_url = upload_image_to_imgbb(c_bytes)
+                            if c_url:
+                                current_config["category_images"][cat] = c_url
+                                save_config(current_config)
+                                st.rerun()
         
         with tab_settings:
             st.subheader("🤖 Telegram Bot Settings (ऑटोमैटिक मैसेज)")
@@ -1470,6 +1506,9 @@ else:
             for idx, row in filtered_df.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
+    # --------------------------------------------------------------------------
+    # --- 📦 NEW CATEGORY GRID SYSTEM WITH IMAGES ---
+    # --------------------------------------------------------------------------
     elif st.session_state.selected_category is None:
     
         valid_categories = products_df['Category'].dropna().unique().tolist()
@@ -1477,53 +1516,78 @@ else:
         if len(valid_categories) == 0: 
             st.write(t("No categories yet.", "अभी कोई बॉक्स नहीं है।"))
         else:
-            cat_container = st.container()
-            with cat_container:
-                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
+            cat_images = current_config.get("category_images", {})
+            
+            # HTML for beautiful category cards with images
+            html_code = """
+            <style>
+            .cat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2); border-color: #2b6cb0; }
+            .cat-card:active { transform: scale(0.95); }
+            </style>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; margin-bottom: 20px;" id="oura-cat-grid">
+            """
+            for cat in valid_categories:
+                img_url = cat_images.get(cat, "")
+                img_tag = f'<img src="{img_url}" style="width:100%; height:70px; object-fit:contain; border-radius:4px; margin-bottom:5px;">' if img_url else f'<div style="font-size:35px; height:70px; display:flex; align-items:center; justify-content:center;">📦</div>'
                 
-                # 4 बॉक्स वाला CSS (4 columns per row)
-                st.markdown("""
-                <style>
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
-                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
-                }
-                /* यह लाइन 1 लाइन में 4 बॉक्स पक्के करेगी (100% / 4 = 25%) */
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
-                
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
-                    height: 90px !important; 
-                    min-height: 90px !important; 
-                    width: 100% !important; 
-                    border-radius: 12px !important;
-                    background: #ffffff !important; 
-                    border: 2px solid #e2e8f0 !important;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
-                    color: #1a202c !important; 
-                    font-weight: 700 !important;
-                    font-size: 13px !important; 
-                    white-space: normal !important; 
-                    word-wrap: break-word !important; 
-                    line-height: 1.2 !important; 
-                    padding: 4px !important; 
-                    transition: all 0.2s ease-in-out !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    text-align: center !important;
-                }
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
-                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
-                </style>
-                """, unsafe_allow_html=True)
+                # 'data-cat' stores the real name which the JS will use to click the hidden button
+                html_code += f'''
+                <div class="cat-card" data-cat="{cat}" style="cursor:pointer; width: calc(25% - 6px); background: #ffffff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.08); text-align: center; display:flex; flex-direction:column; align-items:center; transition: all 0.2s ease-in-out;">
+                    {img_tag}
+                    <div style="font-size: 13px; font-weight: 700; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width:100%;">{cat}</div>
+                </div>
+                '''
+            html_code += '</div>'
+            st.markdown(html_code, unsafe_allow_html=True)
+            
+            # HIDDEN BUTTONS FOR STREAMLIT TO RETAIN SESSION STATE
+            st.markdown('<div style="display:none; height:0px; overflow:hidden;">', unsafe_allow_html=True)
+            for idx, cat in enumerate(valid_categories):
+                if st.button(f"HIDDEN_CAT_{cat}", key=f"cat_btn_{idx}"):
+                    st.session_state.selected_category = cat
+                    st.query_params["cat"] = cat
+                    save_cart_to_url()
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-                for idx, cat in enumerate(valid_categories):
-                    if st.button(cat, key=f"cat_btn_{idx}"):
-                        st.session_state.selected_category = cat
-                        st.query_params["cat"] = cat
-                        save_cart_to_url()
-                        st.rerun()
+            # JAVASCRIPT: Connects HTML Card Clicks to Hidden Streamlit Buttons
+            js_code = """
+            <script>
+            const parentDoc = window.parent.document;
+            function setupCategories() {
+                // 1. Hide the Streamlit containers holding our dummy buttons completely
+                const buttons = parentDoc.querySelectorAll('button');
+                buttons.forEach(b => {
+                    if(b.innerText && b.innerText.includes("HIDDEN_CAT_")) {
+                        const container = b.closest('div[data-testid="stElementContainer"]');
+                        if(container) container.style.display = 'none';
+                    }
+                });
+                
+                // 2. Attach click events to the beautiful UI cards
+                const cards = parentDoc.querySelectorAll('.cat-card');
+                cards.forEach(card => {
+                    const newCard = card.cloneNode(true);
+                    card.parentNode.replaceChild(newCard, card);
+                    newCard.addEventListener('click', function() {
+                        const catName = this.getAttribute('data-cat');
+                        const targetText = "HIDDEN_CAT_" + catName;
+                        const allBtns = parentDoc.querySelectorAll('button');
+                        for(let i=0; i<allBtns.length; i++) {
+                            if(allBtns[i].innerText && allBtns[i].innerText.includes(targetText)) {
+                                allBtns[i].click(); // Simulate user clicking the streamlit button
+                                break;
+                            }
+                        }
+                    });
+                });
+            }
+            // Run twice just to be safe with Streamlit's dynamic loading
+            setTimeout(setupCategories, 100);
+            setTimeout(setupCategories, 500);
+            </script>
+            """
+            st_components.html(js_code, height=0, width=0)
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
@@ -1539,7 +1603,6 @@ else:
         const parentWin = window.parent;
         const parentDoc = window.parent.document;
         
-        // 1. फ्लोटिंग बैक बटन (Floating Back Button)
         const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && (btn.innerText.includes('वापस सारे बॉक्स') || btn.innerText.includes('All Categories'))) {
@@ -1560,15 +1623,12 @@ else:
             }
         });
 
-        // 2. मोबाईल बैक बटन (Hardware Mobile Back) के साथ सिंक
         if (!parentWin.ouraMobileBackConfigured) {
             parentWin.ouraMobileBackConfigured = true;
             
-            // यह कोड सुनता है कि क्या ग्राहक ने अपने फोन का बैक बटन दबाया
             parentWin.addEventListener('popstate', function(event) {
                 const btns = parentWin.document.querySelectorAll('button');
                 btns.forEach(b => {
-                    // अगर बैक बटन दबता है, तो हम अपने आप "वापस सारे बॉक्स" वाला बटन दबा देंगे
                     if (b.innerText && (b.innerText.includes('वापस सारे बॉक्स') || b.innerText.includes('All Categories'))) {
                         b.click(); 
                     }
@@ -1576,8 +1636,6 @@ else:
             });
         }
 
-        // जब ग्राहक किसी कैटेगरी में आता है तो हम उसे ब्राउज़र हिस्ट्री में सेव कर देते हैं
-        // ताकि बैक बटन दबाने पर ऐप बंद न हो जाए। 
         if (!parentWin.history.state || parentWin.history.state.oura !== 'in_category') {
             parentWin.history.pushState({ oura: 'in_category' }, "Category", parentWin.location.href);
         }
@@ -1658,15 +1716,11 @@ if st.session_state.cart:
     st.markdown("---")
     st.markdown(f"### 📍 {t(' Billing ', ' बिल ')}")
     
-    # ----------------------------------------------------
-    # यहाँ पर बिलिंग फॉर्म और वैलिडेशन की नई व्यवस्था है
-    # ----------------------------------------------------
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
             st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने आप निकाल लेगा!"))
-            # मैंने यहाँ (*) लगा दिया है ताकि पता चले ये जरूरी है
             cust_mobile = st.text_input(t("Mobile Number (10 digits)*", "मोबाईल नंबर (10 अंक)*"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
@@ -1687,7 +1741,6 @@ if st.session_state.cart:
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & Confirm Order", "✅ बिल तैयार करें और ऑर्डर कन्फर्म करें"))
 
-    # JAVASCRIPT: लाइव मोबाईल नंबर चेक करना, लाल बॉर्डर करना और बटन को बंद करना
     mobile_validation_js = """
     <script>
     const parentDoc = window.parent.document;
@@ -1708,7 +1761,6 @@ if st.session_state.cart:
         });
 
         if (mobileInput && formContainer) {
-            // ऑर्डर कन्फर्म करने वाला बटन ढूंढें
             let submitBtn = formContainer.querySelector('button[data-testid="baseButton-formSubmit"]');
             if (!submitBtn) {
                 const buttons = formContainer.querySelectorAll('button');
@@ -1721,27 +1773,25 @@ if st.session_state.cart:
             
             function checkValid() {
                 const val = mobileInput.value.trim();
-                const isValid = /^\\d{10}$/.test(val); // चेक कर रहे हैं कि 10 अंक हैं या नहीं
+                const isValid = /^\\d{10}$/.test(val); 
                 
                 if (!isValid) {
-                    // जब नंबर गलत/खाली हो - लाल बॉक्स और बटन बंद
                     mobileInput.style.border = '2px solid #ff4b4b'; 
                     mobileInput.style.backgroundColor = '#fff0f0';
                     mobileInput.style.boxShadow = '0 0 5px rgba(255, 75, 75, 0.5)';
                     if (submitBtn) {
                         submitBtn.disabled = true;
                         submitBtn.style.opacity = '0.4';
-                        submitBtn.style.pointerEvents = 'none'; // क्लिक नहीं होगा
+                        submitBtn.style.pointerEvents = 'none';
                     }
                 } else {
-                    // जब नंबर सही हो - हरा बॉक्स और बटन चालू
                     mobileInput.style.border = '2px solid #28a745'; 
                     mobileInput.style.backgroundColor = 'white';
                     mobileInput.style.boxShadow = 'none';
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.style.opacity = '1';
-                        submitBtn.style.pointerEvents = 'auto'; // अब क्लिक कर सकते हैं
+                        submitBtn.style.pointerEvents = 'auto'; 
                     }
                 }
             }
@@ -1750,13 +1800,11 @@ if st.session_state.cart:
                 mobileInput.addEventListener('input', checkValid);
                 mobileInput.dataset.valAttached = 'true';
             }
-            // पेज लोड होते ही तुरंत चेक करें
             checkValid();
         }
     }
     
     setTimeout(applyMobileValidation, 1000);
-    // अगर कुछ नया लोड हो, तो भी यह नजर रखेगा
     const observer = new MutationObserver(applyMobileValidation);
     observer.observe(parentDoc.body, { childList: true, subtree: true });
     </script>
@@ -1766,7 +1814,6 @@ if st.session_state.cart:
     if submit_billing:
         is_valid = True
         
-        # बैकएंड सुरक्षा: अगर गलती से कोई बटन दबा दे, तो पाइथन भी चेक करेगा
         if not cust_mobile or not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10:
             st.error(t("⚠️ Please enter a valid 10-digit mobile number.", "⚠️ कृपया सही 10 अंकों का मोबाईल नंबर डालें।"))
             is_valid = False
@@ -1854,7 +1901,6 @@ if st.session_state.cart:
                     batch.commit()
                     load_ledger_data.clear()
 
-                # --- 📝 WhatsApp और Telegram के लिए फुल डिटेल मेसेज ---
                 msg = f"🛍️ *OURA PRODUCTS - NEW ORDER RECEIVED* 🛍️\n"
                 msg += f"------------------------------------\n"
                 msg += f"👤 *पार्टी/दुकान का नाम:* {cust_name if cust_name else 'Walk-in Customer'}\n"
@@ -1870,7 +1916,6 @@ if st.session_state.cart:
                     msg += f"📊 *GST ({gst_percent}%):* ₹{gst_amt:.2f}\n"
                 msg += f"💰 *कुल बिल अमाउंट (Total Bill): ₹{current_bill_total:.2f}*\n"
                 
-                # Payment Highlight for Telegram
                 if amount_paid > 0:
                     msg += f"\n✅ *अभी जमा किया (Paid Now/Online):* ₹{amount_paid:.2f} 💸\n"
                     msg += f"🔴 *बकाया (Net Balance Due):* ₹{current_bill_total - amount_paid:.2f}\n"
@@ -1882,21 +1927,17 @@ if st.session_state.cart:
                 
                 st.session_state.ready_msg_for_admin = msg
 
-                # --- 🚀 TELEGRAM NOTIFICATION SEND KAREN ---
                 tg_token = current_config.get("telegram_token", "")
                 tg_chat = current_config.get("telegram_chat_id", "")
                 if tg_token and tg_chat:
-                    # PDF के साथ मैसेज भेजेगा
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
-                # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
                 st.success(f"🎉 **ऑर्डर कन्फर्म!** बिल **₹{current_bill_total:.2f}** तैयार है।")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
                 
-                # ऑटोमेटिकली नए टैब में WhatsApp खोलने का जावास्क्रिप्ट कोड
                 js_redirect = f"""
                 <script>
                 window.open("{wa_link_auto}", "_blank");
@@ -2069,7 +2110,6 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
     });
 }
 </script>
-""".replace("__ADMIN_WA__", str(admin_wa_number))
+""".replace("__ADMIN_WA__", str(admin_wanumber))
 
 st_components.html(ai_js_code, height=0, width=0)
- 
