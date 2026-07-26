@@ -1145,7 +1145,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 st.markdown("---")
 
-search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
+search_query = st.text_input(t("🔍 Search , "🔍 सर्च , "")
 
 # --- 🏆 TRUST CERTIFICATES DISPLAY SECTION (TINY BADGES) ---
 c1_url = current_config.get("cert1_url", "")
