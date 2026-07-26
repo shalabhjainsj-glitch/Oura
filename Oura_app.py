@@ -1145,7 +1145,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
 st.markdown("---")
 
-search_query = st.text_input(t("🔍 Search ")
+search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
 # --- 🏆 TRUST CERTIFICATES DISPLAY SECTION (TINY BADGES) ---
 c1_url = current_config.get("cert1_url", "")
@@ -2072,4 +2072,3 @@ if (!parentDoc.getElementById('oura-ai-widget')) {
 """.replace("__ADMIN_WA__", str(admin_wa_number))
 
 st_components.html(ai_js_code, height=0, width=0)
- 
