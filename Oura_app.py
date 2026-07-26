@@ -1891,7 +1891,7 @@ if st.session_state.cart:
 
                 # --- 🚀 सिंगल टच स्क्रीन कन्फर्मेशन और ऑटो-रीडायरेक्ट ट्रिगर ---
                 st.balloons()
-                st.success(f"🎉 **ऑर्डर कन्फर्म!** बिल **₹{current_bill_total:.2f}** तैयार है।")
+                st.success(f"🎉 **ऑर्डर कन्फर्म!** बिल **)
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
