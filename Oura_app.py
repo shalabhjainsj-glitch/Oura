@@ -1939,7 +1939,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 बिल डाउनलोड ")
+        st.markdown("### 📥  ")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
