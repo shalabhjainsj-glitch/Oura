@@ -1614,67 +1614,44 @@ st.header("🛒")
 # --- ग्लोबल सेविंग्स वेरिएबल ---
 st.session_state.cart_total_savings = 0.0
 
-# --- NEW: फ्लोटिंग 'कार्ट देखें' (Quick Checkout) बटन ---
+# --- INSERT FLOATING BUTTON HERE ---
 if st.session_state.cart:
     total_items = sum(item['qty'] for item in st.session_state.cart.values())
     floating_cart_js = f"""
     <script>
-    const parentDoc = window.parent.document;
-    if (!parentDoc.getElementById('floating-cart-btn')) {{
-        const cartBtn = parentDoc.createElement('div');
+    const parentWin = window.parent;
+    const parentDoc = parentWin.document;
+    let cartBtn = parentDoc.getElementById('floating-cart-btn');
+    if (!cartBtn) {{
+        cartBtn = parentDoc.createElement('div');
         cartBtn.id = 'floating-cart-btn';
-        cartBtn.innerHTML = `
-        <div style="
-            position: fixed;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #ff007f 0%, #ff5e00 100%);
-            color: white;
-            padding: 12px 25px;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: bold;
-            box-shadow: 0 5px 15px rgba(255, 94, 0, 0.4);
-            cursor: pointer;
-            z-index: 999998; /* AI बटन के नीचे लेकिन सबसे ऊपर */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            border: 2px solid white;
-            white-space: nowrap;
-        ">
-            🛒 सीधा बिल बनाएं ({total_items} Items)
-        </div>
-        `;
-        // बटन दबाने पर पेज को सबसे नीचे (Smooth) स्क्रॉल करें
-        cartBtn.onclick = function() {{
-            parentDoc.documentElement.scrollTo({{ 
-                top: parentDoc.documentElement.scrollHeight, 
-                behavior: 'smooth' 
-            }});
-        }};
         parentDoc.body.appendChild(cartBtn);
-    }} else {{
-        // अगर आइटम अपडेट होते हैं, तो बटन में गिनती अपडेट करें
-        const btn = parentDoc.getElementById('floating-cart-btn').querySelector('div');
-        if (btn) btn.innerHTML = '🛒 सीधा बिल बनाएं ({total_items} Items)';
     }}
+    cartBtn.innerHTML = `
+    <div style="
+        position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
+        background: linear-gradient(135deg, #ff007f 0%, #ff5e00 100%);
+        color: white; padding: 12px 25px; border-radius: 30px; font-size: 16px;
+        font-weight: bold; box-shadow: 0 5px 15px rgba(255, 94, 0, 0.4);
+        cursor: pointer; z-index: 999998; display: flex; align-items: center;
+        justify-content: center; gap: 8px; border: 2px solid white; white-space: nowrap;
+    ">
+        🛒 सीधा बिल बनाएं ({total_items} Items)
+    </div>
+    `;
+    cartBtn.onclick = function() {{
+        const viewContainer = parentDoc.querySelector('.stApp, [data-testid="stAppViewContainer"]');
+        if (viewContainer) {{
+            viewContainer.scrollTo({{ top: viewContainer.scrollHeight, behavior: 'smooth' }});
+        }} else {{
+            parentWin.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }});
+        }}
+    }};
     </script>
     """
     st_components.html(floating_cart_js, height=0, width=0)
 else:
-    # अगर कार्ट खाली कर दी गई है, तो बटन को स्क्रीन से हटा दें
-    remove_cart_js = """
-    <script>
-    const parentDoc = window.parent.document;
-    const cartBtn = parentDoc.getElementById('floating-cart-btn');
-    if (cartBtn) cartBtn.remove();
-    </script>
-    """
-    st_components.html(remove_cart_js, height=0, width=0)
-# ----------------------------------------------------
+    st_components.html("<script>const btn = window.parent.document.getElementById('floating-cart-btn'); if(btn) btn.remove();</script>", height=0, width=0)
 
 if st.session_state.cart:
     total = 0
