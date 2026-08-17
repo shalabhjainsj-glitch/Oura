@@ -1607,73 +1607,10 @@ else:
             for idx, row in cat_products.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
-
-# --- Floating Cart/Basket Button JS ---
-# यह स्क्रिप्ट एक फ्लोटिंग बास्केट बटन बनाएगी और क्लिक करने पर सीधा बिलिंग सेक्शन में ले जाएगी
-cart_items_count = sum(item['qty'] for item in st.session_state.cart.values()) if st.session_state.cart else 0
-display_style = "flex" if cart_items_count > 0 else "none"
-
-floating_cart_js = f"""
-<script>
-const parentDoc = window.parent.document;
-
-// पुराने AI विजेट को रिमूव करें (अगर पहले से है)
-const oldWidget = parentDoc.getElementById('oura-ai-widget');
-if(oldWidget) oldWidget.remove();
-const oldBtn = parentDoc.getElementById('oura-ai-btn');
-if(oldBtn) oldBtn.remove();
-
-let cartBtn = parentDoc.getElementById('oura-cart-float-btn');
-if (!cartBtn) {{
-    cartBtn = parentDoc.createElement('div');
-    cartBtn.id = 'oura-cart-float-btn';
-    parentDoc.body.appendChild(cartBtn);
-    
-    cartBtn.addEventListener('click', function() {{
-        // कार्ट सेक्शन को ढूंढकर वहाँ स्क्रोल करे
-        const cartSection = parentDoc.getElementById('cart-section-target');
-        if(cartSection) {{
-            cartSection.scrollIntoView({{behavior: 'smooth', block: 'start'}});
-        }} else {{
-            parentDoc.defaultView.scrollTo({{top: parentDoc.body.scrollHeight, behavior: 'smooth'}});
-        }}
-    }});
-}}
-
-cartBtn.innerHTML = `
-<div style="
-    position: fixed; 
-    bottom: 30px; 
-    right: 20px; 
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    color: white; 
-    border-radius: 50px; 
-    padding: 12px 22px; 
-    font-size: 16px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    z-index: 9999999;
-    display: {display_style};
-    align-items: center;
-    gap: 8px;
-    transition: transform 0.2s;
-" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-    🛒 बास्केट 
-    <span style="background: white; color: #11998e; padding: 2px 10px; border-radius: 20px; font-size: 14px;">
-        {cart_items_count}
-    </span>
-</div>
-`;
-</script>
-"""
-st_components.html(floating_cart_js, height=0, width=0)
-
-# --- टारगेट लिंक जिस पर बटन क्लिक करने से स्क्रीन जाएगी ---
-st.markdown('<div id="cart-section-target" style="scroll-margin-top: 80px;"></div>', unsafe_allow_html=True)
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
-st.header("🛒 कार्ट और बिलिंग (Basket & Billing)")
+st.markdown("<div id='billing-section'></div>", unsafe_allow_html=True)
+st.header("🛒")
 
 # --- ग्लोबल सेविंग्स वेरिएबल ---
 st.session_state.cart_total_savings = 0.0
@@ -1784,6 +1721,7 @@ if st.session_state.cart:
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & Confirm Order", "✅ बिल तैयार करें और ऑर्डर कन्फर्म करें"))
 
+    # JAVASCRIPT: लाइव मोबाईल नंबर चेक करना, लाल बॉर्डर करना और बटन को बंद करना
     mobile_validation_js = """
     <script>
     const parentDoc = window.parent.document;
@@ -2024,4 +1962,72 @@ if st.session_state.cart:
         save_cart_to_url()
         st.rerun()
 
-admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
+
+# --- Floating Cart Widget Code ---
+if st.session_state.cart:
+    cart_js_code = """
+    <script>
+    const parentWin = window.parent;
+    const parentDoc = parentWin.document;
+
+    if (!parentDoc.getElementById('oura-cart-widget')) {
+        const widgetDiv = parentDoc.createElement('div');
+        widgetDiv.id = 'oura-cart-widget';
+        widgetDiv.innerHTML = `
+        <style>
+        @keyframes floatCart {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        #oura-cart-btn {
+            position: fixed; 
+            bottom: 140px; /* बटन को थोड़ा ऊपर रखा गया है */
+            right: 20px; 
+            z-index: 9999999;
+            cursor: pointer; 
+            animation: floatCart 3s ease-in-out infinite;
+            background: #2b6cb0; 
+            width: 65px; 
+            height: 65px;
+            border-radius: 50%; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(43, 108, 176, 0.4); 
+            border: 2px solid white;
+            transition: transform 0.2s;
+        }
+        #oura-cart-btn:hover { transform: scale(1.1); }
+        #oura-cart-btn svg { width: 35px; height: 35px; fill: white; }
+        </style>
+        
+        <div id="oura-cart-btn">
+            <svg viewBox="0 0 24 24">
+                <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+        </div>
+        `;
+        
+        // क्लिक करने पर बिल सेक्शन (पेज के सबसे नीचे) पर स्मूथ स्क्रॉल 
+        widgetDiv.querySelector('#oura-cart-btn').addEventListener('click', function() {
+            parentWin.scrollTo({ top: parentDoc.body.scrollHeight, behavior: 'smooth' });
+        });
+        
+        parentDoc.body.appendChild(widgetDiv);
+    }
+    </script>
+    """
+    st_components.html(cart_js_code, height=0, width=0)
+else:
+    # अगर बास्केट खाली है तो बटन हटा दें
+    hide_cart_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    const widget = parentDoc.getElementById('oura-cart-widget');
+    if (widget) {
+        widget.remove();
+    }
+    </script>
+    """
+    st_components.html(hide_cart_js, height=0, width=0)
