@@ -455,6 +455,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
+# नए फील्ड्स: Offer_Name, Discount_Percent
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1608,10 +1609,6 @@ else:
 
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
-
-# --- हिडन एंकर (Scroll to Bottom के लिए) ---
-st.markdown("<div id='cart-section-anchor'></div>", unsafe_allow_html=True)
-
 st.header("🛒")
 
 # --- ग्लोबल सेविंग्स वेरिएबल ---
@@ -1961,99 +1958,83 @@ if st.session_state.cart:
         save_cart_to_url()
         st.rerun()
 
-admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
+# --- Floating Basket Button (Scroll to Bill) ---
+cart_items_count = len(st.session_state.cart)
 
-# --- FLOATING BASKET BUTTON (बिना टेक्स्ट के और स्क्रॉल फिक्स के साथ) ---
-if st.session_state.cart:
-    cart_count = sum(item['qty'] for item in st.session_state.cart.values())
-    basket_js = f"""
-    <script>
-    const parentWin = window.parent;
-    const parentDoc = parentWin.document;
+basket_js = f"""
+<script>
+const parentDoc = window.parent.document;
+let existingBtn = parentDoc.getElementById('oura-basket-btn');
+if (existingBtn) {{
+    existingBtn.remove();
+}}
 
-    let basketBtn = parentDoc.getElementById('oura-basket-btn');
-    if (!basketBtn) {{
-        basketBtn = parentDoc.createElement('div');
-        basketBtn.id = 'oura-basket-btn';
-        basketBtn.innerHTML = `
-            <div style="
-                position: fixed; 
-                bottom: 140px; 
-                right: 20px; 
-                background-color: #2b6cb0; 
-                color: white; 
-                width: 65px; 
-                height: 65px; 
-                border-radius: 50%; 
-                display: flex; 
-                justify-content: center; 
-                align-items: center; 
-                font-size: 30px; 
-                cursor: pointer; 
-                box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-                z-index: 999999;
-                transition: transform 0.2s;
-                border: 3px solid white;
-            ">
-                🛒
-                <div id="oura-basket-badge" style="
-                    position: absolute; 
-                    top: -5px; 
-                    right: -5px; 
-                    background-color: #e53e3e; 
-                    color: white; 
-                    font-size: 14px; 
-                    font-weight: bold; 
-                    border-radius: 50%; 
-                    width: 26px; 
-                    height: 26px; 
-                    display: flex; 
-                    justify-content: center; 
-                    align-items: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                    font-family: sans-serif;
-                ">{cart_count}</div>
-            </div>
-        `;
-        parentDoc.body.appendChild(basketBtn);
+let count = {cart_items_count};
 
-        basketBtn.addEventListener('click', function() {{
-            // हमने ऊपर HTML में जो एंकर लगाया है उसे ढूँढें
-            const anchor = parentDoc.getElementById('cart-section-anchor');
-            if (anchor) {{
-                // एंकर मिल गया, स्मूथ स्क्रॉल करें
-                anchor.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-            }} else {{
-                // अगर एंकर न मिले, तो बैकअप के तौर पर पेज के नीचे तक स्क्रॉल करें
-                const scrollContainer = parentDoc.querySelector('.stMain') || parentDoc.querySelector('.main');
-                if (scrollContainer) {{
-                    scrollContainer.scrollTo({{ top: scrollContainer.scrollHeight, behavior: 'smooth' }});
-                }} else {{
-                    parentWin.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }});
-                }}
-            }}
-        }});
-        
-        // होवर एफेक्ट
-        basketBtn.addEventListener('mouseover', () => basketBtn.children[0].style.transform = 'scale(1.1)');
-        basketBtn.addEventListener('mouseout', () => basketBtn.children[0].style.transform = 'scale(1)');
-    }} else {{
-        // अगर बटन पहले से है, तो सिर्फ नंबर अपडेट करें
-        const badge = parentDoc.getElementById('oura-basket-badge');
-        if (badge) badge.innerText = '{cart_count}';
+if (count > 0) {{
+    const widgetDiv = parentDoc.createElement('div');
+    widgetDiv.id = 'oura-basket-btn';
+    widgetDiv.innerHTML = `
+    <style>
+    @keyframes bounceCart {{
+        0%, 100% {{ transform: translateY(0); }}
+        50% {{ transform: translateY(-5px); }}
     }}
-    </script>
-    """
-    st_components.html(basket_js, height=0, width=0)
-else:
-    # अगर बास्केट खाली हो जाए, तो बटन गायब कर दें
-    remove_basket_js = """
-    <script>
-    const parentDoc = window.parent.document;
-    const basketBtn = parentDoc.getElementById('oura-basket-btn');
-    if (basketBtn) {
-        basketBtn.remove();
-    }
-    </script>
-    """
-    st_components.html(remove_basket_js, height=0, width=0)
+    #oura-basket-btn {{
+        position: fixed; 
+        bottom: 130px; 
+        right: 20px; 
+        z-index: 9999999;
+        cursor: pointer;
+        animation: bounceCart 2s ease-in-out infinite;
+    }}
+    .basket-circle {{
+        background: #2b6cb0;
+        width: 60px; 
+        height: 60px; 
+        border-radius: 50%; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        border: 3px solid white;
+        position: relative;
+        transition: transform 0.2s;
+    }}
+    .basket-circle:active {{
+        transform: scale(0.9);
+    }}
+    .basket-icon {{
+        font-size: 28px;
+        margin-left: -2px;
+    }}
+    .basket-badge {{
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background-color: #ff007f;
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 13px;
+        font-weight: bold;
+        border: 2px solid white;
+    }}
+    </style>
+    <div class="basket-circle" onclick="window.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }})">
+        <span class="basket-icon">🛒</span>
+        <span class="basket-badge">${{count}}</span>
+    </div>
+    `;
+    parentDoc.body.appendChild(widgetDiv);
+}}
+</script>
+"""
+st_components.html(basket_js, height=0, width=0)
+
+
+```
