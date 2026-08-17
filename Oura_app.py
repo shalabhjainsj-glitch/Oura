@@ -455,7 +455,6 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-# नए फील्ड्स: Offer_Name, Discount_Percent
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1609,7 +1608,10 @@ else:
 
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
-st.markdown("<div id='billing-section'></div>", unsafe_allow_html=True)
+
+# --- हिडन एंकर (Scroll to Bottom के लिए) ---
+st.markdown("<div id='cart-section-anchor'></div>", unsafe_allow_html=True)
+
 st.header("🛒")
 
 # --- ग्लोबल सेविंग्स वेरिएबल ---
@@ -1721,7 +1723,6 @@ if st.session_state.cart:
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & Confirm Order", "✅ बिल तैयार करें और ऑर्डर कन्फर्म करें"))
 
-    # JAVASCRIPT: लाइव मोबाईल नंबर चेक करना, लाल बॉर्डर करना और बटन को बंद करना
     mobile_validation_js = """
     <script>
     const parentDoc = window.parent.document;
@@ -1816,7 +1817,6 @@ if st.session_state.cart:
                         auto_last_balance = t_bill - t_adv
                     except: pass
 
-                # PDF जनरेट करते समय सेविंग्स (Savings) की वैल्यू भी भेजें
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
                     cust_gst, gst_percent, shipping_cost, auto_last_balance, amount_paid, current_config, bill_date,
@@ -1846,7 +1846,6 @@ if st.session_state.cart:
                 for k, item in st.session_state.cart.items():
                     item_unit = item.get('unit', 'Pcs')
                     
-                    # नेट प्राइस कैलकुलेट करें
                     orig_p = item['price']
                     d_pct = item.get('discount_pct', 0.0)
                     net_p = orig_p - (orig_p * d_pct / 100)
@@ -1962,72 +1961,99 @@ if st.session_state.cart:
         save_cart_to_url()
         st.rerun()
 
+admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
-# --- Floating Cart Widget Code ---
+# --- FLOATING BASKET BUTTON (बिना टेक्स्ट के और स्क्रॉल फिक्स के साथ) ---
 if st.session_state.cart:
-    cart_js_code = """
+    cart_count = sum(item['qty'] for item in st.session_state.cart.values())
+    basket_js = f"""
     <script>
     const parentWin = window.parent;
     const parentDoc = parentWin.document;
 
-    if (!parentDoc.getElementById('oura-cart-widget')) {
-        const widgetDiv = parentDoc.createElement('div');
-        widgetDiv.id = 'oura-cart-widget';
-        widgetDiv.innerHTML = `
-        <style>
-        @keyframes floatCart {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-        #oura-cart-btn {
-            position: fixed; 
-            bottom: 140px; /* बटन को थोड़ा ऊपर रखा गया है */
-            right: 20px; 
-            z-index: 9999999;
-            cursor: pointer; 
-            animation: floatCart 3s ease-in-out infinite;
-            background: #2b6cb0; 
-            width: 65px; 
-            height: 65px;
-            border-radius: 50%; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center;
-            box-shadow: 0 4px 15px rgba(43, 108, 176, 0.4); 
-            border: 2px solid white;
-            transition: transform 0.2s;
-        }
-        #oura-cart-btn:hover { transform: scale(1.1); }
-        #oura-cart-btn svg { width: 35px; height: 35px; fill: white; }
-        </style>
-        
-        <div id="oura-cart-btn">
-            <svg viewBox="0 0 24 24">
-                <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-            </svg>
-        </div>
+    let basketBtn = parentDoc.getElementById('oura-basket-btn');
+    if (!basketBtn) {{
+        basketBtn = parentDoc.createElement('div');
+        basketBtn.id = 'oura-basket-btn';
+        basketBtn.innerHTML = `
+            <div style="
+                position: fixed; 
+                bottom: 140px; 
+                right: 20px; 
+                background-color: #2b6cb0; 
+                color: white; 
+                width: 65px; 
+                height: 65px; 
+                border-radius: 50%; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                font-size: 30px; 
+                cursor: pointer; 
+                box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+                z-index: 999999;
+                transition: transform 0.2s;
+                border: 3px solid white;
+            ">
+                🛒
+                <div id="oura-basket-badge" style="
+                    position: absolute; 
+                    top: -5px; 
+                    right: -5px; 
+                    background-color: #e53e3e; 
+                    color: white; 
+                    font-size: 14px; 
+                    font-weight: bold; 
+                    border-radius: 50%; 
+                    width: 26px; 
+                    height: 26px; 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                    font-family: sans-serif;
+                ">{cart_count}</div>
+            </div>
         `;
+        parentDoc.body.appendChild(basketBtn);
+
+        basketBtn.addEventListener('click', function() {{
+            // हमने ऊपर HTML में जो एंकर लगाया है उसे ढूँढें
+            const anchor = parentDoc.getElementById('cart-section-anchor');
+            if (anchor) {{
+                // एंकर मिल गया, स्मूथ स्क्रॉल करें
+                anchor.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }} else {{
+                // अगर एंकर न मिले, तो बैकअप के तौर पर पेज के नीचे तक स्क्रॉल करें
+                const scrollContainer = parentDoc.querySelector('.stMain') || parentDoc.querySelector('.main');
+                if (scrollContainer) {{
+                    scrollContainer.scrollTo({{ top: scrollContainer.scrollHeight, behavior: 'smooth' }});
+                }} else {{
+                    parentWin.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }});
+                }}
+            }}
+        }});
         
-        // क्लिक करने पर बिल सेक्शन (पेज के सबसे नीचे) पर स्मूथ स्क्रॉल 
-        widgetDiv.querySelector('#oura-cart-btn').addEventListener('click', function() {
-            parentWin.scrollTo({ top: parentDoc.body.scrollHeight, behavior: 'smooth' });
-        });
-        
-        parentDoc.body.appendChild(widgetDiv);
-    }
+        // होवर एफेक्ट
+        basketBtn.addEventListener('mouseover', () => basketBtn.children[0].style.transform = 'scale(1.1)');
+        basketBtn.addEventListener('mouseout', () => basketBtn.children[0].style.transform = 'scale(1)');
+    }} else {{
+        // अगर बटन पहले से है, तो सिर्फ नंबर अपडेट करें
+        const badge = parentDoc.getElementById('oura-basket-badge');
+        if (badge) badge.innerText = '{cart_count}';
+    }}
     </script>
     """
-    st_components.html(cart_js_code, height=0, width=0)
+    st_components.html(basket_js, height=0, width=0)
 else:
-    # अगर बास्केट खाली है तो बटन हटा दें
-    hide_cart_js = """
+    # अगर बास्केट खाली हो जाए, तो बटन गायब कर दें
+    remove_basket_js = """
     <script>
     const parentDoc = window.parent.document;
-    const widget = parentDoc.getElementById('oura-cart-widget');
-    if (widget) {
-        widget.remove();
+    const basketBtn = parentDoc.getElementById('oura-basket-btn');
+    if (basketBtn) {
+        basketBtn.remove();
     }
     </script>
     """
-    st_components.html(hide_cart_js, height=0, width=0)
+    st_components.html(remove_basket_js, height=0, width=0)
