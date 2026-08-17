@@ -140,7 +140,7 @@ def send_telegram_alert(token, chat_id, text_msg, pdf_bytes=None, pdf_name="Invo
     except Exception as e:
         return False
 
-# --- PDF GENERATION ---
+# --- PDF GENERATION (अब डिस्काउंट और सेविंग्स के साथ) ---
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date, total_savings):
     pdf = FPDF()
     pdf.add_page()
@@ -219,6 +219,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     idx = 1
     
     for k, item in cart.items():
+        # डिस्काउंट कैलकुलेट करें
         orig_p = item['price']
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
@@ -228,6 +229,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
         clean_name = re.sub(r'[^\x00-\x7F]+', ' ', str(item['name'])) 
         
+        # बिल में ऑफर का नाम जोड़ें
         if d_pct > 0:
             clean_name += f" ({d_name}: -{d_pct}%)"
             
@@ -246,9 +248,10 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
     pdf.ln(2)
     
+    # कस्टमर को खुश करने के लिए बिल में सेविंग्स दिखाना
     if total_savings > 0:
         pdf.set_font("Arial", 'B', 10)
-        pdf.set_text_color(34, 139, 34)
+        pdf.set_text_color(34, 139, 34) # Green color
         pdf.cell(190, 8, f"*** YAY! You saved Rs. {total_savings:.2f} with Special Offers! ***", ln=True, align='C')
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
@@ -394,6 +397,7 @@ hide_streamlit_style = """
             .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
             .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}
 
+            /* CSS FOR OFFER TAG SHINE EFFECT */
             @keyframes shine {
                 0% { background-position: -200% center; }
                 100% { background-position: 200% center; }
@@ -451,6 +455,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
+# नए फील्ड्स: Offer_Name, Discount_Percent
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -542,6 +547,7 @@ if 'cart_loaded' not in st.session_state:
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
                             
+                        # डिस्काउंट डाटा लोड करें
                         disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
                         offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -684,6 +690,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_id: new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
                 with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
+                # --- OFFER SYSTEM INPUTS ---
                 st.markdown("**🎁 Special Offer / Discount (ऑफर और डिस्काउंट)**")
                 col_off1, col_off2 = st.columns(2)
                 with col_off1: new_offer_name = st.text_input("Offer Name (e.g., Diwali Offer, 15 Aug Sale)", "")
@@ -1138,6 +1145,7 @@ if c1_url or c2_url or c3_url:
     cert_html += '</div>'
     st.markdown(cert_html, unsafe_allow_html=True)
 
+
 def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
     if not path_str: return []
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
@@ -1169,6 +1177,7 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
+    # --- डिस्काउंट डेटा निकालें ---
     disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
     offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -1184,6 +1193,7 @@ def show_product_card(row, idx, prefix):
     t2_qty = safe_int(row.get('Tier2_Qty'), 0)
     t2_price = safe_float(row.get('Tier2_Price'), t1_price)
 
+    # --- नया नेट प्राइस (Net Price) कैलकुलेट करें ---
     def apply_disc(price): return price - (price * disc_pct / 100) if price > 0 else 0.0
     
     net_retail = apply_disc(retail_price)
@@ -1208,6 +1218,7 @@ def show_product_card(row, idx, prefix):
 
     show_wholesale = st.session_state.wholesale_mode
 
+    # WhatsApp शेयर टेक्स्ट में डिस्काउंट शामिल करें
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     if disc_pct > 0:
         share_text += f"🎉 *{offer_nm} : FLAT {disc_pct}% OFF!* 🎉\n\n"
@@ -1229,6 +1240,7 @@ def show_product_card(row, idx, prefix):
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
         
+        # --- जादुई चमक वाला ऑफर बैनर ---
         if disc_pct > 0:
             st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
@@ -1248,6 +1260,7 @@ def show_product_card(row, idx, prefix):
         t_fd = t("(Free Delivery)", "(फ्री डिलीवरी)")
         del_tag = t_fd if show_fd else f"<span style='color:#d32f2f;font-size:11px;'>{t_ex}</span>"
 
+        # --- HTML फॉरमैटिंग (कटे हुए पुराने रेट और नए रेट के साथ) ---
         def get_price_html(orig, net, color, lbl):
             if disc_pct > 0:
                 return f'<span style="color:{color}; font-size:12px;">{lbl} <del style="color:#999;">₹{orig}</del> <b style="font-size:15px;">₹{net:.2f}</b></span>'
@@ -1303,6 +1316,7 @@ def show_product_card(row, idx, prefix):
                 
             if is_in_stock:
                 opts = {}
+                # हम ओरिजिनल (Original) रेट सेव करेंगे, ताकि कार्ट में सेविंग्स (बचत) दिखा सकें
                 if retail_price > 0:
                     lbl_on = f"{retail_qty} {u_base} (💳 Online: ₹{net_retail:.2f})" if disc_pct > 0 else f"{retail_qty} {u_base} (💳 Online Payment - ₹{retail_price})"
                     opts[lbl_on] = {"price": retail_price, "unit": u_base, "min_q": retail_qty, "type": "Online"}
@@ -1319,7 +1333,7 @@ def show_product_card(row, idx, prefix):
                         opts[lbl_t2] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
                     
                 selected_opt = st.selectbox("पेमेंट का तरीका और पैकेज चुनें:", list(opts.keys()), key=f"sel_{prefix_idx}")
-                buy_price = opts[selected_opt]["price"] 
+                buy_price = opts[selected_opt]["price"] # ये ओरिजिनल प्राइस है
                 buy_unit = opts[selected_opt]["unit"]
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
@@ -1395,6 +1409,7 @@ def show_product_card(row, idx, prefix):
                         
                     st.markdown("---")
                     
+                    # --- EDIT OFFERS ---
                     st.markdown("**🎁 Edit Offers (ऑफर बदलें)**")
                     col_eo1, col_eo2 = st.columns(2)
                     with col_eo1: e_off_name = st.text_input("Offer Name", value=str(row.get("Offer_Name", "")), key=f"eoff_{prefix_idx}")
@@ -1489,6 +1504,7 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
+                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
@@ -1591,71 +1607,76 @@ else:
             for idx, row in cat_products.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
+
+# --- Floating Cart/Basket Button JS ---
+# यह स्क्रिप्ट एक फ्लोटिंग बास्केट बटन बनाएगी और क्लिक करने पर सीधा बिलिंग सेक्शन में ले जाएगी
+cart_items_count = sum(item['qty'] for item in st.session_state.cart.values()) if st.session_state.cart else 0
+display_style = "flex" if cart_items_count > 0 else "none"
+
+floating_cart_js = f"""
+<script>
+const parentDoc = window.parent.document;
+
+// पुराने AI विजेट को रिमूव करें (अगर पहले से है)
+const oldWidget = parentDoc.getElementById('oura-ai-widget');
+if(oldWidget) oldWidget.remove();
+const oldBtn = parentDoc.getElementById('oura-ai-btn');
+if(oldBtn) oldBtn.remove();
+
+let cartBtn = parentDoc.getElementById('oura-cart-float-btn');
+if (!cartBtn) {{
+    cartBtn = parentDoc.createElement('div');
+    cartBtn.id = 'oura-cart-float-btn';
+    parentDoc.body.appendChild(cartBtn);
+    
+    cartBtn.addEventListener('click', function() {{
+        // कार्ट सेक्शन को ढूंढकर वहाँ स्क्रोल करे
+        const cartSection = parentDoc.getElementById('cart-section-target');
+        if(cartSection) {{
+            cartSection.scrollIntoView({{behavior: 'smooth', block: 'start'}});
+        }} else {{
+            parentDoc.defaultView.scrollTo({{top: parentDoc.body.scrollHeight, behavior: 'smooth'}});
+        }}
+    }});
+}}
+
+cartBtn.innerHTML = `
+<div style="
+    position: fixed; 
+    bottom: 30px; 
+    right: 20px; 
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white; 
+    border-radius: 50px; 
+    padding: 12px 22px; 
+    font-size: 16px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 9999999;
+    display: {display_style};
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s;
+" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+    🛒 बास्केट 
+    <span style="background: white; color: #11998e; padding: 2px 10px; border-radius: 20px; font-size: 14px;">
+        {cart_items_count}
+    </span>
+</div>
+`;
+</script>
+"""
+st_components.html(floating_cart_js, height=0, width=0)
+
+# --- टारगेट लिंक जिस पर बटन क्लिक करने से स्क्रीन जाएगी ---
+st.markdown('<div id="cart-section-target" style="scroll-margin-top: 80px;"></div>', unsafe_allow_html=True)
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 st.markdown("---")
-st.header("🛒")
+st.header("🛒 कार्ट और बिलिंग (Basket & Billing)")
 
 # --- ग्लोबल सेविंग्स वेरिएबल ---
 st.session_state.cart_total_savings = 0.0
-
-# --- फ्लोटिंग 'कार्ट देखें' (Quick Checkout) बटन ---
-if st.session_state.cart:
-    total_items = sum(item['qty'] for item in st.session_state.cart.values())
-    
-    floating_cart_js = f"""
-    <script>
-    const parentDoc = window.parent.document;
-    let cartBtn = parentDoc.getElementById('floating-cart-btn');
-    if (!cartBtn) {{
-        cartBtn = parentDoc.createElement('div');
-        cartBtn.id = 'floating-cart-btn';
-        cartBtn.style.position = 'fixed';
-        cartBtn.style.bottom = '25px';
-        cartBtn.style.left = '50%';
-        cartBtn.style.transform = 'translateX(-50%)';
-        cartBtn.style.background = 'linear-gradient(135deg, #ff007f 0%, #ff5e00 100%)';
-        cartBtn.style.color = 'white';
-        cartBtn.style.padding = '12px 25px';
-        cartBtn.style.borderRadius = '30px';
-        cartBtn.style.fontSize = '16px';
-        cartBtn.style.fontWeight = 'bold';
-        cartBtn.style.boxShadow = '0 5px 15px rgba(255, 94, 0, 0.4)';
-        cartBtn.style.cursor = 'pointer';
-        cartBtn.style.zIndex = '999998';
-        cartBtn.style.display = 'flex';
-        cartBtn.style.alignItems = 'center';
-        cartBtn.style.justifyContent = 'center';
-        cartBtn.style.gap = '8px';
-        cartBtn.style.border = '2px solid white';
-        cartBtn.style.whiteSpace = 'nowrap';
-        
-        cartBtn.onclick = function() {{
-            const scrollHeight = parentDoc.documentElement.scrollHeight || parentDoc.body.scrollHeight;
-            parentDoc.documentElement.scrollTo({{ 
-                top: scrollHeight, 
-                behavior: 'smooth' 
-            }});
-            parentDoc.body.scrollTo({{ 
-                top: scrollHeight, 
-                behavior: 'smooth' 
-            }});
-        }};
-        parentDoc.body.appendChild(cartBtn);
-    }}
-    cartBtn.innerHTML = '🛒 सीधा बिल बनाएं ({total_items} Items)';
-    cartBtn.style.display = 'flex';
-    </script>
-    """
-    st_components.html(floating_cart_js, height=0, width=0)
-else:
-    remove_cart_js = """
-    <script>
-    const parentDoc = window.parent.document;
-    const cartBtn = parentDoc.getElementById('floating-cart-btn');
-    if (cartBtn) cartBtn.style.display = 'none';
-    </script>
-    """
-    st_components.html(remove_cart_js, height=0, width=0)
 
 if st.session_state.cart:
     total = 0
@@ -1667,6 +1688,7 @@ if st.session_state.cart:
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
         
+        # नेट प्राइस कैलकुलेशन
         net_p = orig_p - (orig_p * d_pct / 100)
         subtotal = net_p * item['qty']
         savings = (orig_p - net_p) * item['qty']
@@ -1856,6 +1878,7 @@ if st.session_state.cart:
                         auto_last_balance = t_bill - t_adv
                     except: pass
 
+                # PDF जनरेट करते समय सेविंग्स (Savings) की वैल्यू भी भेजें
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
                     cust_gst, gst_percent, shipping_cost, auto_last_balance, amount_paid, current_config, bill_date,
@@ -1885,6 +1908,7 @@ if st.session_state.cart:
                 for k, item in st.session_state.cart.items():
                     item_unit = item.get('unit', 'Pcs')
                     
+                    # नेट प्राइस कैलकुलेट करें
                     orig_p = item['price']
                     d_pct = item.get('discount_pct', 0.0)
                     net_p = orig_p - (orig_p * d_pct / 100)
@@ -2001,148 +2025,3 @@ if st.session_state.cart:
         st.rerun()
 
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
-
-ai_js_code = """
-<script>
-const parentWin = window.parent;
-const parentDoc = parentWin.document;
-
-if (!parentDoc.getElementById('oura-ai-widget')) {
-    const widgetDiv = parentDoc.createElement('div');
-    widgetDiv.id = 'oura-ai-widget';
-    widgetDiv.innerHTML = `
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-    @keyframes floatDoll {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-15px); }
-        100% { transform: translateY(0px); }
-    }
-    #oura-ai-btn {
-        position: fixed; bottom: 90px; right: 15px; z-index: 9999999;
-        cursor: pointer; animation: floatDoll 3s ease-in-out infinite;
-        filter: drop-shadow(0px 8px 10px rgba(0,0,0,0.3));
-    }
-    #oura-ai-btn img { width: 70px; height: 70px; border-radius: 50%; border: 3px solid #2b6cb0; background: white; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    
-    #ai-chat-box {
-        position: fixed; bottom: 170px; right: 15px; z-index: 9999999;
-        width: 320px; max-width: 90vw; height: 400px; max-height: 60vh; background: #ffffff; border-radius: 15px;
-        box-shadow: 0 15px 30px rgba(0,0,0,0.2); display: none;
-        flex-direction: column; overflow: hidden; border: 2px solid #e2e8f0;
-        font-family: 'Poppins', sans-serif; box-sizing: border-box;
-    }
-    #ai-chat-box * { box-sizing: border-box; }
-    
-    .ai-header {
-        background: linear-gradient(135deg, #2b6cb0 0%, #4299e1 100%);
-        color: white; padding: 12px 15px; font-weight: 600; font-size: 16px;
-        display: flex; justify-content: space-between; align-items: center;
-    }
-    .ai-messages {
-        flex: 1; padding: 15px; overflow-y: auto; background: #fdfdfd;
-        display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth;
-    }
-    .msg-ai {
-        background: #f1f3f5; padding: 10px 15px; border-radius: 0 15px 15px 15px;
-        align-self: flex-start; max-width: 85%; font-size: 13px; border: 1px solid #e9ecef;
-        color: #333;
-    }
-    .msg-user {
-        background: #2b6cb0; color: white; padding: 10px 15px; border-radius: 15px 0 15px 15px;
-        align-self: flex-end; max-width: 85%; font-size: 13px;
-    }
-    .ai-input-area {
-        display: flex; border-top: 1px solid #eee; padding: 10px; background: white; align-items: center; width: 100%;
-    }
-    .ai-input-area input {
-        flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 20px;
-        outline: none; font-size: 14px; min-width: 0;
-    }
-    .ai-input-area button {
-        background: #25D366; color: white; border: none; padding: 10px 16px;
-        margin-left: 8px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 14px;
-    }
-    </style>
-    
-    <div id="ai-chat-box">
-        <div class="ai-header">
-            <span>👩‍💻 Oura Helpline</span>
-            <span id="close-ai-btn" style="cursor:pointer; font-size:20px; line-height: 1;">×</span>
-        </div>
-        <div class="ai-messages" id="ai-msgs">
-            <div class="msg-ai">नमस्ते! 🙏 मैं Oura की असिस्टेंट हूँ। बताइए, मैं आपकी क्या मदद कर सकती हूँ?</div>
-        </div>
-        <div class="ai-input-area">
-            <input type="text" id="ai-input" placeholder="मैसेज लिखें..."/>
-            <button id="ai-send-btn">Send</button>
-        </div>
-    </div>
-    
-    <div id="oura-ai-btn">
-        <img src="https://img.icons8.com/color/256/customer-support.png" alt="AI Girl"/>
-    </div>
-    `;
-    parentDoc.body.appendChild(widgetDiv);
-
-    let msgCount = 0;
-    const adminWA = "__ADMIN_WA__";
-
-    function handleSend() {
-        let input = parentDoc.getElementById('ai-input');
-        let text = input.value.trim();
-        if(!text) return;
-        
-        let msgs = parentDoc.getElementById('ai-msgs');
-        msgs.innerHTML += `<div class="msg-user">${text}</div>`;
-        input.value = '';
-        msgs.scrollTop = msgs.scrollHeight;
-        msgCount++;
-        
-        setTimeout(() => {
-            let reply = "";
-            let t = text.toLowerCase();
-            
-            if(msgCount >= 4 || t.includes("call") || t.includes("admin") || t.includes("owner") || t.includes("मालिक") || t.includes("whatsapp") || t.includes("bat") || t.includes("बात") || t.includes("number") || t.includes("संपर्क") || t.includes("contact")) {
-                reply = `मुझे लगता है इस विषय पर आपको सीधे एडमिन (Shalabh Sir) से बात करनी चाहिए。<br><br>📲 <a href="https://wa.me/${adminWA}?text=Hello" target="_blank" style="color:#25D366; font-weight:bold; text-decoration:none;">यहाँ क्लिक करके WhatsApp करें</a><br><br>📞 या कॉल करें: <b>+91-${adminWA}</b>`;
-            } 
-            else if(t.includes("rate") || t.includes("price") || t.includes("रेट") || t.includes("प्राइस") || t.includes("कितने")) {
-                reply = "हर प्रोडक्ट के नीचे आपको 3 रेट (सिंगल, होलसेल, और सुपर बल्क) दिखेंगे। आप कार्ट में जितनी ज्यादा मात्रा डालेंगे, सबसे कम वाला रेट अपने चरम लग जाएगा! 🛍️";
-            } 
-            else if(t.includes("delivery") || t.includes("डिलीवरी") || t.includes("shipping") || t.includes("पहुंचेगा") || t.includes("चार्ज")) {
-                reply = "छोटे आर्डर पर कुछ प्रोडक्ट्स पर 'फ्री डिलीवरी' है। बल्क आर्डर का कोरियर चार्ज आपके बिल में जुड़ता है। सारा माल हमारी दिल्ली वेयरहाउस से डिस्पैच होता है। 🚚";
-            } 
-            else if(t.includes("seller") || t.includes("सेलर") || t.includes("अकाउंट") || t.includes("दुकान") || t.includes("बेचना")) {
-                reply = "सेलर बनने के लिए आपको एडमिन से एक 'टोकन' (Password) लेना होगा। फिर आप ऊपर 'लॉगिन' करके अपने रेट और प्रोडक्ट्स खुद डाल सकते हैं! 🏪";
-            } 
-            else if(t.includes("hi") || t.includes("hello") || t.includes("नमस्ते")) {
-                reply = "हेलो जी! 🙋‍♀️ बताइए मैं आपको कौन से प्रोडक्ट या रेट की जानकारी दूँ?";
-            }
-            else {
-                reply = "मैं अभी नई हूँ और सीख रही हूँ! 👩‍💻 आप होलसेल रेट, डिलीवरी या सेलर अकाउंट के बारे में पूछ सकते हैं। <br><br>मुझसे नहीं, सीधे मालिक से बात करने के लिए बस '<b>Call</b>' या '<b>Admin</b>' लिखें।";
-            }
-            
-            msgs.innerHTML += `<div class="msg-ai">${reply}</div>`;
-            msgs.scrollTop = msgs.scrollHeight;
-        }, 800);
-    }
-
-    parentDoc.getElementById('ai-send-btn').addEventListener('click', handleSend);
-    
-    parentDoc.getElementById('ai-input').addEventListener('keypress', function(e) {
-        if(e.key === 'Enter') handleSend();
-    });
-    
-    parentDoc.getElementById('close-ai-btn').addEventListener('click', function() {
-        parentDoc.getElementById('ai-chat-box').style.display = 'none';
-    });
-
-    parentDoc.getElementById('oura-ai-btn').addEventListener('click', function() {
-        let box = parentDoc.getElementById('ai-chat-box');
-        box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
-    });
-}
-</script>
-""".replace("__ADMIN_WA__", str(admin_wa_number))
-
-st_components.html(ai_js_code, height=0, width=0)
