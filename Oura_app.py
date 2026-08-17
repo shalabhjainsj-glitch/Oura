@@ -1687,7 +1687,7 @@ if st.session_state.cart:
         </div>
         ''', unsafe_allow_html=True)
 
-        with st.expander(t("💻 Pay by Scanning QR (If using Laptop/PC)", "💻 QR Code स्कैन करें (अगर आप कंप्यूटर पर हैं)")):
+        with st.expander(t("💻 Pay  QR ", "💻 QR Code ")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
