@@ -140,7 +140,7 @@ def send_telegram_alert(token, chat_id, text_msg, pdf_bytes=None, pdf_name="Invo
     except Exception as e:
         return False
 
-# --- PDF GENERATION (अब डिस्काउंट और सेविंग्स के साथ) ---
+# --- PDF GENERATION ---
 def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_rate, shipping_charge, last_balance, amount_paid, config, invoice_date, total_savings):
     pdf = FPDF()
     pdf.add_page()
@@ -219,7 +219,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     idx = 1
     
     for k, item in cart.items():
-        # डिस्काउंट कैलकुलेट करें
         orig_p = item['price']
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
@@ -229,7 +228,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
         clean_name = re.sub(r'[^\x00-\x7F]+', ' ', str(item['name'])) 
         
-        # बिल में ऑफर का नाम जोड़ें
         if d_pct > 0:
             clean_name += f" ({d_name}: -{d_pct}%)"
             
@@ -248,10 +246,9 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
     pdf.ln(2)
     
-    # कस्टमर को खुश करने के लिए बिल में सेविंग्स दिखाना
     if total_savings > 0:
         pdf.set_font("Arial", 'B', 10)
-        pdf.set_text_color(34, 139, 34) # Green color
+        pdf.set_text_color(34, 139, 34)
         pdf.cell(190, 8, f"*** YAY! You saved Rs. {total_savings:.2f} with Special Offers! ***", ln=True, align='C')
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
@@ -397,7 +394,6 @@ hide_streamlit_style = """
             .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
             .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}
 
-            /* CSS FOR OFFER TAG SHINE EFFECT */
             @keyframes shine {
                 0% { background-position: -200% center; }
                 100% { background-position: 200% center; }
@@ -455,7 +451,6 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-# नए फील्ड्स: Offer_Name, Discount_Percent
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -547,7 +542,6 @@ if 'cart_loaded' not in st.session_state:
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
                             
-                        # डिस्काउंट डाटा लोड करें
                         disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
                         offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -690,7 +684,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_id: new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
                 with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
-                # --- OFFER SYSTEM INPUTS ---
                 st.markdown("**🎁 Special Offer / Discount (ऑफर और डिस्काउंट)**")
                 col_off1, col_off2 = st.columns(2)
                 with col_off1: new_offer_name = st.text_input("Offer Name (e.g., Diwali Offer, 15 Aug Sale)", "")
@@ -1145,7 +1138,6 @@ if c1_url or c2_url or c3_url:
     cert_html += '</div>'
     st.markdown(cert_html, unsafe_allow_html=True)
 
-
 def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""):
     if not path_str: return []
     paths = [p.strip() for p in path_str.split('|') if p.strip()]
@@ -1177,7 +1169,6 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
-    # --- डिस्काउंट डेटा निकालें ---
     disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
     offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -1193,7 +1184,6 @@ def show_product_card(row, idx, prefix):
     t2_qty = safe_int(row.get('Tier2_Qty'), 0)
     t2_price = safe_float(row.get('Tier2_Price'), t1_price)
 
-    # --- नया नेट प्राइस (Net Price) कैलकुलेट करें ---
     def apply_disc(price): return price - (price * disc_pct / 100) if price > 0 else 0.0
     
     net_retail = apply_disc(retail_price)
@@ -1218,7 +1208,6 @@ def show_product_card(row, idx, prefix):
 
     show_wholesale = st.session_state.wholesale_mode
 
-    # WhatsApp शेयर टेक्स्ट में डिस्काउंट शामिल करें
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     if disc_pct > 0:
         share_text += f"🎉 *{offer_nm} : FLAT {disc_pct}% OFF!* 🎉\n\n"
@@ -1240,7 +1229,6 @@ def show_product_card(row, idx, prefix):
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
         
-        # --- जादुई चमक वाला ऑफर बैनर ---
         if disc_pct > 0:
             st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
@@ -1260,7 +1248,6 @@ def show_product_card(row, idx, prefix):
         t_fd = t("(Free Delivery)", "(फ्री डिलीवरी)")
         del_tag = t_fd if show_fd else f"<span style='color:#d32f2f;font-size:11px;'>{t_ex}</span>"
 
-        # --- HTML फॉरमैटिंग (कटे हुए पुराने रेट और नए रेट के साथ) ---
         def get_price_html(orig, net, color, lbl):
             if disc_pct > 0:
                 return f'<span style="color:{color}; font-size:12px;">{lbl} <del style="color:#999;">₹{orig}</del> <b style="font-size:15px;">₹{net:.2f}</b></span>'
@@ -1316,7 +1303,6 @@ def show_product_card(row, idx, prefix):
                 
             if is_in_stock:
                 opts = {}
-                # हम ओरिजिनल (Original) रेट सेव करेंगे, ताकि कार्ट में सेविंग्स (बचत) दिखा सकें
                 if retail_price > 0:
                     lbl_on = f"{retail_qty} {u_base} (💳 Online: ₹{net_retail:.2f})" if disc_pct > 0 else f"{retail_qty} {u_base} (💳 Online Payment - ₹{retail_price})"
                     opts[lbl_on] = {"price": retail_price, "unit": u_base, "min_q": retail_qty, "type": "Online"}
@@ -1333,7 +1319,7 @@ def show_product_card(row, idx, prefix):
                         opts[lbl_t2] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
                     
                 selected_opt = st.selectbox("पेमेंट का तरीका और पैकेज चुनें:", list(opts.keys()), key=f"sel_{prefix_idx}")
-                buy_price = opts[selected_opt]["price"] # ये ओरिजिनल प्राइस है
+                buy_price = opts[selected_opt]["price"] 
                 buy_unit = opts[selected_opt]["unit"]
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
@@ -1409,7 +1395,6 @@ def show_product_card(row, idx, prefix):
                         
                     st.markdown("---")
                     
-                    # --- EDIT OFFERS ---
                     st.markdown("**🎁 Edit Offers (ऑफर बदलें)**")
                     col_eo1, col_eo2 = st.columns(2)
                     with col_eo1: e_off_name = st.text_input("Offer Name", value=str(row.get("Offer_Name", "")), key=f"eoff_{prefix_idx}")
@@ -1504,7 +1489,6 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
-                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
@@ -1614,44 +1598,64 @@ st.header("🛒")
 # --- ग्लोबल सेविंग्स वेरिएबल ---
 st.session_state.cart_total_savings = 0.0
 
-# --- INSERT FLOATING BUTTON HERE ---
+# --- फ्लोटिंग 'कार्ट देखें' (Quick Checkout) बटन ---
 if st.session_state.cart:
     total_items = sum(item['qty'] for item in st.session_state.cart.values())
+    
     floating_cart_js = f"""
     <script>
-    const parentWin = window.parent;
-    const parentDoc = parentWin.document;
+    const parentDoc = window.parent.document;
     let cartBtn = parentDoc.getElementById('floating-cart-btn');
     if (!cartBtn) {{
         cartBtn = parentDoc.createElement('div');
         cartBtn.id = 'floating-cart-btn';
+        cartBtn.style.position = 'fixed';
+        cartBtn.style.bottom = '25px';
+        cartBtn.style.left = '50%';
+        cartBtn.style.transform = 'translateX(-50%)';
+        cartBtn.style.background = 'linear-gradient(135deg, #ff007f 0%, #ff5e00 100%)';
+        cartBtn.style.color = 'white';
+        cartBtn.style.padding = '12px 25px';
+        cartBtn.style.borderRadius = '30px';
+        cartBtn.style.fontSize = '16px';
+        cartBtn.style.fontWeight = 'bold';
+        cartBtn.style.boxShadow = '0 5px 15px rgba(255, 94, 0, 0.4)';
+        cartBtn.style.cursor = 'pointer';
+        cartBtn.style.zIndex = '999998';
+        cartBtn.style.display = 'flex';
+        cartBtn.style.alignItems = 'center';
+        cartBtn.style.justifyContent = 'center';
+        cartBtn.style.gap = '8px';
+        cartBtn.style.border = '2px solid white';
+        cartBtn.style.whiteSpace = 'nowrap';
+        
+        cartBtn.onclick = function() {{
+            const scrollHeight = parentDoc.documentElement.scrollHeight || parentDoc.body.scrollHeight;
+            parentDoc.documentElement.scrollTo({{ 
+                top: scrollHeight, 
+                behavior: 'smooth' 
+            }});
+            parentDoc.body.scrollTo({{ 
+                top: scrollHeight, 
+                behavior: 'smooth' 
+            }});
+        }};
         parentDoc.body.appendChild(cartBtn);
     }}
-    cartBtn.innerHTML = `
-    <div style="
-        position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
-        background: linear-gradient(135deg, #ff007f 0%, #ff5e00 100%);
-        color: white; padding: 12px 25px; border-radius: 30px; font-size: 16px;
-        font-weight: bold; box-shadow: 0 5px 15px rgba(255, 94, 0, 0.4);
-        cursor: pointer; z-index: 999998; display: flex; align-items: center;
-        justify-content: center; gap: 8px; border: 2px solid white; white-space: nowrap;
-    ">
-        🛒 सीधा बिल बनाएं ({total_items} Items)
-    </div>
-    `;
-    cartBtn.onclick = function() {{
-        const viewContainer = parentDoc.querySelector('.stApp, [data-testid="stAppViewContainer"]');
-        if (viewContainer) {{
-            viewContainer.scrollTo({{ top: viewContainer.scrollHeight, behavior: 'smooth' }});
-        }} else {{
-            parentWin.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }});
-        }}
-    }};
+    cartBtn.innerHTML = '🛒 सीधा बिल बनाएं ({total_items} Items)';
+    cartBtn.style.display = 'flex';
     </script>
     """
     st_components.html(floating_cart_js, height=0, width=0)
 else:
-    st_components.html("<script>const btn = window.parent.document.getElementById('floating-cart-btn'); if(btn) btn.remove();</script>", height=0, width=0)
+    remove_cart_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    const cartBtn = parentDoc.getElementById('floating-cart-btn');
+    if (cartBtn) cartBtn.style.display = 'none';
+    </script>
+    """
+    st_components.html(remove_cart_js, height=0, width=0)
 
 if st.session_state.cart:
     total = 0
@@ -1663,7 +1667,6 @@ if st.session_state.cart:
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
         
-        # नेट प्राइस कैलकुलेशन
         net_p = orig_p - (orig_p * d_pct / 100)
         subtotal = net_p * item['qty']
         savings = (orig_p - net_p) * item['qty']
@@ -1759,7 +1762,6 @@ if st.session_state.cart:
 
         submit_billing = st.form_submit_button(t("✅ Prepare Bill & Confirm Order", "✅ बिल तैयार करें और ऑर्डर कन्फर्म करें"))
 
-    # JAVASCRIPT: लाइव मोबाईल नंबर चेक करना, लाल बॉर्डर करना और बटन को बंद करना
     mobile_validation_js = """
     <script>
     const parentDoc = window.parent.document;
@@ -1854,7 +1856,6 @@ if st.session_state.cart:
                         auto_last_balance = t_bill - t_adv
                     except: pass
 
-                # PDF जनरेट करते समय सेविंग्स (Savings) की वैल्यू भी भेजें
                 pdf_bytes = generate_pdf_bill(
                     st.session_state.cart, cust_name, cust_mobile, cust_address, 
                     cust_gst, gst_percent, shipping_cost, auto_last_balance, amount_paid, current_config, bill_date,
@@ -1884,7 +1885,6 @@ if st.session_state.cart:
                 for k, item in st.session_state.cart.items():
                     item_unit = item.get('unit', 'Pcs')
                     
-                    # नेट प्राइस कैलकुलेट करें
                     orig_p = item['price']
                     d_pct = item.get('discount_pct', 0.0)
                     net_p = orig_p - (orig_p * d_pct / 100)
