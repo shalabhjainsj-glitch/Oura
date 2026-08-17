@@ -2036,5 +2036,3 @@ if (count > 0) {{
 """
 st_components.html(basket_js, height=0, width=0)
 
-
-```
