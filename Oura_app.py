@@ -1694,10 +1694,7 @@ if st.session_state.cart:
                     qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total:.2f}&cu=INR"
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
-
-    st.markdown("---")
-    st.markdown(f"### 📍 ")
-    
+                    st.markdown("---")
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
