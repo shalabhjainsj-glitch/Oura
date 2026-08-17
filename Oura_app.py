@@ -613,7 +613,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
+    t("📦 ", "📦 "), 
     value=st.session_state.wholesale_mode
 )
 
