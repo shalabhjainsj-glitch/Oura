@@ -615,7 +615,7 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 st.session_state.wholesale_mode = st.toggle(
-    t("", "") , 
+    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
     value=st.session_state.wholesale_mode
 )
 
@@ -661,7 +661,7 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
-        st.success(t("✅ Logged  Admin.", "✅  (मालिक) "))
+        st.success(t("✅ Logged in as Admin. You have full control.", "✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।"))
         tab_add, tab_banner, tab_settings, tab_ledger = st.tabs([
             t("➕ Add Product", "➕ नया उत्पाद"), 
             t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
@@ -1127,7 +1127,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input(t("🔍 Search ", "🔍  सर्च "), "")
+search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1494,7 +1494,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader(t("🛍️ ", "🛍️ "))
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1614,6 +1614,68 @@ st.header("🛒")
 # --- ग्लोबल सेविंग्स वेरिएबल ---
 st.session_state.cart_total_savings = 0.0
 
+# --- NEW: फ्लोटिंग 'कार्ट देखें' (Quick Checkout) बटन ---
+if st.session_state.cart:
+    total_items = sum(item['qty'] for item in st.session_state.cart.values())
+    floating_cart_js = f"""
+    <script>
+    const parentDoc = window.parent.document;
+    if (!parentDoc.getElementById('floating-cart-btn')) {{
+        const cartBtn = parentDoc.createElement('div');
+        cartBtn.id = 'floating-cart-btn';
+        cartBtn.innerHTML = `
+        <div style="
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #ff007f 0%, #ff5e00 100%);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(255, 94, 0, 0.4);
+            cursor: pointer;
+            z-index: 999998; /* AI बटन के नीचे लेकिन सबसे ऊपर */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 2px solid white;
+            white-space: nowrap;
+        ">
+            🛒 सीधा बिल बनाएं ({total_items} Items)
+        </div>
+        `;
+        // बटन दबाने पर पेज को सबसे नीचे (Smooth) स्क्रॉल करें
+        cartBtn.onclick = function() {{
+            parentDoc.documentElement.scrollTo({{ 
+                top: parentDoc.documentElement.scrollHeight, 
+                behavior: 'smooth' 
+            }});
+        }};
+        parentDoc.body.appendChild(cartBtn);
+    }} else {{
+        // अगर आइटम अपडेट होते हैं, तो बटन में गिनती अपडेट करें
+        const btn = parentDoc.getElementById('floating-cart-btn').querySelector('div');
+        if (btn) btn.innerHTML = '🛒 सीधा बिल बनाएं ({total_items} Items)';
+    }}
+    </script>
+    """
+    st_components.html(floating_cart_js, height=0, width=0)
+else:
+    # अगर कार्ट खाली कर दी गई है, तो बटन को स्क्रीन से हटा दें
+    remove_cart_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    const cartBtn = parentDoc.getElementById('floating-cart-btn');
+    if (cartBtn) cartBtn.remove();
+    </script>
+    """
+    st_components.html(remove_cart_js, height=0, width=0)
+# ----------------------------------------------------
+
 if st.session_state.cart:
     total = 0
     total_savings = 0
@@ -1667,23 +1729,24 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 {t('Online', 'online')}")
+        st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
         pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
         
+        st.info("💡 **टिप:** अगर आप मोबाइल से ऑर्डर कर रहे हैं, तो नीचे वाले हरे बटन पर क्लिक करके डायरेक्ट पेमेंट कर सकते हैं। उसके बाद नीचे फॉर्म भरकर ऑर्डर सबमिट कर दें।")
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ {t("Pay Instantly via UPI App", " UPI  (Pay)")} ⚡
+            ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
         </a>
         <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
             {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
         </div>
         ''', unsafe_allow_html=True)
 
-        with st.expander(t("💻 Pay by Scanning QR ", "💻 QR Code स्कैन करें ")):
+        with st.expander(t("💻 Pay by Scanning QR (If using Laptop/PC)", "💻 QR Code स्कैन करें (अगर आप कंप्यूटर पर हैं)")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
@@ -1692,13 +1755,13 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    st.markdown(f"### 📍 {t('Billing ', ' बिल ')}")
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
-            
+            st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने आप निकाल लेगा!"))
             cust_mobile = st.text_input(t("Mobile Number (10 digits)*", "मोबाईल नंबर (10 अंक)*"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
@@ -1926,7 +1989,7 @@ if st.session_state.cart:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 st.balloons()
-                st.success(f"🎉 **ऑर्डर कन्फर्म!** कुल बिल **₹{current_bill_total:.2f}** ")
+                st.success(f"🎉 **ऑर्डर कन्फर्म!** आपका कुल बिल **₹{current_bill_total:.2f}** का तैयार हो चुका है।")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -1939,7 +2002,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥  ")
+        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1948,10 +2011,10 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t(' WhatsApp', 'WhatsApp ')}")
+        st.markdown(f"### 📲 {t('Resend Order on WhatsApp', 'WhatsApp पर दोबारा भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t(" Bill WhatsApp", "WhatsApp ")}</a>''', unsafe_allow_html=True)
+        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill Details on WhatsApp", "WhatsApp पर पूरी डिटेल भेजें")}</a>''', unsafe_allow_html=True)
 
     if st.button(t("🗑️ Empty Basket", "🗑️ बास्केट खाली करें")):
         st.session_state.cart = {}
