@@ -455,7 +455,6 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-# नए फील्ड्स: Offer_Name, Discount_Percent
 expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -547,7 +546,6 @@ if 'cart_loaded' not in st.session_state:
                         if img_link and not img_link.startswith("http"):
                             img_link = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link.replace('\\', '/'), safe='/')}"
                             
-                        # डिस्काउंट डाटा लोड करें
                         disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
                         offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -1607,7 +1605,12 @@ else:
             for idx, row in cat_products.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
+# ----------------- CART & BILL SECTION -----------------
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
+
+# यह अदृश्य एंकर है जहाँ स्क्रॉल होकर पेज रुकेगा
+st.markdown('<div id="cart-section-anchor" style="position:relative; top:-50px;"></div>', unsafe_allow_html=True)
+
 st.markdown("---")
 st.header("🛒")
 
@@ -1958,81 +1961,100 @@ if st.session_state.cart:
         save_cart_to_url()
         st.rerun()
 
-# --- Floating Basket Button (Scroll to Bill) ---
-cart_items_count = len(st.session_state.cart)
+admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
-basket_js = f"""
-<script>
-const parentDoc = window.parent.document;
-let existingBtn = parentDoc.getElementById('oura-basket-btn');
-if (existingBtn) {{
-    existingBtn.remove();
-}}
 
-let count = {cart_items_count};
+# --- FLOATING BASKET BUTTON (NO AI) ---
+# यह सिर्फ तभी चलेगा जब कार्ट में आइटम्स मौजूद होंगे 
+if len(st.session_state.cart) > 0:
+    unique_items_count = len(st.session_state.cart)
+    
+    basket_js = f"""
+    <script>
+    const parentDoc = window.parent.document;
+    
+    // पहले का कोई विजेट हो तो उसे हटा दें ताकि बार-बार लोड ना हो
+    let existingWidget = parentDoc.getElementById('oura-basket-widget');
+    if (existingWidget) {{
+        existingWidget.remove();
+    }}
 
-if (count > 0) {{
     const widgetDiv = parentDoc.createElement('div');
-    widgetDiv.id = 'oura-basket-btn';
+    widgetDiv.id = 'oura-basket-widget';
     widgetDiv.innerHTML = `
     <style>
-    @keyframes bounceCart {{
-        0%, 100% {{ transform: translateY(0); }}
-        50% {{ transform: translateY(-5px); }}
-    }}
-    #oura-basket-btn {{
+    #basket-float-btn {{
         position: fixed; 
-        bottom: 130px; 
+        bottom: 130px; /* थोड़ा ऊपर सेट किया गया है */
         right: 20px; 
         z-index: 9999999;
-        cursor: pointer;
-        animation: bounceCart 2s ease-in-out infinite;
-    }}
-    .basket-circle {{
-        background: #2b6cb0;
-        width: 60px; 
-        height: 60px; 
+        width: 65px; 
+        height: 65px; 
+        background-color: #2b6cb0; 
         border-radius: 50%; 
         display: flex; 
         justify-content: center; 
         align-items: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        border: 3px solid white;
-        position: relative;
-        transition: transform 0.2s;
+        cursor: pointer;
+        transition: transform 0.2s, background-color 0.2s;
     }}
-    .basket-circle:active {{
-        transform: scale(0.9);
+    #basket-float-btn:hover {{
+        transform: scale(1.05);
+        background-color: #1a4a79;
     }}
-    .basket-icon {{
-        font-size: 28px;
-        margin-left: -2px;
+    #basket-float-btn img {{
+        width: 35px;
+        height: 35px;
+        filter: brightness(0) invert(1);
     }}
-    .basket-badge {{
+    .cart-badge {{
         position: absolute;
-        top: -5px;
-        right: -5px;
-        background-color: #ff007f;
+        top: -3px;
+        right: -3px;
+        background-color: #e53e3e; 
         color: white;
         border-radius: 50%;
-        width: 24px;
-        height: 24px;
+        width: 26px;
+        height: 26px;
         display: flex;
         justify-content: center;
         align-items: center;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: bold;
         border: 2px solid white;
+        font-family: sans-serif;
     }}
     </style>
-    <div class="basket-circle" onclick="window.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }})">
-        <span class="basket-icon">🛒</span>
-        <span class="basket-badge">${{count}}</span>
+    
+    <div id="basket-float-btn">
+        <span class="cart-badge">{unique_items_count}</span>
+        <img src="https://img.icons8.com/ios-filled/50/000000/shopping-cart.png" alt="Cart"/>
     </div>
     `;
     parentDoc.body.appendChild(widgetDiv);
-}}
-</script>
-"""
-st_components.html(basket_js, height=0, width=0)
 
+    // क्लिक करने पर सीधे बिल सेक्शन पर स्क्रॉल करेगा
+    parentDoc.getElementById('basket-float-btn').addEventListener('click', function() {{
+        const target = parentDoc.getElementById('cart-section-anchor');
+        if(target) {{
+            target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+        }} else {{
+            window.parent.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }});
+        }}
+    }});
+    </script>
+    """
+    st_components.html(basket_js, height=0, width=0)
+else:
+    # कार्ट खाली होने पर भी अगर विजेट बना हो तो उसे हटा दें
+    remove_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    let existingWidget = parentDoc.getElementById('oura-basket-widget');
+    if (existingWidget) {
+        existingWidget.remove();
+    }
+    </script>
+    """
+    st_components.html(remove_js, height=0, width=0)
