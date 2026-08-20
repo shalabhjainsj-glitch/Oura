@@ -637,7 +637,7 @@ def handle_ws_toggle():
 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
-)
+
 # -----------------------------------
 
 
