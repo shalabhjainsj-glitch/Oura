@@ -635,7 +635,9 @@ def handle_ws_toggle():
         st.session_state.wholesale_mode = False
         st.session_state.ws_clicks = 0
 
-st.toggle(  ), 
+st.toggle(
+    
+            ), 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
