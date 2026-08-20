@@ -1951,7 +1951,7 @@ if st.session_state.cart:
                 if tg_token and tg_chat:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
-                st.balloons(  )
+                st.balloons()
                 st.success(f"🎉 **ऑर्डर कन्फर्म!**  **₹{current_bill_total:.2f}** ")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
