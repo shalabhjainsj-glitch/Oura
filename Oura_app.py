@@ -1149,7 +1149,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 except Exception as e:
                                     st.error("⚠️ बिल डिलीट करने में समस्या आई।")
 
-    st.markdown("---")
+    st.markdown("-----")
 
 search_query = st.text_input(t("🔍 Search ", "🔍 सर्च करें "), "")
 
