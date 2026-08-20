@@ -636,7 +636,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    t("📦 ", "📦 "), 
+    t( ), 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
