@@ -624,7 +624,7 @@ def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         # जब यूज़र चालू करने की कोशिश करे
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 3:
+        if st.session_state.ws_clicks >= 5:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 # चालू होने के बाद क्लिक रीसेट कर दें
         else:
