@@ -15,6 +15,41 @@ from PIL import Image
 import datetime
 from fpdf import FPDF
 
+# 1. पेज कॉन्फ़िगरेशन (यह हमेशा सबसे ऊपर होना चाहिए)
+st.set_page_config(page_title="Oura Store", layout="wide")
+
+# 2. स्क्रीन रिफ्रेश (Pull-to-Refresh) को बंद करने का CSS कोड
+disable_pull_to_refresh = """
+<style>
+/* यह कोड मोबाइल में स्क्रीन को नीचे खींचने पर रिफ्रेश होने से पूरी तरह रोकेगा */
+html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    overscroll-behavior-y: none !important;
+}
+
+/* स्क्रॉलिंग को स्मूथ बनाने के लिए */
+div[data-testid="stAppViewContainer"] {
+    overflow-y: auto;
+}
+</style>
+"""
+
+# CSS को ऐप में लागू करें
+st.markdown(disable_pull_to_refresh, unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------
+# 3. यहाँ से आपका बाकी का मौजूदा Oura ऐप का कोड शुरू होगा
+# ---------------------------------------------------------
+
+st.title("Oura Products")
+
+# उदाहरण के लिए (आप इसे अपने असली कोड से बदल लें):
+st.write("उत्पादों की सूची नीचे दी गई है। अब आप इसे मोबाइल में बेझिझक ऊपर-नीचे स्क्रॉल कर सकते हैं, यह रिफ्रेश नहीं होगा।")
+
+# डमी उत्पाद लिस्टिंग (टेस्टिंग के लिए)
+for i in range(1, 21):
+    st.info(f"उत्पाद {i} - Oura स्पेशल आइटम")
+
 # --- फोल्डर सेटअप (PDF के लिए) ---
 INVOICE_FOLDER = "saved_invoices"
 if not os.path.exists(INVOICE_FOLDER): os.makedirs(INVOICE_FOLDER)
