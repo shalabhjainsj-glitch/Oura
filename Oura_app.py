@@ -628,7 +628,7 @@ def handle_ws_toggle():
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 # चालू होने के बाद क्लिक रीसेट कर दें
         else:
-            # अगर 3 बार नहीं दबाया तो इसे वापस बंद दिखाएँ
+            # अगर 5 बार नहीं दबाया तो इसे वापस बंद दिखाएँ
             st.session_state.ws_toggle_widget = False 
     else: 
         # जब यूज़र बंद करने की कोशिश करे, तो तुरंत बंद कर दें
