@@ -1704,7 +1704,7 @@ if st.session_state.cart:
     
         
         
-                st.components.v1.html(f'''
+        st.components.v1.html(f'''
         <div style="text-align:center;">
             <button onclick="window.top.location.href='{pay_url}'" 
                     style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; border:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; cursor: pointer;">
