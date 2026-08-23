@@ -1717,7 +1717,7 @@ if st.session_state.cart:
         ''', height=120)
 
 
-        with st.expander(t("💻  QR ", "💻 QR ")):
+        with st.expander(t("💻  QR Code ", "💻 QR Code ")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
