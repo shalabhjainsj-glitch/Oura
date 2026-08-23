@@ -1704,15 +1704,18 @@ if st.session_state.cart:
     
         
         
-        st.markdown(f'''
-        <a href="{pay_url}" target="_top" style="display:block; text-align:center;
- background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-        ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
-        </a>
-        <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
-            {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
+                st.components.v1.html(f'''
+        <div style="text-align:center;">
+            <button onclick="window.top.location.href='{pay_url}'" 
+                    style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; border:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; cursor: pointer;">
+                ⚡ सीधे UPI ऐप से पेमेंट करें (Touch & Pay) ⚡
+            </button>
+            <div style="text-align:center; font-size:13px; color:gray; margin-top:10px;">
+                क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा
+            </div>
         </div>
-        ''', unsafe_allow_html=True)
+        ''', height=120)
+
 
         with st.expander(t("💻  QR ", "💻 QR ")):
             qr_tabs = st.tabs(list(available_upis.keys()))
