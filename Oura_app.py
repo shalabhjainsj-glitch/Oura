@@ -348,8 +348,6 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            /* .stApp { background-color: #f4f6f9; }  <-- इसे हटा दिया गया है ताकि डायनामिक कलर आ सके */
-
             div.stButton > button {
                 background-color: #2b6cb0;
                 color: white !important;
@@ -410,6 +408,15 @@ hide_streamlit_style = """
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# --- पूरे ऐप का परमानेंट बैकग्राउंड (लॉगिन हो या लॉगआउट) ---
+global_bg_color = current_config.get("bg_color", "#f4f6f9")
+st.markdown(f"""
+<style>
+.stApp {{ background-color: {global_bg_color} !important; }}
+</style>
+""", unsafe_allow_html=True)
+# -------------------------------------------------------
 
 if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     pwa_js = f"""
@@ -945,7 +952,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
             
             # ---------------------------------------------------------
-            # नया कलर स्लाइडर यहाँ जोड़ा गया है
             st.markdown("---")
             st.subheader("🎨 App Background Color (लाइव कलर मैचिंग)")
             
@@ -954,12 +960,13 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             # यह स्लाइडर आपको रंग चुनने देगा 
             new_bg_color = st.color_picker("यहाँ क्लिक करें और स्लाइडर घुमाकर अपना मनपसंद रंग बनाएं:", value=old_color)
             
-            # जैसे ही आप स्लाइडर घुमाएंगे, यह कोड तुरंत ऐप का बैकग्राउंड बदल देगा 
-            st.markdown(f"""
-            <style>
-            .stApp {{ background-color: {new_bg_color} !important; }}
-            </style>
-            """, unsafe_allow_html=True)
+            # लाइव प्रीव्यू (जब आप नया रंग चुनेंगे, तभी स्क्रीन का रंग बदलकर दिखाएगा)
+            if new_bg_color != old_color:
+                st.markdown(f"""
+                <style>
+                .stApp {{ background-color: {new_bg_color} !important; }}
+                </style>
+                """, unsafe_allow_html=True)
             # ---------------------------------------------------------
 
             if st.button("⚙️ Save All Settings"):
@@ -1413,7 +1420,7 @@ def show_product_card(row, idx, prefix):
         if can_market:
             with st.expander(t("📘 Create Facebook / Instagram Post", "📘 Facebook / Instagram पर पोस्ट डालें")):
                 fb_text_copy = share_text + "\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
-                st.info(t("💡 **Tip:** 1. Click '📥 Photo' on the image above to save it. \n2. Copy the text below. \n3. Paste on Facebook!", "💡 **टिप:** 1. ऊपर फोटो पर बने नीले '📥 Photo' बटन को दबाकर फोटो सेव करें। \n2. नीचे से टेक्स्ट Copy करें। \n3. फेसबुक पर जाकर पेस्ट कर दें!"))
+                st.info(t("💡 **Tip:** 1. Click '📥 Photo' on the image above to save it. \n2. Copy the text below. \n3. Paste on Facebook!", "💡 **टिप:** 1. ऊपर फोटो पर बने नीले '📥 Photo' बटन को दबाकर फोटो सेव करें। \n2. নিচে से टेक्स्ट Copy करें। \n3. फेसबुक पर जाकर पेस्ट कर दें!"))
                 st.text_area(t("Text for Facebook Post:", "Facebook पोस्ट के लिए टेक्स्ट:"), value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
@@ -1729,7 +1736,7 @@ if st.session_state.cart:
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
-            st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने চরম आप निकाल लेगा!"))
+            st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने चरम आप निकाल लेगा!"))
             cust_mobile = st.text_input(t("Mobile Number (10 digits)*", "मोबाईल नंबर (10 अंक)*"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
