@@ -1735,7 +1735,7 @@ if st.session_state.cart:
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
-            st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने चरम आप निकाल लेगा!"))
+            st.info(t("💡 ", "💡 "))
             cust_mobile = st.text_input(t("Mobile Number (10 digits)*", "मोबाईल नंबर (10 अंक)*"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
@@ -1960,7 +1960,7 @@ if st.session_state.cart:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 st.balloons()
-                st.success(f"🎉 **ऑर्डर कन्फर्म!** आपका कुल बिल **₹{current_bill_total:.2f}** का तैयार हो चुका है।")
+                st.success(f"🎉 **ऑर्डर कन्फर्म!**₹{current_bill_total:.2f}** ")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -1973,7 +1973,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 आपका बिल डाउनलोड करें")
+        st.markdown("### 📥 ")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1982,7 +1982,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t('Resend Order on WhatsApp', 'WhatsApp पर दोबारा भेजें')}")
+        st.markdown(f"### 📲 {t(' WhatsApp', 'WhatsApp ')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill Details on WhatsApp", "WhatsApp पर पूरी डिटेल भेजें")}</a>''', unsafe_allow_html=True)
