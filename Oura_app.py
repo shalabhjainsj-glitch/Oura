@@ -626,7 +626,7 @@ if 'ws_toggle_widget' not in st.session_state:
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 3:
+        if st.session_state.ws_clicks >= 5:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 
         else:
