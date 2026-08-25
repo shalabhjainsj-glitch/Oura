@@ -104,7 +104,8 @@ def load_config():
         "phonepe_upi": "", "paytm_upi": "", "gpay_upi": "", "bhim_upi": "", "upi_id": "",
         "has_banner": False, "has_logo": False, "free_delivery_tag": True, "sellers": {},
         "cert1_url": "", "cert2_url": "", "cert3_url": "",
-        "telegram_token": "", "telegram_chat_id": ""
+        "telegram_token": "", "telegram_chat_id": "",
+        "bg_color": "#f4f6f9" # डिफ़ॉल्ट कलर
     }
 
 def save_config(config):
@@ -219,7 +220,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     idx = 1
     
     for k, item in cart.items():
-        # डिस्काउंट कैलकुलेट करें
         orig_p = item['price']
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
@@ -229,7 +229,6 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
         clean_name = re.sub(r'[^\x00-\x7F]+', ' ', str(item['name'])) 
         
-        # बिल में ऑफर का नाम जोड़ें
         if d_pct > 0:
             clean_name += f" ({d_name}: -{d_pct}%)"
             
@@ -248,10 +247,9 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         
     pdf.ln(2)
     
-    # कस्टमर को खुश करने के लिए बिल में सेविंग्स दिखाना
     if total_savings > 0:
         pdf.set_font("Arial", 'B', 10)
-        pdf.set_text_color(34, 139, 34) # Green color
+        pdf.set_text_color(34, 139, 34)
         pdf.cell(190, 8, f"*** YAY! You saved Rs. {total_savings:.2f} with Special Offers! ***", ln=True, align='C')
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
@@ -350,7 +348,7 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
             
-            .stApp { background-color: #f4f6f9; }
+            /* .stApp { background-color: #f4f6f9; }  <-- इसे हटा दिया गया है ताकि डायनामिक कलर आ सके */
 
             div.stButton > button {
                 background-color: #2b6cb0;
@@ -397,7 +395,6 @@ hide_streamlit_style = """
             .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
             .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}
 
-            /* CSS FOR OFFER TAG SHINE EFFECT */
             @keyframes shine {
                 0% { background-position: -200% center; }
                 100% { background-position: 200% center; }
@@ -613,7 +610,6 @@ multi_color_marquee = f"""
 st.markdown(multi_color_marquee, unsafe_allow_html=True)
 
 
-# --- 3-CLICK HIDDEN TOGGLE LOGIC ---
 if 'ws_clicks' not in st.session_state: 
     st.session_state.ws_clicks = 0
 
@@ -622,25 +618,21 @@ if 'ws_toggle_widget' not in st.session_state:
 
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
-        # जब यूज़र चालू करने की कोशिश करे
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 5:
+        if st.session_state.ws_clicks >= 3:
             st.session_state.wholesale_mode = True
-            st.session_state.ws_clicks = 0 # चालू होने के बाद क्लिक रीसेट कर दें
+            st.session_state.ws_clicks = 0 
         else:
-            # अगर 5 बार नहीं दबाया तो इसे वापस बंद दिखाएँ
             st.session_state.ws_toggle_widget = False 
     else: 
-        # जब यूज़र बंद करने की कोशिश करे, तो तुरंत बंद कर दें
         st.session_state.wholesale_mode = False
         st.session_state.ws_clicks = 0
 
 st.toggle(
- t("📦 ", "📦 "), 
+    t("📦 Show Wholesale Rates", "📦 थोक (Wholesale) रेट देखें"), 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
-# -----------------------------------
 
 
 if st.session_state.show_login and not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
@@ -685,7 +677,7 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
-        st.success(t("✅  Admin.", "✅  एडमिन "))
+        st.success(t("✅ Logged in as Admin. You have full control.", "✅ आप एडमिन (मालिक) के रूप में लॉगिन हैं। आपके पास पूरे ऐप का कंट्रोल है।"))
         tab_add, tab_banner, tab_settings, tab_ledger = st.tabs([
             t("➕ Add Product", "➕ नया उत्पाद"), 
             t("🖼️ Banner & Logo", "🖼️ बैनर व लोगो"), 
@@ -714,7 +706,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_id: new_id = st.text_input(t("ID (Keep Unique)", "ID (यूनिक रखें)"))
                 with col_name: new_name = st.text_input(t("Product Name", "नाम"))
                 
-                # --- OFFER SYSTEM INPUTS ---
                 st.markdown("**🎁 Special Offer / Discount (ऑफर और डिस्काउंट)**")
                 col_off1, col_off2 = st.columns(2)
                 with col_off1: new_offer_name = st.text_input("Offer Name (e.g., Diwali Offer, 15 Aug Sale)", "")
@@ -953,6 +944,24 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 new_gpay = st.text_input("GPay UPI ID", value=current_config.get("gpay_upi", ""))
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
             
+            # ---------------------------------------------------------
+            # नया कलर स्लाइडर यहाँ जोड़ा गया है
+            st.markdown("---")
+            st.subheader("🎨 App Background Color (लाइव कलर मैचिंग)")
+            
+            old_color = current_config.get("bg_color", "#f4f6f9")
+            
+            # यह स्लाइडर आपको रंग चुनने देगा 
+            new_bg_color = st.color_picker("यहाँ क्लिक करें और स्लाइडर घुमाकर अपना मनपसंद रंग बनाएं:", value=old_color)
+            
+            # जैसे ही आप स्लाइडर घुमाएंगे, यह कोड तुरंत ऐप का बैकग्राउंड बदल देगा 
+            st.markdown(f"""
+            <style>
+            .stApp {{ background-color: {new_bg_color} !important; }}
+            </style>
+            """, unsafe_allow_html=True)
+            # ---------------------------------------------------------
+
             if st.button("⚙️ Save All Settings"):
                 current_config["admin_whatsapp"] = new_wa
                 current_config["admin_gst"] = new_admin_gst
@@ -963,6 +972,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 current_config["bhim_upi"] = new_bhim
                 current_config["telegram_token"] = new_tg_token
                 current_config["telegram_chat_id"] = new_tg_chat
+                
+                # चुने हुए कलर को सेव करने की लाइन 
+                current_config["bg_color"] = new_bg_color
+                
                 save_config(current_config)
                 st.success("✅ Saved!")
                 time.sleep(1)
@@ -1151,7 +1164,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input(t("🔍 Search ", "🔍 सर्च करें "), "")
+search_query = st.text_input(t("🔍 Search any product (e.g., Speaker, Watch...)", "🔍 कोई भी उत्पाद सर्च करें (जैसे: Speaker, Watch...)"), "")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1201,7 +1214,6 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
-    # --- डिस्काउंट डेटा निकालें ---
     disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
     offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -1217,7 +1229,6 @@ def show_product_card(row, idx, prefix):
     t2_qty = safe_int(row.get('Tier2_Qty'), 0)
     t2_price = safe_float(row.get('Tier2_Price'), t1_price)
 
-    # --- नया नेट प्राइस (Net Price) कैलकुलेट करें ---
     def apply_disc(price): return price - (price * disc_pct / 100) if price > 0 else 0.0
     
     net_retail = apply_disc(retail_price)
@@ -1242,7 +1253,6 @@ def show_product_card(row, idx, prefix):
 
     show_wholesale = st.session_state.wholesale_mode
 
-    # WhatsApp शेयर टेक्स्ट में डिस्काउंट शामिल करें
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
     if disc_pct > 0:
         share_text += f"🎉 *{offer_nm} : FLAT {disc_pct}% OFF!* 🎉\n\n"
@@ -1264,7 +1274,6 @@ def show_product_card(row, idx, prefix):
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
         
-        # --- जादुई चमक वाला ऑफर बैनर ---
         if disc_pct > 0:
             st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
@@ -1284,7 +1293,6 @@ def show_product_card(row, idx, prefix):
         t_fd = t("(Free Delivery)", "(फ्री डिलीवरी)")
         del_tag = t_fd if show_fd else f"<span style='color:#d32f2f;font-size:11px;'>{t_ex}</span>"
 
-        # --- HTML फॉरमैटिंग (कटे हुए पुराने रेट और नए रेट के साथ) ---
         def get_price_html(orig, net, color, lbl):
             if disc_pct > 0:
                 return f'<span style="color:{color}; font-size:12px;">{lbl} <del style="color:#999;">₹{orig}</del> <b style="font-size:15px;">₹{net:.2f}</b></span>'
@@ -1340,7 +1348,6 @@ def show_product_card(row, idx, prefix):
                 
             if is_in_stock:
                 opts = {}
-                # हम ओरिजिनल (Original) रेट सेव करेंगे, ताकि कार्ट में सेविंग्स (बचत) दिखा सकें
                 if retail_price > 0:
                     lbl_on = f"{retail_qty} {u_base} (💳 Online: ₹{net_retail:.2f})" if disc_pct > 0 else f"{retail_qty} {u_base} (💳 Online Payment - ₹{retail_price})"
                     opts[lbl_on] = {"price": retail_price, "unit": u_base, "min_q": retail_qty, "type": "Online"}
@@ -1357,7 +1364,7 @@ def show_product_card(row, idx, prefix):
                         opts[lbl_t2] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
                     
                 selected_opt = st.selectbox("पेमेंट का तरीका और पैकेज चुनें:", list(opts.keys()), key=f"sel_{prefix_idx}")
-                buy_price = opts[selected_opt]["price"] # ये ओरिजिनल प्राइस है
+                buy_price = opts[selected_opt]["price"] 
                 buy_unit = opts[selected_opt]["unit"]
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
@@ -1433,7 +1440,6 @@ def show_product_card(row, idx, prefix):
                         
                     st.markdown("---")
                     
-                    # --- EDIT OFFERS ---
                     st.markdown("**🎁 Edit Offers (ऑफर बदलें)**")
                     col_eo1, col_eo2 = st.columns(2)
                     with col_eo1: e_off_name = st.text_input("Offer Name", value=str(row.get("Offer_Name", "")), key=f"eoff_{prefix_idx}")
@@ -1518,7 +1524,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        
+        st.subheader(t("🛍️ Categories", "🛍️ कैटेगरीज (बॉक्स चुनें)"))
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1528,7 +1534,6 @@ else:
             with cat_container:
                 st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
-                # 4 बॉक्स वाला CSS (4 columns per row)
                 st.markdown("""
                 <style>
                 div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
@@ -1631,16 +1636,13 @@ else:
             for idx, row in cat_products.reset_index().iterrows():
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
-# ----------------- CART & BILL SECTION -----------------
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
 
-# यह अदृश्य एंकर है जहाँ स्क्रॉल होकर पेज रुकेगा
 st.markdown('<div id="cart-section-anchor" style="position:relative; top:-50px;"></div>', unsafe_allow_html=True)
 
 st.markdown("---")
 st.header("🛒")
 
-# --- ग्लोबल सेविंग्स वेरिएबल ---
 st.session_state.cart_total_savings = 0.0
 
 if st.session_state.cart:
@@ -1653,7 +1655,6 @@ if st.session_state.cart:
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
         
-        # नेट प्राइस कैलकुलेशन
         net_p = orig_p - (orig_p * d_pct / 100)
         subtotal = net_p * item['qty']
         savings = (orig_p - net_p) * item['qty']
@@ -1696,28 +1697,24 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 {t('Online ', ' online ')}")
+        st.markdown(f"### 💳 {t('Secure Online Payment', 'सुरक्षित online पेमेंट')}")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
-        pay_url = f"intent://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR#Intent;scheme=upi;end"
-    
+        pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
         
+        st.info("💡 **टिप:** अगर आप मोबाइल से ऑर्डर कर रहे हैं, तो नीचे वाले हरे बटन पर क्लिक करके डायरेक्ट पेमेंट कर सकते हैं। उसके बाद नीचे फॉर्म भरकर ऑर्डर सबमिट कर दें।")
         
-        st.components.v1.html(f'''
-        <div style="text-align:center;">
-            <button onclick="window.top.location.href='{pay_url}'" 
-                    style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; border:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; cursor: pointer;">
-                ⚡ सीधे UPI ऐप से पेमेंट करें (Touch & Pay) ⚡
-            </button>
-            <div style="text-align:center; font-size:13px; color:gray; margin-top:10px;">
-                क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा
-            </div>
+        st.markdown(f'''
+        <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
+            ⚡ {t("Pay Instantly via UPI App", "सीधे UPI ऐप से पेमेंट करें (Touch & Pay)")} ⚡
+        </a>
+        <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
+            {t("Opens GPay, PhonePe, Paytm automatically", "क्लिक करते ही GPay, PhonePe या Paytm खुल जाएगा")}
         </div>
-        ''', height=120)
+        ''', unsafe_allow_html=True)
 
-
-        with st.expander(t("💻  QR Code ", "💻 QR Code ")):
+        with st.expander(t("💻 Pay by Scanning QR (If using Laptop/PC)", "💻 QR Code स्कैन करें (अगर आप कंप्यूटर पर हैं)")):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
@@ -1726,13 +1723,13 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    
+    st.markdown(f"### 📍 {t('Delivery & Billing Information', 'डिलीवरी और बिल की जानकारी')}")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input(t("Your Name / Shop Name", "आपका नाम / दुकान का नाम"))
-            
+            st.info(t("💡 The system will automatically fetch the previous balance if the name matches an existing account.", "💡 पार्टी का नाम सही (सेम स्पेलिंग) डालें, सिस्टम पुराना बकाया अपने চরম आप निकाल लेगा!"))
             cust_mobile = st.text_input(t("Mobile Number (10 digits)*", "मोबाईल नंबर (10 अंक)*"))
             cust_address = st.text_area(t("Full Address (with City, Pincode)", "पूरा पता (शहर, पिनकोड सहित)"))
         with col_d2:
@@ -1957,7 +1954,7 @@ if st.session_state.cart:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 st.balloons()
-                st.success(f"🎉 **ऑर्डर कन्फर्म!**  **₹{current_bill_total:.2f}** ")
+                st.success(f"🎉 **ऑर्डर कन्फर्म!** आपका कुल बिल **₹{current_bill_total:.2f}** का तैयार हो चुका है।")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -1970,7 +1967,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 ")
+        st.markdown("### 📥 आपका बिल डाउनलोड करें")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -1979,7 +1976,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown(f"### 📲 {t(' WhatsApp', 'WhatsApp ')}")
+        st.markdown(f"### 📲 {t('Resend Order on WhatsApp', 'WhatsApp पर दोबारा भेजें')}")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ {t("Send Bill Details on WhatsApp", "WhatsApp पर पूरी डिटेल भेजें")}</a>''', unsafe_allow_html=True)
@@ -1994,8 +1991,6 @@ if st.session_state.cart:
 admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
 
-# --- FLOATING BASKET BUTTON (NO AI) ---
-# यह सिर्फ तभी चलेगा जब कार्ट में आइटम्स मौजूद होंगे 
 if len(st.session_state.cart) > 0:
     unique_items_count = len(st.session_state.cart)
     
@@ -2003,7 +1998,6 @@ if len(st.session_state.cart) > 0:
     <script>
     const parentDoc = window.parent.document;
     
-    // पहले का कोई विजेट हो तो उसे हटा दें ताकि बार-बार लोड ना हो
     let existingWidget = parentDoc.getElementById('oura-basket-widget');
     if (existingWidget) {{
         existingWidget.remove();
@@ -2015,7 +2009,7 @@ if len(st.session_state.cart) > 0:
     <style>
     #basket-float-btn {{
         position: fixed; 
-        bottom: 130px; /* थोड़ा ऊपर सेट किया गया है */
+        bottom: 130px; 
         right: 20px; 
         z-index: 9999999;
         width: 65px; 
@@ -2064,7 +2058,6 @@ if len(st.session_state.cart) > 0:
     `;
     parentDoc.body.appendChild(widgetDiv);
 
-    // क्लिक करने पर सीधे बिल सेक्शन पर स्क्रॉल करेगा
     parentDoc.getElementById('basket-float-btn').addEventListener('click', function() {{
         const target = parentDoc.getElementById('cart-section-anchor');
         if(target) {{
@@ -2077,7 +2070,6 @@ if len(st.session_state.cart) > 0:
     """
     st_components.html(basket_js, height=0, width=0)
 else:
-    # कार्ट खाली होने पर भी अगर विजेट बना हो तो उसे हटा दें
     remove_js = """
     <script>
     const parentDoc = window.parent.document;
