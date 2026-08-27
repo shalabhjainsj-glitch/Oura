@@ -631,7 +631,7 @@ if 'ws_toggle_widget' not in st.session_state:
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 3:
+        if st.session_state.ws_clicks >= 5:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 
         else:
@@ -641,7 +641,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    "📦 Show Wholesale Rates", 
+    "📦 ", 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
