@@ -1206,7 +1206,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 Search any product (e.g., Speaker, Watch...)", "")
+search_query = st.text_input("🔍 Search ", "")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1565,7 +1565,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader("🛍️ Categories")
+        st.subheader("🛍️ ")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1776,7 +1776,7 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 Secure Online Payment")
+        st.markdown(f"### 💳 Online Payment")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
@@ -1786,14 +1786,14 @@ if st.session_state.cart:
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ Pay Instantly via UPI App ⚡
+            ⚡ Pay  UPI App ⚡
         </a>
         <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
             Opens GPay, PhonePe, Paytm automatically
         </div>
         ''', unsafe_allow_html=True)
 
-        with st.expander("💻 Pay by Scanning QR (If using Laptop/PC)"):
+        with st.expander("💻 Scanning QR "):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
@@ -1802,13 +1802,13 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    st.markdown("### 📍 Delivery & Billing Information")
+    
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            st.info("💡 Enter the exact Customer Name, the system will automatically fetch the previous balance!")
+            st.info("💡 ")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -2032,7 +2032,7 @@ if st.session_state.cart:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 st.balloons()
-                st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{current_bill_total:.2f}** is ready.")
+                st.success(f"🎉 **Order Confirmed!** total bill  **₹{current_bill_total:.2f}** ")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -2045,7 +2045,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 Download Your Bill")
+        st.markdown("### 📥 Download ")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -2054,7 +2054,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown("### 📲 Resend Order on WhatsApp")
+        st.markdown("### 📲  WhatsApp")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
