@@ -1582,41 +1582,49 @@ else:
                     save_cart_to_url()
                     st.rerun()
             
-            # 2. Hide Buttons Function & Setup Click Event
+            # 2. Hide Buttons Function & Setup Click Event (ROBUST VERSION)
             js_code = """
             <script>
-            const parentWin = window.parent;
             const parentDoc = window.parent.document;
             
-            function hideCategoryButtons() {
+            function setupCategories() {
+                // 1. Hide the ugly default Streamlit buttons
                 const btns = parentDoc.querySelectorAll('button');
                 btns.forEach(b => {
                     if(b.innerText && b.innerText.includes('HIDDEN_CAT_')) {
                         const container = b.closest('div[data-testid="stElementContainer"]');
                         if (container) {
                             container.style.display = 'none';
-                            container.style.height = '0px';
-                            container.style.margin = '0px';
-                            container.style.padding = '0px';
                         }
                     }
                 });
-            }
-            hideCategoryButtons();
-            setTimeout(hideCategoryButtons, 50);
-            setTimeout(hideCategoryButtons, 500);
 
-            // मेन विंडो पर फंक्शन अटैच कर रहे हैं ताकि st.markdown इसे कॉल कर सके
-            parentWin.triggerCategoryClick = function(catName) {
-                const btns = parentDoc.querySelectorAll('button');
-                for(let i=0; i<btns.length; i++) {
-                    // === की जगह includes() यूज करना Streamlit में ज्यादा सेफ है
-                    if(btns[i].innerText && btns[i].innerText.includes('HIDDEN_CAT_' + catName)) {
-                        btns[i].click();
-                        break;
+                // 2. Attach click listeners directly to our beautiful category cards
+                const cards = parentDoc.querySelectorAll('.cat-card');
+                cards.forEach(card => {
+                    // Check if we already attached a click listener so we don't do it twice
+                    if (!card.dataset.hasClickAttached) {
+                        card.dataset.hasClickAttached = 'true';
+                        
+                        card.addEventListener('click', function() {
+                            const catName = this.getAttribute('data-cat-name');
+                            const allBtns = parentDoc.querySelectorAll('button');
+                            
+                            // Find the matching hidden Streamlit button and click it
+                            for(let i = 0; i < allBtns.length; i++) {
+                                if(allBtns[i].innerText && allBtns[i].innerText.includes('HIDDEN_CAT_' + catName)) {
+                                    allBtns[i].click();
+                                    break;
+                                }
+                            }
+                        });
                     }
-                }
-            };
+                });
+            }
+
+            // Run the setup function immediately and keep running it slightly to catch elements that load late
+            setupCategories();
+            setInterval(setupCategories, 500);
             </script>
             """
             st_components.html(js_code, height=0, width=0)
@@ -1631,8 +1639,8 @@ else:
                 img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
                 safe_cat = cat.replace("'", "\\'")
                 
-                # यहाँ onclick में 'window.triggerCategoryClick' यूज किया गया है
-                card = f'<div class="cat-card" onclick="window.triggerCategoryClick(\'{safe_cat}\')" style="background: #ffffff; border-radius: 12px; padding: 10px 5px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%;">'
+                # यहाँ onclick हटाकर data-cat-name लगाया गया है, ताकि इवेंट लिस्नर इसे पकड़ सके
+                card = f'<div class="cat-card" data-cat-name="{safe_cat}" style="background: #ffffff; border-radius: 12px; padding: 10px 5px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%;">'
                 card += f'<img src="{img_url}" style="width: 45px; height: 45px; object-fit: contain; margin-bottom: 8px; border-radius: 6px;">'
                 card += f'<span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>'
                 card += '</div>'
