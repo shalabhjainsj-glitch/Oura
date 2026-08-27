@@ -631,7 +631,7 @@ if 'ws_toggle_widget' not in st.session_state:
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 5:
+        if st.session_state.ws_clicks >= 3:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 
         else:
@@ -641,7 +641,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    "📦 ", 
+    "📦 Show Wholesale Rates", 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
@@ -1206,7 +1206,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 Search ", "")
+search_query = st.text_input("🔍 Search any product (e.g., Speaker, Watch...)", "")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1565,7 +1565,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        
+        st.subheader("🛍️ Categories")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1574,57 +1574,53 @@ else:
             # --- FIXED 4-COLUMN GRID WITH PHOTOS ---
             st.markdown('<div id="hide-cats-marker"></div>', unsafe_allow_html=True)
             
-            # 1. Render Buttons First
+            # 1. Render Buttons First (Using ID instead of Category Name for better stability)
             for idx, cat in enumerate(valid_categories):
-                if st.button(f"HIDDEN_CAT_{cat}", key=f"hidden_cat_{idx}"):
+                if st.button(f"HIDDEN_CAT_{idx}", key=f"hidden_cat_{idx}"):
                     st.session_state.selected_category = cat
                     st.query_params["cat"] = cat
                     save_cart_to_url()
                     st.rerun()
             
-            # 2. Hide Buttons Function & Setup Click Event (ROBUST VERSION)
+            # 2. Hide Buttons Function & Setup Click Event (OPTIMIZED FOR SPEED)
             js_code = """
             <script>
             const parentDoc = window.parent.document;
             
             function setupCategories() {
-                // 1. Hide the ugly default Streamlit buttons
+                // Hide Streamlit buttons
                 const btns = parentDoc.querySelectorAll('button');
                 btns.forEach(b => {
                     if(b.innerText && b.innerText.includes('HIDDEN_CAT_')) {
                         const container = b.closest('div[data-testid="stElementContainer"]');
-                        if (container) {
+                        if (container && container.style.display !== 'none') {
                             container.style.display = 'none';
                         }
                     }
                 });
 
-                // 2. Attach click listeners directly to our beautiful category cards
-                const cards = parentDoc.querySelectorAll('.cat-card');
+                // Attach clicks safely without intervals
+                const cards = parentDoc.querySelectorAll('.cat-card:not(.click-ready)');
                 cards.forEach(card => {
-                    // Check if we already attached a click listener so we don't do it twice
-                    if (!card.dataset.hasClickAttached) {
-                        card.dataset.hasClickAttached = 'true';
-                        
-                        card.addEventListener('click', function() {
-                            const catName = this.getAttribute('data-cat-name');
-                            const allBtns = parentDoc.querySelectorAll('button');
-                            
-                            // Find the matching hidden Streamlit button and click it
-                            for(let i = 0; i < allBtns.length; i++) {
-                                if(allBtns[i].innerText && allBtns[i].innerText.includes('HIDDEN_CAT_' + catName)) {
-                                    allBtns[i].click();
-                                    break;
-                                }
+                    card.classList.add('click-ready');
+                    card.addEventListener('click', function() {
+                        const catIdx = this.getAttribute('data-cat-idx');
+                        const targetText = 'HIDDEN_CAT_' + catIdx;
+                        const allBtns = parentDoc.querySelectorAll('button');
+                        for(let i = 0; i < allBtns.length; i++) {
+                            if(allBtns[i].innerText && allBtns[i].innerText.includes(targetText)) {
+                                allBtns[i].click();
+                                break;
                             }
-                        });
-                    }
+                        }
+                    });
                 });
             }
 
-            // Run the setup function immediately and keep running it slightly to catch elements that load late
             setupCategories();
-            setInterval(setupCategories, 500);
+            setTimeout(setupCategories, 150);
+            setTimeout(setupCategories, 500);
+            setTimeout(setupCategories, 1000);
             </script>
             """
             st_components.html(js_code, height=0, width=0)
@@ -1635,14 +1631,14 @@ else:
             html_parts = []
             html_parts.append('<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0px;">')
             
-            for cat in valid_categories:
+            for idx, cat in enumerate(valid_categories):
                 img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
-                safe_cat = cat.replace("'", "\\'")
                 
                 # --- UPDATED CARD DESIGN ---
-                card = f'<div class="cat-card" data-cat-name="{safe_cat}" style="background: #ffffff; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; overflow: hidden; height: 100%;">'
+                card = f'<div class="cat-card" data-cat-idx="{idx}" style="background: #ffffff; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; overflow: hidden; height: 100%;">'
                 
-                card += f'<img src="{img_url}" style="width: 100%; height: 75px; object-fit: cover; background-color: #f8f9fa; border-bottom: 1px solid #e2e8f0;">'
+                # loading="lazy" added for speed optimization
+                card += f'<img src="{img_url}" loading="lazy" style="width: 100%; height: 75px; object-fit: cover; background-color: #f8f9fa; border-bottom: 1px solid #e2e8f0;">'
                 
                 card += f'<div style="padding: 8px 4px; flex-grow: 1; display: flex; align-items: center; justify-content: center;">'
                 card += f'<span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>'
@@ -1776,7 +1772,7 @@ if st.session_state.cart:
     if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
 
     if available_upis:
-        st.markdown(f"### 💳 Online Payment")
+        st.markdown(f"### 💳 Secure Online Payment")
         
         first_upi_id = list(available_upis.values())[0]["id"]
         merchant_name = urllib.parse.quote("Oura Products")
@@ -1786,14 +1782,14 @@ if st.session_state.cart:
         
         st.markdown(f'''
         <a href="{pay_url}" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ Pay  UPI App ⚡
+            ⚡ Pay Instantly via UPI App ⚡
         </a>
         <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
             Opens GPay, PhonePe, Paytm automatically
         </div>
         ''', unsafe_allow_html=True)
 
-        with st.expander("💻 Scanning QR "):
+        with st.expander("💻 Pay by Scanning QR (If using Laptop/PC)"):
             qr_tabs = st.tabs(list(available_upis.keys()))
             for idx, (name, data) in enumerate(available_upis.items()):
                 with qr_tabs[idx]:
@@ -1802,13 +1798,13 @@ if st.session_state.cart:
                     st.success(f"**{name} UPI ID:** `{data['id']}`")
 
     st.markdown("---")
-    
+    st.markdown("### 📍 Delivery & Billing Information")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            st.info("💡 ")
+            st.info("💡 Enter the exact Customer Name, the system will automatically fetch the previous balance!")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -2032,7 +2028,7 @@ if st.session_state.cart:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 st.balloons()
-                st.success(f"🎉 **Order Confirmed!** total bill  **₹{current_bill_total:.2f}** ")
+                st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{current_bill_total:.2f}** is ready.")
                 
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
@@ -2045,7 +2041,7 @@ if st.session_state.cart:
                 st_components.html(js_redirect, height=0, width=0)
 
     if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 Download ")
+        st.markdown("### 📥 Download Your Bill")
         st.download_button(
             label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
@@ -2054,7 +2050,7 @@ if st.session_state.cart:
             use_container_width=True
         )
 
-        st.markdown("### 📲  WhatsApp")
+        st.markdown("### 📲 Resend Order on WhatsApp")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
