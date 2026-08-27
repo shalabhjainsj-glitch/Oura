@@ -1573,6 +1573,8 @@ else:
         else:
             # --- FIXED 4-COLUMN GRID WITH PHOTOS ---
             st.markdown('<div id="hide-cats-marker"></div>', unsafe_allow_html=True)
+            
+            # 1. Render Buttons First
             for idx, cat in enumerate(valid_categories):
                 if st.button(f"HIDDEN_CAT_{cat}", key=f"hidden_cat_{idx}"):
                     st.session_state.selected_category = cat
@@ -1580,6 +1582,32 @@ else:
                     save_cart_to_url()
                     st.rerun()
             
+            # 2. Hide Buttons Function
+            hide_js = """
+            <script>
+            const parentDoc = window.parent.document;
+            function hideCategoryButtons() {
+                const btns = parentDoc.querySelectorAll('button');
+                btns.forEach(b => {
+                    if(b.innerText.includes('HIDDEN_CAT_')) {
+                        const container = b.closest('div[data-testid="stElementContainer"]');
+                        if (container) {
+                            container.style.display = 'none';
+                            container.style.height = '0px';
+                            container.style.margin = '0px';
+                            container.style.padding = '0px';
+                        }
+                    }
+                });
+            }
+            hideCategoryButtons();
+            setTimeout(hideCategoryButtons, 50);
+            setTimeout(hideCategoryButtons, 500);
+            </script>
+            """
+            st_components.html(hide_js, height=0, width=0)
+            
+            # 3. Render 4-Column Grid
             cat_images = load_category_images()
             
             html_parts = []
@@ -1594,15 +1622,6 @@ else:
             html_parts.append("    }")
             html_parts.append("  }")
             html_parts.append("}")
-            html_parts.append("setTimeout(() => {")
-            html_parts.append("  const btns = parentDoc.querySelectorAll('button');")
-            html_parts.append("  btns.forEach(b => {")
-            html_parts.append("    if(b.innerText.includes('HIDDEN_CAT_')) {")
-            html_parts.append("      const container = b.closest('div[data-testid=\"stElementContainer\"]');")
-            html_parts.append("      if (container) container.style.display = 'none';")
-            html_parts.append("    }")
-            html_parts.append("  });")
-            html_parts.append("}, 50);")
             html_parts.append("</script>")
             html_parts.append('<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0px;">')
             
