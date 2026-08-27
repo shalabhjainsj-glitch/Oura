@@ -1443,18 +1443,18 @@ def show_product_card(row, idx, prefix):
             
         if can_edit or can_market: st.markdown("---")
 
+        if can_market:
+            with st.expander("📘 Create Facebook / Instagram Post"):
+                fb_text_copy = share_text + "\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
+                st.info("💡 **Tip:** 1. Click '📥 Photo' above to save it. \n2. Copy the text below. \n3. Paste on Facebook!")
+                st.text_area("Text for Facebook Post:", value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
+
         if can_edit:
             col_t1, col_t2, col_t3, col_t4 = st.columns([3, 2, 4, 3])
             with col_t1: st.markdown("**Stock:**")
             with col_t2: st.toggle("✅" if is_in_stock else "🚫", value=is_in_stock, key=f"t_stk_{prefix_idx}", on_change=toggle_stock_callback, args=(str(row['ID']), f"t_stk_{prefix_idx}"))
             with col_t3: st.markdown("**Delivery:**")
             with col_t4: st.toggle("🆓" if show_fd else "🚚", value=show_fd, key=f"t_fd_{prefix_idx}", on_change=toggle_fd_callback, args=(str(row['ID']), f"t_fd_{prefix_idx}"))
-
-        if can_market:
-            with st.expander("📘 Create Facebook / Instagram Post"):
-                fb_text_copy = share_text + "\n#OuraProducts #WholesaleMarket #DelhiWholesale #Electronics"
-                st.info("💡 **Tip:** 1. Click '📥 Photo' above to save it. \n2. Copy the text below. \n3. Paste on Facebook!")
-                st.text_area("Text for Facebook Post:", value=fb_text_copy, height=200, key=f"fb_txt_{prefix_idx}")
 
         if can_edit:
             with st.expander("✏️ Edit & Move Product"):
@@ -1639,11 +1639,15 @@ else:
                 img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
                 safe_cat = cat.replace("'", "\\'")
                 
-                # यहाँ onclick हटाकर data-cat-name लगाया गया है, ताकि इवेंट लिस्नर इसे पकड़ सके
-                card = f'<div class="cat-card" data-cat-name="{safe_cat}" style="background: #ffffff; border-radius: 12px; padding: 10px 5px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%;">'
-                card += f'<img src="{img_url}" style="width: 45px; height: 45px; object-fit: contain; margin-bottom: 8px; border-radius: 6px;">'
+                # --- UPDATED CARD DESIGN ---
+                card = f'<div class="cat-card" data-cat-name="{safe_cat}" style="background: #ffffff; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; overflow: hidden; height: 100%;">'
+                
+                card += f'<img src="{img_url}" style="width: 100%; height: 75px; object-fit: cover; background-color: #f8f9fa; border-bottom: 1px solid #e2e8f0;">'
+                
+                card += f'<div style="padding: 8px 4px; flex-grow: 1; display: flex; align-items: center; justify-content: center;">'
                 card += f'<span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>'
-                card += '</div>'
+                card += '</div></div>'
+                
                 html_parts.append(card)
                 
             html_parts.append('</div>')
