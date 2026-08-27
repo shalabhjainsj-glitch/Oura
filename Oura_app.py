@@ -1565,7 +1565,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader("🛍️ Categories")
+        
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -2043,14 +2043,14 @@ if st.session_state.cart:
     if 'ready_pdf' in st.session_state:
         st.markdown("### 📥 Download")
         st.download_button(
-            label="📄 Download Professional PDF Bill",
+            label="📄 Download  Bill",
             data=st.session_state.ready_pdf,
             file_name=st.session_state.ready_filename,
             mime="application/pdf",
             use_container_width=True
         )
 
-        st.markdown("### 📲  WhatsApp")
+        st.markdown("### 📲 ")
         admin_num = current_config.get("admin_whatsapp", "919891587437")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
