@@ -124,16 +124,6 @@ else:
     if migrated:
         save_config(current_config)
 
-# --- LOAD CATEGORY IMAGES ---
-@st.cache_data(ttl=300, show_spinner=False)
-def load_category_images():
-    try:
-        doc = db.collection('settings').document('category_images').get()
-        if doc.exists:
-            return doc.to_dict()
-    except: pass
-    return {}
-
 def send_telegram_alert(token, chat_id, text_msg, pdf_bytes=None, pdf_name="Invoice.pdf"):
     if not token or not chat_id:
         return False
@@ -415,12 +405,6 @@ hide_streamlit_style = """
                 text-align: center; margin-bottom: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
                 border: 1px solid #ffcc00; letter-spacing: 0.5px;
             }
-
-            /* Custom Grid active state */
-            .cat-card:active {
-                transform: scale(0.92) !important;
-                background-color: #f7fafc !important;
-            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -591,6 +575,7 @@ if st.session_state.seller_logged_in:
         time.sleep(2)
         st.rerun()
 
+# --- HEADER LAYOUT MODIFIED (Removed Language Column) ---
 col_logo, col_login = st.columns([8, 2])
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
@@ -955,55 +940,23 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 new_gpay = st.text_input("GPay UPI ID", value=current_config.get("gpay_upi", ""))
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
             
-            # --- CATEGORY IMAGES UPLOAD SECTION ---
-            st.markdown("---")
-            st.subheader("🖼️ Category Photos")
-            st.info("Upload custom photos/icons to display above each category box on the home page.")
-            
-            cat_images_dict = load_category_images()
-            cats_list_for_img = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
-            
-            if cats_list_for_img:
-                col_ci1, col_ci2 = st.columns(2)
-                with col_ci1:
-                    sel_cat_for_img = st.selectbox("Select Category", cats_list_for_img)
-                    if sel_cat_for_img in cat_images_dict:
-                        st.image(cat_images_dict[sel_cat_for_img], width=100)
-                        if st.button("❌ Remove Photo", key="rm_cat_img"):
-                            del cat_images_dict[sel_cat_for_img]
-                            db.collection('settings').document('category_images').set(cat_images_dict)
-                            load_category_images.clear()
-                            st.rerun()
-                
-                with col_ci2:
-                    new_cat_img = st.file_uploader(f"Upload Photo for '{sel_cat_for_img}'", type=["jpg", "png", "jpeg"], key="up_cat_img")
-                    if st.button("Save Category Photo") and new_cat_img:
-                        with st.spinner("Uploading..."):
-                            c_bytes, _ = compress_image(new_cat_img.getvalue())
-                            c_url = upload_image_to_imgbb(c_bytes)
-                            if c_url:
-                                cat_images_dict[sel_cat_for_img] = c_url
-                                db.collection('settings').document('category_images').set(cat_images_dict)
-                                load_category_images.clear()
-                                st.success("✅ Photo Saved!")
-                                time.sleep(1)
-                                st.rerun()
-            else:
-                st.warning("Please add some products to create categories first.")
-            # ----------------------------------------
-
+            # ---------------------------------------------------------
             st.markdown("---")
             st.subheader("🎨 App Background Color (Live Preview)")
             
             old_color = current_config.get("bg_color", "#f4f6f9")
+            
+            # Color picker slider
             new_bg_color = st.color_picker("Click here and use the slider to choose your favorite background color:", value=old_color)
             
+            # Live Preview
             if new_bg_color != old_color:
                 st.markdown(f"""
                 <style>
                 .stApp {{ background-color: {new_bg_color} !important; }}
                 </style>
                 """, unsafe_allow_html=True)
+            # ---------------------------------------------------------
 
             if st.button("⚙️ Save All Settings"):
                 current_config["admin_whatsapp"] = new_wa
@@ -1015,6 +968,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 current_config["bhim_upi"] = new_bhim
                 current_config["telegram_token"] = new_tg_token
                 current_config["telegram_chat_id"] = new_tg_chat
+                
+                # Save Color
                 current_config["bg_color"] = new_bg_color
                 
                 save_config(current_config)
@@ -1550,7 +1505,6 @@ def show_product_card(row, idx, prefix):
                 load_products.clear()
                 st.rerun()
 
-# --- MAIN PAGE: DISPLAY CATEGORIES OR SEARCH RESULTS ---
 if products_df.empty:
     st.info("New products coming soon!")
 else:
@@ -1570,59 +1524,51 @@ else:
         if len(valid_categories) == 0: 
             st.write("No categories yet.")
         else:
-            # --- CUSTOM 4-COLUMN GRID WITH PHOTOS (100% MOBILE FRIENDLY) ---
-            
-            # 1. Render Hidden Streamlit Buttons
-            st.markdown('<div id="hide-cats-marker"></div>', unsafe_allow_html=True)
-            for idx, cat in enumerate(valid_categories):
-                if st.button(f"HIDDEN_CAT_{cat}", key=f"hidden_cat_{idx}"):
-                    st.session_state.selected_category = cat
-                    st.query_params["cat"] = cat
-                    save_cart_to_url()
-                    st.rerun()
-            
-            # 2. Raw HTML Grid
-            cat_images = load_category_images()
-            grid_html = """
-            <script>
-            const parentDoc = window.parent.document;
-            function triggerCategoryClick(catName) {
-                const btns = parentDoc.querySelectorAll('button');
-                for(let i=0; i<btns.length; i++) {
-                    if(btns[i].innerText === 'HIDDEN_CAT_' + catName) {
-                        btns[i].click();
-                        break;
-                    }
-                }
-            }
-            
-            setTimeout(() => {
-                const btns = parentDoc.querySelectorAll('button');
-                btns.forEach(b => {
-                    if(b.innerText.includes('HIDDEN_CAT_')) {
-                        const container = b.closest('div[data-testid="stElementContainer"]');
-                        if (container) container.style.display = 'none';
-                    }
-                });
-            }, 50);
-            </script>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0px;">
-            """
-            
-            for cat in valid_categories:
-                img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
-                safe_cat = cat.replace("'", "\\'")
+            cat_container = st.container()
+            with cat_container:
+                st.markdown('<div id="safe-cat-grid"></div>', unsafe_allow_html=True)
                 
-                grid_html += f"""
-                <div class="cat-card" onclick="triggerCategoryClick('{safe_cat}')" 
-                     style="background: #ffffff; border-radius: 12px; padding: 10px 5px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%;">
-                    <img src="{img_url}" style="width: 45px; height: 45px; object-fit: contain; margin-bottom: 8px; border-radius: 6px;">
-                    <span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>
-                </div>
-                """
-            grid_html += '</div>'
-            st.markdown(grid_html, unsafe_allow_html=True)
-            # ---------------------------------------------------------------
+                st.markdown("""
+                <style>
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) {
+                    display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; justify-content: flex-start !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"] { width: calc(25% - 8px) !important; }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(#safe-cat-grid),
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) > div[data-testid="stElementContainer"]:has(style) { display: none !important; }
+                
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button {
+                    height: 90px !important; 
+                    min-height: 90px !important; 
+                    width: 100% !important; 
+                    border-radius: 12px !important;
+                    background: #ffffff !important; 
+                    border: 2px solid #e2e8f0 !important;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important; 
+                    color: #1a202c !important; 
+                    font-weight: 700 !important;
+                    font-size: 13px !important; 
+                    white-space: normal !important; 
+                    word-wrap: break-word !important; 
+                    line-height: 1.2 !important; 
+                    padding: 4px !important; 
+                    transition: all 0.2s ease-in-out !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    text-align: center !important;
+                }
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:hover { transform: translateY(-3px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.2) !important; border-color: #2b6cb0 !important; color: #2b6cb0 !important;}
+                div[data-testid="stVerticalBlock"]:has(#safe-cat-grid) button:active { transform: scale(0.95) !important; }
+                </style>
+                """, unsafe_allow_html=True)
+
+                for idx, cat in enumerate(valid_categories):
+                    if st.button(cat, key=f"cat_btn_{idx}"):
+                        st.session_state.selected_category = cat
+                        st.query_params["cat"] = cat
+                        save_cart_to_url()
+                        st.rerun()
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
