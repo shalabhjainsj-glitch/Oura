@@ -415,6 +415,12 @@ hide_streamlit_style = """
                 text-align: center; margin-bottom: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
                 border: 1px solid #ffcc00; letter-spacing: 0.5px;
             }
+
+            /* Custom Grid active state */
+            .cat-card:active {
+                transform: scale(0.92) !important;
+                background-color: #f7fafc !important;
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -585,7 +591,6 @@ if st.session_state.seller_logged_in:
         time.sleep(2)
         st.rerun()
 
-# --- HEADER LAYOUT ---
 col_logo, col_login = st.columns([8, 2])
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
@@ -1565,30 +1570,59 @@ else:
         if len(valid_categories) == 0: 
             st.write("No categories yet.")
         else:
-            # --- NEW CATEGORY GRID WITH PHOTOS ---
-            cat_images = load_category_images()
+            # --- CUSTOM 4-COLUMN GRID WITH PHOTOS (100% MOBILE FRIENDLY) ---
             
-            # Create a 4-column layout for category boxes
-            cols = st.columns(4)
+            # 1. Render Hidden Streamlit Buttons
+            st.markdown('<div id="hide-cats-marker"></div>', unsafe_allow_html=True)
             for idx, cat in enumerate(valid_categories):
-                with cols[idx % 4]:
-                    # Create a neat card box for each category
-                    with st.container(border=True):
-                        # Get the assigned photo URL, or show a beautiful default 3D box icon
-                        img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
-                        
-                        st.markdown(f'''
-                        <div style="text-align: center; padding-top: 5px;">
-                            <img src="{img_url}" style="width: 65px; height: 65px; object-fit: contain; margin-bottom: 10px; border-radius: 8px;">
-                        </div>
-                        ''', unsafe_allow_html=True)
-                        
-                        if st.button(cat, key=f"cat_btn_{idx}", use_container_width=True):
-                            st.session_state.selected_category = cat
-                            st.query_params["cat"] = cat
-                            save_cart_to_url()
-                            st.rerun()
-            # -------------------------------------
+                if st.button(f"HIDDEN_CAT_{cat}", key=f"hidden_cat_{idx}"):
+                    st.session_state.selected_category = cat
+                    st.query_params["cat"] = cat
+                    save_cart_to_url()
+                    st.rerun()
+            
+            # 2. Raw HTML Grid
+            cat_images = load_category_images()
+            grid_html = """
+            <script>
+            const parentDoc = window.parent.document;
+            function triggerCategoryClick(catName) {
+                const btns = parentDoc.querySelectorAll('button');
+                for(let i=0; i<btns.length; i++) {
+                    if(btns[i].innerText === 'HIDDEN_CAT_' + catName) {
+                        btns[i].click();
+                        break;
+                    }
+                }
+            }
+            
+            setTimeout(() => {
+                const btns = parentDoc.querySelectorAll('button');
+                btns.forEach(b => {
+                    if(b.innerText.includes('HIDDEN_CAT_')) {
+                        const container = b.closest('div[data-testid="stElementContainer"]');
+                        if (container) container.style.display = 'none';
+                    }
+                });
+            }, 50);
+            </script>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0px;">
+            """
+            
+            for cat in valid_categories:
+                img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
+                safe_cat = cat.replace("'", "\\'")
+                
+                grid_html += f"""
+                <div class="cat-card" onclick="triggerCategoryClick('{safe_cat}')" 
+                     style="background: #ffffff; border-radius: 12px; padding: 10px 5px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%;">
+                    <img src="{img_url}" style="width: 45px; height: 45px; object-fit: contain; margin-bottom: 8px; border-radius: 6px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>
+                </div>
+                """
+            grid_html += '</div>'
+            st.markdown(grid_html, unsafe_allow_html=True)
+            # ---------------------------------------------------------------
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
