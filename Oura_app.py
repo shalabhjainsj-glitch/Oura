@@ -1992,11 +1992,9 @@ if st.session_state.cart:
                 msg += f"------------------------------------\n"
                 msg += f"📱 *Date:* {bill_date.strftime('%d-%m-%Y')}\n"
                 
-                # --- NEW STATE SAVING LOGIC ---
                 st.session_state.ready_msg_for_admin = msg
                 st.session_state.ready_bill_total = current_bill_total
                 st.session_state.selected_payment_mode = payment_mode
-                st.session_state.trigger_js_redirect = True
 
                 tg_token = current_config.get("telegram_token", "")
                 tg_chat = current_config.get("telegram_chat_id", "")
@@ -2011,6 +2009,7 @@ if st.session_state.cart:
         st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{st.session_state.get('ready_bill_total', 0):.2f}** is ready.")
 
         admin_num = current_config.get("admin_whatsapp", "919891587437")
+        wa_url = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
 
         # अगर कस्टमर ने "Pay Online Now" चुना है
         if "Online" in st.session_state.get('selected_payment_mode', ''):
@@ -2025,33 +2024,26 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # ऑटोमैटिक WA और UPI ट्रिगर करने वाला स्क्रिप्ट (Direct Redirect)
-                if st.session_state.get('trigger_js_redirect', False):
-                    auto_js = f"""
-                    <script>
-                    const waUrl = "https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}";
-                    const upiUrl = "{pay_url}";
-                    
-                    // 1. WhatsApp मेसेज एक नए टैब में खोलें
-                    window.open(waUrl, "_blank");
-                    
-                    // 2. तुरंत करंट स्क्रीन को UPI ऐप की तरफ रीडायरेक्ट करें
-                    setTimeout(function() {{
-                        window.location.href = upiUrl;
-                    }}, 800);
-                    </script>
-                    """
-                    st_components.html(auto_js, height=0, width=0)
-                    st.session_state.trigger_js_redirect = False # सिर्फ एक बार चले
-
-                # मैन्युअल बटन को हटाकर सिर्फ एक लोडिंग/स्टेटस बॉक्स और छोटा बैकअप लिंक
-                st.markdown(f'''
-                <div style="text-align:center; background: #f0fdf4; border: 2px solid #22c55e; padding:15px; border-radius:10px; margin-bottom:15px;">
-                    <h3 style="color:#166534; margin:0;">⏳ Opening UPI App...</h3>
-                    <p style="color:#15803d; font-size:14px; margin-top:5px;">Please complete the payment (₹{st.session_state.get('ready_bill_total', 0):.2f}) on your phone.</p>
-                    <a href="{pay_url}" style="font-size:12px; color:#16a34a; text-decoration:underline;">Click here if UPI doesn't open automatically</a>
+                # यह है "जादुई बटन" (Magic Button) - जो WA भी खोलेगा और UPI भी
+                combined_button_html = f"""
+                <div style="text-align:center; margin-bottom: 20px;">
+                    <a href="{pay_url}" target="_top" onclick="window.open('{wa_url}', '_blank');" 
+                       style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:22px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
+                        🚀 TAP HERE TO PAY & SEND WHATSAPP
+                    </a>
+                    <p style="color: gray; font-size: 14px; margin-top: 10px;">
+                        (This button will open your UPI App and send the bill to Admin simultaneously)
+                    </p>
                 </div>
-                ''', unsafe_allow_html=True)
+                <style>
+                @keyframes pulse {{
+                    0% {{ transform: scale(1); }}
+                    50% {{ transform: scale(1.02); }}
+                    100% {{ transform: scale(1); }}
+                }}
+                </style>
+                """
+                st.markdown(combined_button_html, unsafe_allow_html=True)
 
                 with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
@@ -2062,26 +2054,12 @@ if st.session_state.cart:
                             st.success(f"**{name} UPI ID:** `{upi_id}`")
             else:
                 st.warning("⚠️ No UPI IDs configured by Admin.")
-                if st.session_state.get('trigger_js_redirect', False):
-                    wa_js = f"""
-                    <script>
-                    window.open("https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}", "_blank");
-                    </script>
-                    """
-                    st_components.html(wa_js, height=0, width=0)
-                    st.session_state.trigger_js_redirect = False
+                st.markdown(f'''<a href="{wa_url}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
                     
         # अगर कस्टमर ने "Cash" चुना है
         else:
             st.info("💵 You selected **Cash / Pay Later**. Your order has been placed successfully!")
-            if st.session_state.get('trigger_js_redirect', False):
-                wa_js = f"""
-                <script>
-                window.open("https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}", "_blank");
-                </script>
-                """
-                st_components.html(wa_js, height=0, width=0)
-                st.session_state.trigger_js_redirect = False
+            st.markdown(f'''<a href="{wa_url}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Order on WhatsApp</a>''', unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("### 📥 Download Your Bill")
@@ -2092,10 +2070,6 @@ if st.session_state.cart:
             mime="application/pdf",
             use_container_width=True
         )
-
-        st.markdown("### 📲 Resend Order on WhatsApp")
-        wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-        st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
 
     if st.button("🗑️ Empty Basket"):
         st.session_state.cart = {}
