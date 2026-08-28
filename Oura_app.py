@@ -631,7 +631,7 @@ if 'ws_toggle_widget' not in st.session_state:
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 5:
+        if st.session_state.ws_clicks >= 3:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 
         else:
@@ -641,7 +641,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    "📦 ", 
+    "📦 Show Wholesale Rates", 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
@@ -1206,7 +1206,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 Search ", "")
+search_query = st.text_input("🔍 Search any product (e.g., Speaker, Watch...)", "")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1565,7 +1565,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        
+        st.subheader("🛍️ Categories")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1763,50 +1763,16 @@ if st.session_state.cart:
     
     st.subheader(f"Total Amount: ₹{total:.2f}")
     if total_savings > 0:
-        st.markdown(f"<h4 style='color:green;'>🎉 Savings: ₹{total_savings:.2f}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color:green;'>🎉 Total Savings: ₹{total_savings:.2f}</h4>", unsafe_allow_html=True)
     
-    available_upis = {}
-    if current_config.get("phonepe_upi"): available_upis["PhonePe"] = {"id": current_config["phonepe_upi"], "color": "#5e35b1", "icon": "🟣"}
-    if current_config.get("paytm_upi"): available_upis["Paytm"] = {"id": current_config["paytm_upi"], "color": "#00baf2", "icon": "🔵"}
-    if current_config.get("gpay_upi"): available_upis["Google Pay"] = {"id": current_config["gpay_upi"], "color": "#1a73e8", "icon": "🔴"}
-    if current_config.get("bhim_upi"): available_upis["BHIM"] = {"id": current_config["bhim_upi"], "color": "#ff7043", "icon": "🟠"}
-
-    if available_upis:
-        st.markdown(f"### 💳  Online Payment")
-        
-        first_upi_id = list(available_upis.values())[0]["id"]
-        merchant_name = urllib.parse.quote("Oura Products")
-        pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={total:.2f}&cu=INR"
-        
-        
-        
-        # JavaScript और target="_top" जोड़ा गया है ताकि Streamlit iframe के बाहर UPI ऐप खुल सके
-        st.markdown(f'''
-        <a href="{pay_url}" target="_top" onclick="window.parent.location.href='{pay_url}'; return false;" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:15px 20px; border-radius:12px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom:15px; transition: transform 0.2s;">
-            ⚡ Pay Instantly via UPI App ⚡
-        </a>
-        <div style="text-align:center; font-size:13px; color:gray; margin-top:-10px; margin-bottom:15px;">
-            Opens GPay, PhonePe, Paytm automatically
-        </div>
-        ''', unsafe_allow_html=True)
-
-
-        with st.expander("💻 Scanning QR "):
-            qr_tabs = st.tabs(list(available_upis.keys()))
-            for idx, (name, data) in enumerate(available_upis.items()):
-                with qr_tabs[idx]:
-                    qr_data = f"upi://pay?pa={data['id']}&pn=Oura_Products&am={total:.2f}&cu=INR"
-                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=150)
-                    st.success(f"**{name} UPI ID:** `{data['id']}`")
-
     st.markdown("---")
-    
+    st.markdown("### 📍 Delivery & Billing Information")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            
+            st.info("💡 Enter the exact Customer Name, the system will automatically fetch the previous balance!")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -1823,6 +1789,10 @@ if st.session_state.cart:
             shipping_cost = st.number_input("🚚 Courier / Packing Charge (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
             
             amount_paid = st.number_input("💸 Amount Paid Now (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
+
+        st.markdown("---")
+        # नया पेमेंट का ऑप्शन फॉर्म के अंदर
+        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash / Pay Later", "📱 Pay Online Now (UPI)"], horizontal=True)
 
         submit_billing = st.form_submit_button("✅ Prepare Bill & Confirm Order")
 
@@ -2022,7 +1992,11 @@ if st.session_state.cart:
                 msg += f"------------------------------------\n"
                 msg += f"📱 *Date:* {bill_date.strftime('%d-%m-%Y')}\n"
                 
+                # --- NEW STATE SAVING LOGIC ---
                 st.session_state.ready_msg_for_admin = msg
+                st.session_state.ready_bill_total = current_bill_total
+                st.session_state.selected_payment_mode = payment_mode
+                st.session_state.trigger_js_redirect = True
 
                 tg_token = current_config.get("telegram_token", "")
                 tg_chat = current_config.get("telegram_chat_id", "")
@@ -2030,30 +2004,108 @@ if st.session_state.cart:
                     send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
 
                 st.balloons()
-                st.success(f"🎉 **Order Confirmed!** total bill **₹{current_bill_total:.2f}** ")
-                
-                admin_num = current_config.get("admin_whatsapp", "919891587437")
-                wa_link_auto = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-                
-                js_redirect = f"""
+
+    # --- CONDITIONAL RENDERING OF PAYMENT SECTION AFTER ORDER PLACEMENT ---
+    if 'ready_pdf' in st.session_state:
+        st.markdown("---")
+        st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{st.session_state.get('ready_bill_total', 0):.2f}** is ready.")
+
+        admin_num = current_config.get("admin_whatsapp", "919891587437")
+
+        # अगर कस्टमर ने "Pay Online Now" चुना है
+        if "Online" in st.session_state.get('selected_payment_mode', ''):
+            available_upis = {}
+            if current_config.get("phonepe_upi"): available_upis["PhonePe"] = current_config["phonepe_upi"]
+            if current_config.get("paytm_upi"): available_upis["Paytm"] = current_config["paytm_upi"]
+            if current_config.get("gpay_upi"): available_upis["Google Pay"] = current_config["gpay_upi"]
+            if current_config.get("bhim_upi"): available_upis["BHIM"] = current_config["bhim_upi"]
+
+            if available_upis:
+                st.markdown(f"### ⚡ Complete Your UPI Payment (₹{st.session_state.get('ready_bill_total', 0):.2f})")
+
+                first_upi_id = list(available_upis.values())[0]
+                merchant_name = urllib.parse.quote("Oura Products")
+                pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
+
+                # बड़ा मैन्युअल बटन ताकि Iframe का कोई भी ब्लॉक काम न करे
+                st.markdown(f'''
+                <a href="{pay_url}" target="_blank" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:20px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); margin-bottom:15px; border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
+                    📱 TAP HERE TO PAY VIA UPI APP
+                </a>
+                <div style="text-align:center; font-size:14px; color:gray; margin-top:-5px; margin-bottom:15px;">
+                    Select GPay, PhonePe, or Paytm when prompted by your phone.
+                </div>
+                <style>
+                @keyframes pulse {{
+                    0% {{ transform: scale(1); }}
+                    50% {{ transform: scale(1.02); }}
+                    100% {{ transform: scale(1); }}
+                }}
+                </style>
+                ''', unsafe_allow_html=True)
+
+                # ऑटोमैटिक WA और UPI ट्रिगर करने वाला स्क्रिप्ट
+                if st.session_state.get('trigger_js_redirect', False):
+                    auto_js = f"""
+                    <script>
+                    // पहले WhatsApp मेसेज खोलें
+                    window.open("https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}", "_blank");
+                    
+                    // 1.5 सेकंड बाद पेमेंट ऐप ऑटोमैटिक खोलने की कोशिश करें
+                    setTimeout(function() {{
+                        const link = document.createElement('a');
+                        link.href = '{pay_url}';
+                        link.target = '_blank';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }}, 1500);
+                    </script>
+                    """
+                    st_components.html(auto_js, height=0, width=0)
+                    st.session_state.trigger_js_redirect = False # सिर्फ एक बार चले
+
+                with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
+                    qr_tabs = st.tabs(list(available_upis.keys()))
+                    for idx, (name, upi_id) in enumerate(available_upis.items()):
+                        with qr_tabs[idx]:
+                            qr_data = f"upi://pay?pa={upi_id}&pn=Oura_Products&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
+                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=200)
+                            st.success(f"**{name} UPI ID:** `{upi_id}`")
+            else:
+                st.warning("⚠️ No UPI IDs configured by Admin.")
+                if st.session_state.get('trigger_js_redirect', False):
+                    wa_js = f"""
+                    <script>
+                    window.open("https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}", "_blank");
+                    </script>
+                    """
+                    st_components.html(wa_js, height=0, width=0)
+                    st.session_state.trigger_js_redirect = False
+                    
+        # अगर कस्टमर ने "Cash" चुना है
+        else:
+            st.info("💵 You selected **Cash / Pay Later**. Your order has been placed successfully!")
+            if st.session_state.get('trigger_js_redirect', False):
+                wa_js = f"""
                 <script>
-                window.open("{wa_link_auto}", "_blank");
+                window.open("https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}", "_blank");
                 </script>
                 """
-                st_components.html(js_redirect, height=0, width=0)
+                st_components.html(wa_js, height=0, width=0)
+                st.session_state.trigger_js_redirect = False
 
-    if 'ready_pdf' in st.session_state:
-        st.markdown("### 📥 Download")
+        st.markdown("---")
+        st.markdown("### 📥 Download Your Bill")
         st.download_button(
-            label="📄 Download  Bill",
+            label="📄 Download Professional PDF Bill",
             data=st.session_state.ready_pdf,
             file_name=st.session_state.ready_filename,
             mime="application/pdf",
             use_container_width=True
         )
 
-        st.markdown("### 📲 ")
-        admin_num = current_config.get("admin_whatsapp", "919891587437")
+        st.markdown("### 📲 Resend Order on WhatsApp")
         wa_link = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
         st.markdown(f'''<a href="{wa_link}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
 
