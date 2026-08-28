@@ -2021,49 +2021,37 @@ if st.session_state.cart:
             if current_config.get("bhim_upi"): available_upis["BHIM"] = current_config["bhim_upi"]
 
             if available_upis:
-                st.markdown(f"### ⚡ Complete Your UPI Payment (₹{st.session_state.get('ready_bill_total', 0):.2f})")
-
                 first_upi_id = list(available_upis.values())[0]
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # बड़ा मैन्युअल बटन ताकि Iframe का कोई भी ब्लॉक काम न करे
-                st.markdown(f'''
-                <a href="{pay_url}" target="_blank" style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:20px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); margin-bottom:15px; border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
-                    📱 TAP HERE TO PAY VIA UPI APP
-                </a>
-                <div style="text-align:center; font-size:14px; color:gray; margin-top:-5px; margin-bottom:15px;">
-                    Select GPay, PhonePe, or Paytm when prompted by your phone.
-                </div>
-                <style>
-                @keyframes pulse {{
-                    0% {{ transform: scale(1); }}
-                    50% {{ transform: scale(1.02); }}
-                    100% {{ transform: scale(1); }}
-                }}
-                </style>
-                ''', unsafe_allow_html=True)
-
-                # ऑटोमैटिक WA और UPI ट्रिगर करने वाला स्क्रिप्ट
+                # ऑटोमैटिक WA और UPI ट्रिगर करने वाला स्क्रिप्ट (Direct Redirect)
                 if st.session_state.get('trigger_js_redirect', False):
                     auto_js = f"""
                     <script>
-                    // पहले WhatsApp मेसेज खोलें
-                    window.open("https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}", "_blank");
+                    const waUrl = "https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}";
+                    const upiUrl = "{pay_url}";
                     
-                    // 1.5 सेकंड बाद पेमेंट ऐप ऑटोमैटिक खोलने की कोशिश करें
+                    // 1. WhatsApp मेसेज एक नए टैब में खोलें
+                    window.open(waUrl, "_blank");
+                    
+                    // 2. तुरंत करंट स्क्रीन को UPI ऐप की तरफ रीडायरेक्ट करें
                     setTimeout(function() {{
-                        const link = document.createElement('a');
-                        link.href = '{pay_url}';
-                        link.target = '_blank';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }}, 1500);
+                        window.location.href = upiUrl;
+                    }}, 800);
                     </script>
                     """
                     st_components.html(auto_js, height=0, width=0)
                     st.session_state.trigger_js_redirect = False # सिर्फ एक बार चले
+
+                # मैन्युअल बटन को हटाकर सिर्फ एक लोडिंग/स्टेटस बॉक्स और छोटा बैकअप लिंक
+                st.markdown(f'''
+                <div style="text-align:center; background: #f0fdf4; border: 2px solid #22c55e; padding:15px; border-radius:10px; margin-bottom:15px;">
+                    <h3 style="color:#166534; margin:0;">⏳ Opening UPI App...</h3>
+                    <p style="color:#15803d; font-size:14px; margin-top:5px;">Please complete the payment (₹{st.session_state.get('ready_bill_total', 0):.2f}) on your phone.</p>
+                    <a href="{pay_url}" style="font-size:12px; color:#16a34a; text-decoration:underline;">Click here if UPI doesn't open automatically</a>
+                </div>
+                ''', unsafe_allow_html=True)
 
                 with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
