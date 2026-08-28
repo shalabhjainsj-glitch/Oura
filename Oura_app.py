@@ -2024,15 +2024,15 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # यह है "जादुई बटन" (Magic Button) - जो WA भी खोलेगा और UPI भी
-                combined_button_html = f"""
+                # यह 100% शुद्ध UPI लिंक है (WhatsApp हटा दिया गया है)
+                upi_button_html = f"""
                 <div style="text-align:center; margin-bottom: 20px;">
-                    <a href="{pay_url}" target="_top" onclick="window.open('{wa_url}', '_blank');" 
+                    <a href="{pay_url}" target="_top" 
                        style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:22px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
-                        🚀 TAP HERE TO PAY & SEND WHATSAPP
+                        🚀 TAP HERE TO PAY VIA UPI
                     </a>
                     <p style="color: gray; font-size: 14px; margin-top: 10px;">
-                        (This button will open your UPI App and send the bill to Admin simultaneously)
+                        (Select GPay, PhonePe, or Paytm when prompted)
                     </p>
                 </div>
                 <style>
@@ -2043,7 +2043,10 @@ if st.session_state.cart:
                 }}
                 </style>
                 """
-                st.markdown(combined_button_html, unsafe_allow_html=True)
+                st.markdown(upi_button_html, unsafe_allow_html=True)
+                
+                # WhatsApp का बटन अलग से नीचे दिया है
+                st.markdown(f'''<a href="{wa_url}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Order on WhatsApp</a>''', unsafe_allow_html=True)
 
                 with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
