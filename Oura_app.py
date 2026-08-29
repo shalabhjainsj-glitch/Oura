@@ -2021,14 +2021,15 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                upi_button_html = f"""
+                # यह बटन अब सिर्फ UPI खोलेगा (WhatsApp नहीं)
+                pay_btn_html = f"""
                 <div style="text-align:center; margin-bottom: 20px;">
-                    <a href="{pay_url}" 
+                    <a href="{pay_url}" target="_top" 
                        style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:22px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
-                        🚀 TAP HERE TO PAY NOW
+                        🚀 TAP HERE TO PAY VIA UPI
                     </a>
                     <p style="color: gray; font-size: 14px; margin-top: 10px;">
-                        (Clicking this will directly open your UPI app securely)
+                        (Opens GPay, PhonePe, Paytm directly on your phone)
                     </p>
                 </div>
                 <style>
@@ -2039,7 +2040,7 @@ if st.session_state.cart:
                 }}
                 </style>
                 """
-                st.markdown(upi_button_html, unsafe_allow_html=True)
+                st.markdown(pay_btn_html, unsafe_allow_html=True)
 
                 with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
@@ -2064,20 +2065,19 @@ if st.session_state.cart:
             mime="application/pdf",
             use_container_width=True
         )
-
+        
+        # --- NEW CUSTOMER SUPPORT SECTION ---
+        st.markdown("---")
+        st.markdown("### 🎧 Customer Support")
         support_html = """
-        <div style="background-color: #f0f7ff; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px; border: 1px solid #cce3fd; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <h4 style="margin-top: 0; color: #0056b3; margin-bottom: 10px;">🎧 Customer Support</h4>
-            <p style="color: #4a5568; font-size: 14px; margin-bottom: 15px;">Need help with your order? Contact us directly:</p>
-            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                <a href="tel:+919891587437" style="background-color: #2b6cb0; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">📞 Call</a>
-                <a href="https://wa.me/919891587437" target="_blank" style="background-color: #25D366; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">💬 WhatsApp</a>
-                <a href="mailto:Shalabh.jain.sj@gmail.com" style="background-color: #e53e3e; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">✉️ Email</a>
-            </div>
-            <div style="margin-top: 15px; font-size: 14px; color: #4a5568;">
-                <b>Phone:</b> +91-9891587437<br>
-                <b>Email:</b> Shalabh.jain.sj@gmail.com
-            </div>
+        <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:15px;">
+            <a href="tel:+919891587437" style="flex:1; text-align:center; background-color:#2b6cb0; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📞 Call Us</a>
+            <a href="https://wa.me/919891587437" target="_blank" style="flex:1; text-align:center; background-color:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 WhatsApp</a>
+            <a href="mailto:Shalabh.jain.sj@gmail.com" style="flex:1; text-align:center; background-color:#ea4335; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📧 Email</a>
+        </div>
+        <div style="text-align:center; font-size:14px; color:gray;">
+            <b>No:</b> +91 9891587437 <br>
+            <b>Email:</b> Shalabh.jain.sj@gmail.com
         </div>
         """
         st.markdown(support_html, unsafe_allow_html=True)
@@ -2088,8 +2088,6 @@ if st.session_state.cart:
         if 'ready_msg_for_admin' in st.session_state: del st.session_state.ready_msg_for_admin
         save_cart_to_url()
         st.rerun()
-
-admin_wa_number = current_config.get("admin_whatsapp", "919891587437")
 
 if len(st.session_state.cart) > 0:
     unique_items_count = len(st.session_state.cart)
