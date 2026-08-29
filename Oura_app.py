@@ -596,9 +596,9 @@ col_logo, col_login = st.columns([8, 2])
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
         try: st.image(current_config["banner_url"], use_container_width=True)
-        except: st.title("🛍️ Oura")
+        except: st.title("🛍️ Oura Products - Wholesale")
     else:
-        st.title("🛍️ Oura")
+        st.title("🛍️ Oura Products - Wholesale")
 
 with col_login:
     if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
@@ -631,7 +631,7 @@ if 'ws_toggle_widget' not in st.session_state:
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 5:
+        if st.session_state.ws_clicks >= 3:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 
         else:
@@ -641,7 +641,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    "📦", 
+    "📦 Show Wholesale Rates", 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
@@ -1206,7 +1206,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 Search any product", "")
+search_query = st.text_input("🔍 Search any product (e.g., Speaker, Watch...)", "")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1766,13 +1766,13 @@ if st.session_state.cart:
         st.markdown(f"<h4 style='color:green;'>🎉 Total Savings: ₹{total_savings:.2f}</h4>", unsafe_allow_html=True)
     
     st.markdown("---")
-    
+    st.markdown("### 📍 Delivery & Billing Information")
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            st.info("💡")
+            st.info("💡 Enter the exact Customer Name, the system will automatically fetch the previous balance!")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -1791,7 +1791,7 @@ if st.session_state.cart:
             amount_paid = st.number_input("💸 Amount Paid Now (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         st.markdown("---")
-        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash on delivery", "📱 Pay Online Now (UPI)"], horizontal=True)
+        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash / Pay Later", "📱 Pay Online Now (UPI)"], horizontal=True)
 
         submit_billing = st.form_submit_button("✅ Prepare Bill & Confirm Order")
 
@@ -1832,6 +1832,7 @@ if st.session_state.cart:
                 if (!isValid) {
                     mobileInput.style.border = '2px solid #ff4b4b'; 
                     mobileInput.style.backgroundColor = '#fff0f0';
+                    mobileInput.style.color = '#000000'; // TEXT COLOR ADDED HERE
                     mobileInput.style.boxShadow = '0 0 5px rgba(255, 75, 75, 0.5)';
                     if (submitBtn) {
                         submitBtn.disabled = true;
@@ -1841,6 +1842,7 @@ if st.session_state.cart:
                 } else {
                     mobileInput.style.border = '2px solid #28a745'; 
                     mobileInput.style.backgroundColor = 'white';
+                    mobileInput.style.color = '#000000'; // TEXT COLOR ADDED HERE
                     mobileInput.style.boxShadow = 'none';
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -2005,7 +2007,7 @@ if st.session_state.cart:
     # --- CONDITIONAL RENDERING OF PAYMENT SECTION AFTER ORDER PLACEMENT ---
     if 'ready_pdf' in st.session_state:
         st.markdown("---")
-        st.success(f"🎉 **Order Confirmed!**  total bill **₹{st.session_state.get('ready_bill_total', 0):.2f}** ")
+        st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{st.session_state.get('ready_bill_total', 0):.2f}** is ready.")
 
         # अगर कस्टमर ने "Pay Online Now" चुना है
         if "Online" in st.session_state.get('selected_payment_mode', ''):
@@ -2041,7 +2043,7 @@ if st.session_state.cart:
                 """
                 st.markdown(upi_button_html, unsafe_allow_html=True)
 
-                with st.expander("💻 Paying Scan QR Code"):
+                with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
                     for idx, (name, upi_id) in enumerate(available_upis.items()):
                         with qr_tabs[idx]:
