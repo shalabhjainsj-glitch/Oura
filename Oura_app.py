@@ -349,7 +349,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
-st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
+st.set_page_config(page_title="Oura", page_icon=app_icon_url, layout="wide")
 
 hide_streamlit_style = """
             <style>
