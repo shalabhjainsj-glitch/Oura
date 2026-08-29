@@ -1793,7 +1793,7 @@ if st.session_state.cart:
         st.markdown("---")
         payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash ", "📱 Pay Online Now (UPI)"], horizontal=True)
 
-        submit_billing = st.form_submit_button("✅ Prepare Bill & Confirm Order")
+        submit_billing = st.form_submit_button("✅ Confirm Order")
 
     mobile_validation_js = """
     <script>
