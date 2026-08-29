@@ -349,7 +349,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
-st.set_page_config(page_title="Oura", page_icon=app_icon_url, layout="wide")
+st.set_page_config(page_title="Oura Products - Wholesale", page_icon=app_icon_url, layout="wide")
 
 hide_streamlit_style = """
             <style>
@@ -1791,7 +1791,6 @@ if st.session_state.cart:
             amount_paid = st.number_input("💸 Amount Paid Now (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         st.markdown("---")
-        # नया पेमेंट का ऑप्शन फॉर्म के अंदर
         payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash / Pay Later", "📱 Pay Online Now (UPI)"], horizontal=True)
 
         submit_billing = st.form_submit_button("✅ Prepare Bill & Confirm Order")
@@ -2021,15 +2020,15 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # यह बटन अब सिर्फ UPI खोलेगा (WhatsApp नहीं)
-                pay_btn_html = f"""
+                # डायरेक्ट UPI बटन (बिना WhatsApp के)
+                upi_button_html = f"""
                 <div style="text-align:center; margin-bottom: 20px;">
                     <a href="{pay_url}" target="_top" 
                        style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:22px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
-                        🚀 TAP HERE TO PAY VIA UPI
+                        🚀 TAP HERE TO PAY VIA UPI APP
                     </a>
                     <p style="color: gray; font-size: 14px; margin-top: 10px;">
-                        (Opens GPay, PhonePe, Paytm directly on your phone)
+                        (Clicking this will directly open GPay, PhonePe, or Paytm)
                     </p>
                 </div>
                 <style>
@@ -2040,7 +2039,7 @@ if st.session_state.cart:
                 }}
                 </style>
                 """
-                st.markdown(pay_btn_html, unsafe_allow_html=True)
+                st.markdown(upi_button_html, unsafe_allow_html=True)
 
                 with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
@@ -2065,22 +2064,12 @@ if st.session_state.cart:
             mime="application/pdf",
             use_container_width=True
         )
-        
-        # --- NEW CUSTOMER SUPPORT SECTION ---
+
         st.markdown("---")
-        st.markdown("### 🎧 Customer Support")
-        support_html = """
-        <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:15px;">
-            <a href="tel:+919891587437" style="flex:1; text-align:center; background-color:#2b6cb0; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📞 Call Us</a>
-            <a href="https://wa.me/919891587437" target="_blank" style="flex:1; text-align:center; background-color:#25D366; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 WhatsApp</a>
-            <a href="mailto:Shalabh.jain.sj@gmail.com" style="flex:1; text-align:center; background-color:#ea4335; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📧 Email</a>
-        </div>
-        <div style="text-align:center; font-size:14px; color:gray;">
-            <b>No:</b> +91 9891587437 <br>
-            <b>Email:</b> Shalabh.jain.sj@gmail.com
-        </div>
-        """
-        st.markdown(support_html, unsafe_allow_html=True)
+        # नया कस्टमर सपोर्ट सेक्शन 
+        with st.expander("🎧 Customer Support"):
+            st.markdown(f"**📞 Phone / WhatsApp:** +91 9891587437")
+            st.markdown(f"**📧 Email:** Shalabh.jain.sj@gmail.com")
 
     if st.button("🗑️ Empty Basket"):
         st.session_state.cart = {}
