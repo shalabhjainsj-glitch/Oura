@@ -2008,9 +2008,6 @@ if st.session_state.cart:
         st.markdown("---")
         st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{st.session_state.get('ready_bill_total', 0):.2f}** is ready.")
 
-        admin_num = current_config.get("admin_whatsapp", "919891587437")
-        wa_url = f"https://wa.me/{admin_num}?text={urllib.parse.quote(st.session_state.ready_msg_for_admin)}"
-
         # अगर कस्टमर ने "Pay Online Now" चुना है
         if "Online" in st.session_state.get('selected_payment_mode', ''):
             available_upis = {}
@@ -2024,15 +2021,14 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # यह 100% शुद्ध UPI लिंक है (WhatsApp हटा दिया गया है)
                 upi_button_html = f"""
                 <div style="text-align:center; margin-bottom: 20px;">
-                    <a href="{pay_url}" target="_top" 
+                    <a href="{pay_url}" 
                        style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:22px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
-                        🚀 TAP HERE TO PAY VIA UPI
+                        🚀 TAP HERE TO PAY NOW
                     </a>
                     <p style="color: gray; font-size: 14px; margin-top: 10px;">
-                        (Select GPay, PhonePe, or Paytm when prompted)
+                        (Clicking this will directly open your UPI app securely)
                     </p>
                 </div>
                 <style>
@@ -2044,9 +2040,6 @@ if st.session_state.cart:
                 </style>
                 """
                 st.markdown(upi_button_html, unsafe_allow_html=True)
-                
-                # WhatsApp का बटन अलग से नीचे दिया है
-                st.markdown(f'''<a href="{wa_url}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Order on WhatsApp</a>''', unsafe_allow_html=True)
 
                 with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
@@ -2057,12 +2050,10 @@ if st.session_state.cart:
                             st.success(f"**{name} UPI ID:** `{upi_id}`")
             else:
                 st.warning("⚠️ No UPI IDs configured by Admin.")
-                st.markdown(f'''<a href="{wa_url}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Bill Details on WhatsApp</a>''', unsafe_allow_html=True)
                     
         # अगर कस्टमर ने "Cash" चुना है
         else:
             st.info("💵 You selected **Cash / Pay Later**. Your order has been placed successfully!")
-            st.markdown(f'''<a href="{wa_url}" target="_blank" style="display:block; text-align:center; background: #25D366; color:white; padding:15px; border-radius:10px; text-decoration:none; font-size:18px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom:10px;">✅ Send Order on WhatsApp</a>''', unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("### 📥 Download Your Bill")
@@ -2073,6 +2064,23 @@ if st.session_state.cart:
             mime="application/pdf",
             use_container_width=True
         )
+
+        support_html = """
+        <div style="background-color: #f0f7ff; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px; border: 1px solid #cce3fd; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <h4 style="margin-top: 0; color: #0056b3; margin-bottom: 10px;">🎧 Customer Support</h4>
+            <p style="color: #4a5568; font-size: 14px; margin-bottom: 15px;">Need help with your order? Contact us directly:</p>
+            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                <a href="tel:+919891587437" style="background-color: #2b6cb0; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">📞 Call</a>
+                <a href="https://wa.me/919891587437" target="_blank" style="background-color: #25D366; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">💬 WhatsApp</a>
+                <a href="mailto:Shalabh.jain.sj@gmail.com" style="background-color: #e53e3e; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">✉️ Email</a>
+            </div>
+            <div style="margin-top: 15px; font-size: 14px; color: #4a5568;">
+                <b>Phone:</b> +91-9891587437<br>
+                <b>Email:</b> Shalabh.jain.sj@gmail.com
+            </div>
+        </div>
+        """
+        st.markdown(support_html, unsafe_allow_html=True)
 
     if st.button("🗑️ Empty Basket"):
         st.session_state.cart = {}
