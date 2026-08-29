@@ -2055,15 +2055,19 @@ if st.session_state.cart:
         else:
             st.info("💵 You selected **Cash / Pay Later**. Your order has been placed successfully!")
 
-        st.markdown("---")
-        st.markdown("### 📥 Download Your Bill")
-        st.download_button(
-            label="📄 Download Professional PDF Bill",
-            data=st.session_state.ready_pdf,
-            file_name=st.session_state.ready_filename,
-            mime="application/pdf",
-            use_container_width=True
-        )
+        # --- MODIFIED SECTION START ---
+        # सिर्फ एडमिन और सेलर के लिए पीडीएफ डाउनलोड का ऑप्शन
+        if st.session_state.get('admin_logged_in') or st.session_state.get('seller_logged_in'):
+            st.markdown("---")
+            st.markdown("### 📥 Download Your Bill (Admin / Seller Only)")
+            st.download_button(
+                label="📄 Download Professional PDF Bill",
+                data=st.session_state.ready_pdf,
+                file_name=st.session_state.ready_filename,
+                mime="application/pdf",
+                use_container_width=True
+            )
+        # --- MODIFIED SECTION END ---
 
         st.markdown("---")
         # नया कस्टमर सपोर्ट सेक्शन 
