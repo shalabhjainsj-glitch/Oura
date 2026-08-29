@@ -596,9 +596,9 @@ col_logo, col_login = st.columns([8, 2])
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
         try: st.image(current_config["banner_url"], use_container_width=True)
-        except: st.title("🛍️ Oura Products - Wholesale")
+        except: st.title("🛍️ Oura")
     else:
-        st.title("🛍️ Oura Products - Wholesale")
+        st.title("🛍️ Oura")
 
 with col_login:
     if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
@@ -631,7 +631,7 @@ if 'ws_toggle_widget' not in st.session_state:
 def handle_ws_toggle():
     if st.session_state.ws_toggle_widget: 
         st.session_state.ws_clicks += 1
-        if st.session_state.ws_clicks >= 3:
+        if st.session_state.ws_clicks >= 5:
             st.session_state.wholesale_mode = True
             st.session_state.ws_clicks = 0 
         else:
@@ -641,7 +641,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    "📦 Show Wholesale Rates", 
+    "📦", 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
@@ -1565,7 +1565,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        st.subheader("🛍️ Categories")
+        st.subheader("🛍️")
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1766,13 +1766,13 @@ if st.session_state.cart:
         st.markdown(f"<h4 style='color:green;'>🎉 Total Savings: ₹{total_savings:.2f}</h4>", unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("### 📍 Delivery & Billing Information")
+    
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            st.info("💡 Enter the exact Customer Name, the system will automatically fetch the previous balance!")
+            st.info("💡")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -1791,7 +1791,7 @@ if st.session_state.cart:
             amount_paid = st.number_input("💸 Amount Paid Now (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         st.markdown("---")
-        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash / Pay Later", "📱 Pay Online Now (UPI)"], horizontal=True)
+        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash ", "📱 Pay Online Now (UPI)"], horizontal=True)
 
         submit_billing = st.form_submit_button("✅ Prepare Bill & Confirm Order")
 
