@@ -349,7 +349,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
-st.set_page_config(page_title="Oura", page_icon=app_icon_url, layout="wide")
+st.set_page_config(page_title="Oura ", page_icon=app_icon_url, layout="wide")
 
 hide_streamlit_style = """
             <style>
@@ -596,9 +596,9 @@ col_logo, col_login = st.columns([8, 2])
 with col_logo:
     if current_config.get("has_banner", False) and current_config.get("banner_url"):
         try: st.image(current_config["banner_url"], use_container_width=True)
-        except: st.title("🛍️ Oura")
+        except: st.title("🛍️ Oura ")
     else:
-        st.title("🛍️ Oura")
+        st.title("🛍️ Oura ")
 
 with col_login:
     if not (st.session_state.admin_logged_in or st.session_state.seller_logged_in):
@@ -641,7 +641,7 @@ def handle_ws_toggle():
         st.session_state.ws_clicks = 0
 
 st.toggle(
-    "📦", 
+    "📦 ", 
     key="ws_toggle_widget",
     on_change=handle_ws_toggle
 )
@@ -689,7 +689,7 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
-        st.success("✅ Logged in as Admin. You have full control.")
+        st.success("✅ Logged in as Admin. ")
         tab_add, tab_banner, tab_settings, tab_ledger = st.tabs([
             "➕ Add Product", 
             "🖼️ Banner & Logo", 
@@ -1206,7 +1206,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
 
     st.markdown("---")
 
-search_query = st.text_input("🔍 Search any product (e.g., Speaker, Watch...)", "")
+search_query = st.text_input("🔍 Search")
 
 c1_url = current_config.get("cert1_url", "")
 c2_url = current_config.get("cert2_url", "")
@@ -1565,7 +1565,7 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
-        
+       
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
@@ -1772,7 +1772,7 @@ if st.session_state.cart:
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            st.info("💡")
+            
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -1791,9 +1791,9 @@ if st.session_state.cart:
             amount_paid = st.number_input("💸 Amount Paid Now (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         st.markdown("---")
-        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash ", "📱 Pay Online Now (UPI)"], horizontal=True)
+        payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash on delivery", "📱 Pay Online  (UPI)"], horizontal=True)
 
-        submit_billing = st.form_submit_button("✅ Order now")
+        submit_billing = st.form_submit_button("✅   Order now")
 
     mobile_validation_js = """
     <script>
@@ -1965,7 +1965,7 @@ if st.session_state.cart:
                     batch.commit()
                     load_ledger_data.clear()
 
-                msg = f"🛍️ *OURA PRODUCTS - NEW ORDER RECEIVED* 🛍️\n"
+                msg = f"🛍️ *OURA  - NEW ORDER RECEIVED* 🛍️\n"
                 msg += f"------------------------------------\n"
                 msg += f"👤 *Customer:* {cust_name if cust_name else 'Walk-in Customer'}\n"
                 msg += f"📞 *Mobile:* {cust_mobile if cust_mobile else 'N/A'}\n"
@@ -2007,7 +2007,7 @@ if st.session_state.cart:
     # --- CONDITIONAL RENDERING OF PAYMENT SECTION AFTER ORDER PLACEMENT ---
     if 'ready_pdf' in st.session_state:
         st.markdown("---")
-        st.success(f"🎉 **Order Confirmed!** Your total bill of **₹{st.session_state.get('ready_bill_total', 0):.2f}** is ready.")
+        st.success(f"🎉 **Order Confirmed!** Your total bill  **₹{st.session_state.get('ready_bill_total', 0):.2f}** ")
 
         # अगर कस्टमर ने "Pay Online Now" चुना है
         if "Online" in st.session_state.get('selected_payment_mode', ''):
@@ -2022,28 +2022,47 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # डायरेक्ट UPI बटन (बिना WhatsApp के)
+                # डायरेक्ट UPI बटन (बिना WhatsApp के) - (HTML Component का उपयोग किया गया है ताकि लिंक ब्लॉक न हो)
                 upi_button_html = f"""
-                <div style="text-align:center; margin-bottom: 20px;">
-                    <a href="{pay_url}" target="_top" 
-                       style="display:block; text-align:center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color:white; padding:22px; border-radius:12px; text-decoration:none; font-size:22px; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; animation: pulse 1.5s infinite;">
-                        🚀 TAP HERE TO PAY VIA UPI APP
-                    </a>
-                    <p style="color: gray; font-size: 14px; margin-top: 10px;">
-                        (Clicking this will directly open GPay, PhonePe, or Paytm)
-                    </p>
-                </div>
+                <!DOCTYPE html>
+                <html>
+                <head>
                 <style>
                 @keyframes pulse {{
                     0% {{ transform: scale(1); }}
                     50% {{ transform: scale(1.02); }}
                     100% {{ transform: scale(1); }}
                 }}
+                .upi-btn {{
+                    display: block; 
+                    text-align: center; 
+                    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
+                    color: white; 
+                    padding: 18px; 
+                    border-radius: 12px; 
+                    text-decoration: none; 
+                    font-size: 20px; 
+                    font-weight: bold; 
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+                    border: 2px solid #0f7a71; 
+                    animation: pulse 1.5s infinite;
+                    font-family: sans-serif;
+                }}
                 </style>
+                </head>
+                <body style="margin:0; text-align:center;">
+                    <a href="{pay_url}" target="_top" class="upi-btn">
+                        🚀 TAP HERE TO PAY VIA UPI APP
+                    </a>
+                    <p style="color: gray; font-size: 14px; margin-top: 10px; font-family: sans-serif;">
+                        (Clicking this will directly open GPay, PhonePe, or Paytm)
+                    </p>
+                </body>
+                </html>
                 """
-                st.markdown(upi_button_html, unsafe_allow_html=True)
+                st_components.html(upi_button_html, height=130)
 
-                with st.expander("💻 Paying from Laptop/PC? Scan QR Code"):
+                with st.expander("💻 Paying  Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
                     for idx, (name, upi_id) in enumerate(available_upis.items()):
                         with qr_tabs[idx]:
@@ -2055,7 +2074,7 @@ if st.session_state.cart:
                     
         # अगर कस्टमर ने "Cash" चुना है
         else:
-            st.info("💵 You selected **Cash / Pay Later**. Your order has been placed successfully!")
+            st.info("💵 You selected **Cash on delivery**. Your order has been placed successfully!")
 
         # --- MODIFIED SECTION START ---
         # सिर्फ एडमिन और सेलर के लिए पीडीएफ डाउनलोड का ऑप्शन
