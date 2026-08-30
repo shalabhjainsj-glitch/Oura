@@ -351,6 +351,7 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura ", page_icon=app_icon_url, layout="wide")
 
+# CSS अपडेट किया गया है ताकि डार्क मोड में भी टेक्स्ट काला (Black) दिखाई दे
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -372,27 +373,37 @@ hide_streamlit_style = """
             div.stButton > button:hover { background-color: #2c5282; }
             div.stButton > button:active { transform: scale(0.98); }
 
+            /* Fix Container visibility for dark mode */
             div[data-testid="stContainer"] {
-                background-color: #ffffff;
+                background-color: #ffffff !important;
                 border-radius: 10px !important;
                 border: 1px solid #e2e8f0 !important;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.05);
                 padding: 15px;
                 transition: box-shadow 0.2s;
+                color: #000000 !important;
+            }
+            div[data-testid="stContainer"] * {
+                color: #000000 !important;
             }
             div[data-testid="stContainer"]:hover {
                 box-shadow: 0 6px 12px rgba(0,0,0,0.08);
                 border-color: #cbd5e0 !important;
             }
 
+            /* Fix Expander visibility for dark mode */
             div[data-testid="stExpander"] {
-                background-color: #ffffff;
+                background-color: #ffffff !important;
                 border-radius: 8px;
                 border-left: 4px solid #2b6cb0 !important;
                 border-top: 1px solid #e2e8f0;
                 border-right: 1px solid #e2e8f0;
                 border-bottom: 1px solid #e2e8f0;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                color: #000000 !important;
+            }
+            div[data-testid="stExpander"] * {
+                color: #000000 !important;
             }
 
             .swipe-gallery {
@@ -2007,7 +2018,7 @@ if st.session_state.cart:
     # --- CONDITIONAL RENDERING OF PAYMENT SECTION AFTER ORDER PLACEMENT ---
     if 'ready_pdf' in st.session_state:
         st.markdown("---")
-        st.success(f"🎉 **Order Confirmed!** Your total bill  **₹{st.session_state.get('ready_bill_total', 0):.2f}** ")
+        st.success(f"🎉 **Order Confirmed!** Your total bill **₹{st.session_state.get('ready_bill_total', 0):.2f}**")
 
         # अगर कस्टमर ने "Pay Online Now" चुना है
         if "Online" in st.session_state.get('selected_payment_mode', ''):
@@ -2022,53 +2033,28 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # डायरेक्ट UPI बटन (बिना WhatsApp के) - (HTML Component का उपयोग किया गया है ताकि लिंक ब्लॉक न हो)
-                upi_button_html = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                <style>
-                @keyframes pulse {{
-                    0% {{ transform: scale(1); }}
-                    50% {{ transform: scale(1.02); }}
-                    100% {{ transform: scale(1); }}
-                }}
-                .upi-btn {{
-                    display: block; 
-                    text-align: center; 
-                    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
-                    color: white; 
-                    padding: 18px; 
-                    border-radius: 12px; 
-                    text-decoration: none; 
-                    font-size: 20px; 
-                    font-weight: bold; 
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
-                    border: 2px solid #0f7a71; 
-                    animation: pulse 1.5s infinite;
-                    font-family: sans-serif;
-                }}
-                </style>
-                </head>
-                <body style="margin:0; text-align:center;">
-                    <a href="{pay_url}" target="_top" class="upi-btn">
-                        🚀 TAP HERE TO PAY VIA UPI APP
-                    </a>
-                    <p style="color: gray; font-size: 14px; margin-top: 10px; font-family: sans-serif;">
-                        (Clicking this will directly open GPay, PhonePe, or Paytm)
-                    </p>
-                </body>
-                </html>
-                """
-                st_components.html(upi_button_html, height=130)
+                # डायरेक्ट UPI बटन (बिना iframe के, सीधे markdown में ताकि Android Webview में चले)
+                st.markdown(f'''
+                <a href="{pay_url}" target="_top" style="display: block; text-align: center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white !important; padding: 18px; border-radius: 12px; text-decoration: none; font-size: 20px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; font-family: sans-serif; margin-bottom: 10px;">
+                    🚀 TAP HERE TO PAY VIA UPI APP
+                </a>
+                <p style="text-align: center; color: gray !important; font-size: 14px; margin-top: 5px;">
+                    (Clicking this will directly open GPay, PhonePe, or Paytm)
+                </p>
+                ''', unsafe_allow_html=True)
 
-                with st.expander("💻 Paying  Scan QR Code"):
-                    qr_tabs = st.tabs(list(available_upis.keys()))
-                    for idx, (name, upi_id) in enumerate(available_upis.items()):
-                        with qr_tabs[idx]:
-                            qr_data = f"upi://pay?pa={upi_id}&pn=Oura_Products&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
-                            st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=200)
-                            st.success(f"**{name} UPI ID:** `{upi_id}`")
+                # QR Code (बिना Expander/Tabs के सीधा दिखाया गया ताकि गायब न हो)
+                st.markdown("### 💻 Scan QR Code to Pay")
+                for name, upi_id in available_upis.items():
+                    qr_data = f"upi://pay?pa={upi_id}&pn=Oura_Products&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}"
+                    
+                    st.markdown(f'''
+                    <div style="background-color: white; padding: 15px; border-radius: 10px; border: 1px solid #ddd; text-align: center; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <p style="color: black !important; font-weight: bold; font-size: 16px; margin-bottom: 10px;">{name} UPI ID: <code style="color: #d32f2f !important;">{upi_id}</code></p>
+                        <img src="{qr_url}" style="width: 200px; height: 200px; margin: 0 auto; display: block; border: 2px solid #eee; border-radius: 8px;">
+                    </div>
+                    ''', unsafe_allow_html=True)
             else:
                 st.warning("⚠️ No UPI IDs configured by Admin.")
                     
@@ -2076,8 +2062,6 @@ if st.session_state.cart:
         else:
             st.info("💵 You selected **Cash on delivery**. Your order has been placed successfully!")
 
-        # --- MODIFIED SECTION START ---
-        # सिर्फ एडमिन और सेलर के लिए पीडीएफ डाउनलोड का ऑप्शन
         if st.session_state.get('admin_logged_in') or st.session_state.get('seller_logged_in'):
             st.markdown("---")
             st.markdown("### 📥 Download Your Bill (Admin / Seller Only)")
@@ -2088,13 +2072,16 @@ if st.session_state.cart:
                 mime="application/pdf",
                 use_container_width=True
             )
-        # --- MODIFIED SECTION END ---
 
         st.markdown("---")
-        # नया कस्टमर सपोर्ट सेक्शन 
-        with st.expander("🎧 Customer Support"):
-            st.markdown(f"**📞 Phone / WhatsApp:** +91 9891587437")
-            st.markdown(f"**📧 Email:** Shalabh.jain.sj@gmail.com")
+        # नया कस्टमर सपोर्ट सेक्शन (बिना Expander के, ताकि टेक्स्ट गायब न हो)
+        st.markdown(f'''
+        <div style="background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px;">
+            <h3 style="color: #2b6cb0 !important; margin-top: 0; margin-bottom: 10px;">🎧 Customer Support</h3>
+            <p style="color: #000000 !important; font-size: 16px; margin: 5px 0;"><strong>📞 Phone / WhatsApp:</strong> +91 9891587437</p>
+            <p style="color: #000000 !important; font-size: 16px; margin: 5px 0;"><strong>📧 Email:</strong> Shalabh.jain.sj@gmail.com</p>
+        </div>
+        ''', unsafe_allow_html=True)
 
     if st.button("🗑️ Empty Basket"):
         st.session_state.cart = {}
