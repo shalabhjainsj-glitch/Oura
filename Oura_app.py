@@ -1790,57 +1790,70 @@ if st.session_state.cart:
                         async (position) => {
                             const lat = position.coords.latitude;
                             const lon = position.coords.longitude;
+                            let finalAddress = "";
+                            
                             try {
-                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                                const data = await response.json();
+                                const res = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon);
+                                if (!res.ok) throw new Error('Nominatim failed');
+                                const data = await res.json();
                                 if (data && data.display_name) {
-                                    statusText.innerText = "✅ Location Found!";
-                                    const parentDoc = window.parent.document;
-                                    let addressTextArea = null;
-                                    
-                                    // Method 1: Get directly by aria-label
-                                    addressTextArea = parentDoc.querySelector('textarea[aria-label="Full Address (with City, Pincode)"]');
-                                    
-                                    // Method 2: Fallback to searching all textareas
-                                    if (!addressTextArea) {
-                                        const textAreas = parentDoc.querySelectorAll('textarea');
-                                        for (let i = 0; i < textAreas.length; i++) {
-                                            const wrapper = textAreas[i].closest('div[data-testid="stTextArea"]');
-                                            if (wrapper && wrapper.textContent.includes('Full Address')) {
-                                                addressTextArea = textAreas[i];
-                                                break;
-                                            }
+                                    finalAddress = data.display_name;
+                                }
+                            } catch (err1) {
+                                try {
+                                    const res2 = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en');
+                                    if (!res2.ok) throw new Error('BDC failed');
+                                    const data2 = await res2.json();
+                                    let parts = [data2.locality, data2.city, data2.principalSubdivision, data2.countryName];
+                                    finalAddress = parts.filter(p => p && p.trim() !== "").join(", ");
+                                } catch (err2) {
+                                    finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
+                                }
+                            }
+                            
+                            if (!finalAddress || finalAddress.trim() === "") {
+                                finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
+                            }
+
+                            try {
+                                const parentDoc = window.parent.document;
+                                let addressTextArea = parentDoc.querySelector('textarea[aria-label="Full Address (with City, Pincode)"]');
+                                
+                                if (!addressTextArea) {
+                                    const textAreas = parentDoc.querySelectorAll('textarea');
+                                    for (let i = 0; i < textAreas.length; i++) {
+                                        const wrapper = textAreas[i].closest('div[data-testid="stTextArea"]');
+                                        if (wrapper && wrapper.textContent.includes('Full Address')) {
+                                            addressTextArea = textAreas[i];
+                                            break;
                                         }
                                     }
-
-                                    if (addressTextArea) {
-                                        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                                        nativeInputValueSetter.call(addressTextArea, data.display_name);
-                                        // Dispatch events so Streamlit backend records the change
-                                        addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
-                                        addressTextArea.dispatchEvent(new Event('change', { bubbles: true }));
-                                    } else {
-                                        statusText.innerText = "❌ Textbox not found.";
-                                    }
-                                } else {
-                                    statusText.innerText = "❌ Address not found.";
                                 }
-                            } catch (err) {
-                                statusText.innerText = "❌ Error fetching address.";
+
+                                if (addressTextArea) {
+                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                                    nativeInputValueSetter.call(addressTextArea, finalAddress);
+                                    addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                                    addressTextArea.dispatchEvent(new Event('change', { bubbles: true }));
+                                    statusText.innerText = "✅ Location Added!";
+                                } else {
+                                    statusText.innerText = "❌ Textbox not found.";
+                                }
+                            } catch (err3) {
+                                statusText.innerText = "❌ Error typing in box.";
                             }
                         },
                         (error) => {
-                            console.error(error);
                             if (error.code === error.PERMISSION_DENIED) {
-                                statusText.innerText = "❌ Please ENABLE Location Permission for App.";
+                                statusText.innerText = "❌ Permission Denied.";
                             } else {
-                                statusText.innerText = "❌ Could not get GPS location.";
+                                statusText.innerText = "❌ GPS Error.";
                             }
                         },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
                 } else {
-                    statusText.innerText = "❌ Geolocation not supported.";
+                    statusText.innerText = "❌ GPS not supported.";
                 }
             }
             </script>
