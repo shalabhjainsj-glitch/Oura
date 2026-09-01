@@ -1774,14 +1774,13 @@ if st.session_state.cart:
             cust_name = st.text_input("Your Name / Shop Name")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             
-            # --- AUTO LOCATION HTML & JS ---
+            # --- ROBUST AUTO LOCATION HTML & JS FOR WEBVIEW / APK ---
             loc_html = """
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: -15px;">
                 <button onclick="fetchLocation()" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Get My Location</button>
                 <span id="loc-status" style="font-size: 12px; color: #666; font-family: sans-serif;"></span>
             </div>
             <script>
-            const parentDoc = window.parent.document;
             function fetchLocation() {
                 const statusText = document.getElementById('loc-status');
                 statusText.innerText = "⏳ Fetching...";
@@ -1795,22 +1794,33 @@ if st.session_state.cart:
                                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
                                 const data = await response.json();
                                 if (data && data.display_name) {
-                                    statusText.innerText = "✅ Found!";
-                                    const labels = parentDoc.querySelectorAll('p');
+                                    statusText.innerText = "✅ Location Found!";
+                                    const parentDoc = window.parent.document;
                                     let addressTextArea = null;
-                                    for (let label of labels) {
-                                        if (label.innerText.includes('Full Address (with City, Pincode)')) {
-                                            const container = label.closest('div[data-testid="stTextArea"]');
-                                            if (container) {
-                                                addressTextArea = container.querySelector('textarea');
+                                    
+                                    // Method 1: Get directly by aria-label
+                                    addressTextArea = parentDoc.querySelector('textarea[aria-label="Full Address (with City, Pincode)"]');
+                                    
+                                    // Method 2: Fallback to searching all textareas
+                                    if (!addressTextArea) {
+                                        const textAreas = parentDoc.querySelectorAll('textarea');
+                                        for (let i = 0; i < textAreas.length; i++) {
+                                            const wrapper = textAreas[i].closest('div[data-testid="stTextArea"]');
+                                            if (wrapper && wrapper.textContent.includes('Full Address')) {
+                                                addressTextArea = textAreas[i];
                                                 break;
                                             }
                                         }
                                     }
+
                                     if (addressTextArea) {
                                         let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
                                         nativeInputValueSetter.call(addressTextArea, data.display_name);
+                                        // Dispatch events so Streamlit backend records the change
                                         addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                                        addressTextArea.dispatchEvent(new Event('change', { bubbles: true }));
+                                    } else {
+                                        statusText.innerText = "❌ Textbox not found.";
                                     }
                                 } else {
                                     statusText.innerText = "❌ Address not found.";
@@ -1820,17 +1830,22 @@ if st.session_state.cart:
                             }
                         },
                         (error) => {
-                            statusText.innerText = "❌ Location permission denied.";
+                            console.error(error);
+                            if (error.code === error.PERMISSION_DENIED) {
+                                statusText.innerText = "❌ Please ENABLE Location Permission for App.";
+                            } else {
+                                statusText.innerText = "❌ Could not get GPS location.";
+                            }
                         },
-                        { enableHighAccuracy: true }
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
                 } else {
-                    statusText.innerText = "❌ Geolocation not supported by browser.";
+                    statusText.innerText = "❌ Geolocation not supported.";
                 }
             }
             </script>
             """
-            st_components.html(loc_html, height=40)
+            st_components.html(loc_html, height=50)
             # -------------------------------
             
             cust_address = st.text_area("Full Address (with City, Pincode)")
