@@ -1772,8 +1772,67 @@ if st.session_state.cart:
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             cust_name = st.text_input("Your Name / Shop Name")
-            
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
+            
+            # --- AUTO LOCATION HTML & JS ---
+            loc_html = """
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: -15px;">
+                <button onclick="fetchLocation()" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Get My Location</button>
+                <span id="loc-status" style="font-size: 12px; color: #666; font-family: sans-serif;"></span>
+            </div>
+            <script>
+            const parentDoc = window.parent.document;
+            function fetchLocation() {
+                const statusText = document.getElementById('loc-status');
+                statusText.innerText = "⏳ Fetching...";
+                
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        async (position) => {
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
+                            try {
+                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                                const data = await response.json();
+                                if (data && data.display_name) {
+                                    statusText.innerText = "✅ Found!";
+                                    const labels = parentDoc.querySelectorAll('p');
+                                    let addressTextArea = null;
+                                    for (let label of labels) {
+                                        if (label.innerText.includes('Full Address (with City, Pincode)')) {
+                                            const container = label.closest('div[data-testid="stTextArea"]');
+                                            if (container) {
+                                                addressTextArea = container.querySelector('textarea');
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (addressTextArea) {
+                                        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                                        nativeInputValueSetter.call(addressTextArea, data.display_name);
+                                        addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                                    }
+                                } else {
+                                    statusText.innerText = "❌ Address not found.";
+                                }
+                            } catch (err) {
+                                statusText.innerText = "❌ Error fetching address.";
+                            }
+                        },
+                        (error) => {
+                            statusText.innerText = "❌ Location permission denied.";
+                        },
+                        { enableHighAccuracy: true }
+                    );
+                } else {
+                    statusText.innerText = "❌ Geolocation not supported by browser.";
+                }
+            }
+            </script>
+            """
+            st_components.html(loc_html, height=40)
+            # -------------------------------
+            
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
             bill_date = st.date_input("Invoice Date", datetime.date.today())
@@ -2076,7 +2135,6 @@ if st.session_state.cart:
         else:
             st.info("💵 You selected **Cash on delivery**. Your order has been placed successfully!")
 
-        # --- MODIFIED SECTION START ---
         # सिर्फ एडमिन और सेलर के लिए पीडीएफ डाउनलोड का ऑप्शन
         if st.session_state.get('admin_logged_in') or st.session_state.get('seller_logged_in'):
             st.markdown("---")
@@ -2088,10 +2146,8 @@ if st.session_state.cart:
                 mime="application/pdf",
                 use_container_width=True
             )
-        # --- MODIFIED SECTION END ---
 
         st.markdown("---")
-        # नया कस्टमर सपोर्ट सेक्शन 
         with st.expander("🎧 Customer Support"):
             st.markdown(f"**📞 Phone / WhatsApp:** +91 9891587437")
             st.markdown(f"**📧 Email:** Shalabh.jain.sj@gmail.com")
