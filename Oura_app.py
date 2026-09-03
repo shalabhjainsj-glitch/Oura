@@ -425,41 +425,6 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- ON LOAD LOCATION PERMISSION (Background Fetch) ---
-on_load_loc_html = """
-<script>
-if (navigator.geolocation && !window.parent.localStorage.getItem('oura_user_address')) {
-    navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            let finalAddress = "";
-            try {
-                const res = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon);
-                const data = await res.json();
-                if (data && data.display_name) finalAddress = data.display_name;
-            } catch (err1) {
-                try {
-                    const res2 = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en');
-                    const data2 = await res2.json();
-                    let parts = [data2.locality, data2.city, data2.principalSubdivision, data2.countryName];
-                    finalAddress = parts.filter(p => p && p.trim() !== "").join(", ");
-                } catch (err2) {
-                    finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
-                }
-            }
-            if (finalAddress) {
-                window.parent.localStorage.setItem('oura_user_address', finalAddress);
-            }
-        },
-        (error) => { console.log("User denied location or error occurred."); },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-}
-</script>
-"""
-st_components.html(on_load_loc_html, height=0, width=0)
-
 # --- GLOBAL BACKGROUND STYLING ---
 global_bg_color = current_config.get("bg_color", "#f4f6f9")
 st.markdown(f"""
@@ -1802,6 +1767,97 @@ if st.session_state.cart:
     
     st.markdown("---")
     
+    # --- ADDRESS BOOK ANCHOR ---
+    st.markdown("### 📍 Delivery Details")
+    st.markdown('<div id="address-book-anchor"></div>', unsafe_allow_html=True)
+    
+    addr_book_ui_js = """
+    <script>
+    const parentDoc = window.parent.document;
+
+    function triggerReactChange(el, value) {
+        let setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, "value")?.set;
+        if (!setter && el.tagName === 'TEXTAREA') setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+        if (!setter && el.tagName === 'INPUT') setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+
+        if (setter) {
+            setter.call(el, value);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    function renderAddressBook() {
+        let anchor = parentDoc.getElementById('address-book-anchor');
+        if(!anchor) {
+            setTimeout(renderAddressBook, 500);
+            return;
+        }
+
+        let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+
+        if(book.length === 0) {
+            anchor.innerHTML = '';
+            return;
+        }
+
+        let html = `
+        <div style="background: #fdfdfd; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #4a5568; font-size: 14px; margin-bottom: 15px; text-align: center; font-weight: bold;">--- Or Select from saved addresses ---</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+        `;
+
+        book.forEach((addr, idx) => {
+            html += `
+            <div onclick="window.parent.fillSavedAddress(${idx})" style="border: 1px solid #d32f2f; border-radius: 8px; padding: 15px; background: #ffffff; cursor: pointer; position: relative; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="background: #ffebee; color: #d32f2f; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">📍 Saved ${idx+1}</span>
+                    <span style="font-weight: bold; font-size: 14px; color: #1a202c;">${addr.name}</span>
+                </div>
+                <div style="font-size: 13px; color: #4a5568; line-height: 1.4; margin-bottom: 8px;">${addr.address}</div>
+                <div style="font-size: 13px; color: #2d3748; font-weight: bold;">📞 ${addr.mobile}</div>
+                
+                <button onclick="window.parent.deleteSavedAddress(event, ${idx})" style="position: absolute; right: 15px; bottom: 15px; background: none; border: 1px solid #cbd5e0; border-radius: 6px; padding: 5px 10px; font-size: 12px; color: #4a5568; cursor: pointer; font-weight: bold;">❌ Remove</button>
+            </div>
+            `;
+        });
+
+        html += `</div></div>`;
+        anchor.innerHTML = html;
+    }
+
+    window.parent.fillSavedAddress = function(idx) {
+        let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+        let addr = book[idx];
+        if(!addr) return;
+
+        const inputs = parentDoc.querySelectorAll('input, textarea');
+        inputs.forEach(el => {
+            const label = el.getAttribute('aria-label') || "";
+            const wrapper = el.closest('div[data-testid="stTextInput"], div[data-testid="stTextArea"]');
+            const wrapperText = wrapper ? wrapper.innerText : "";
+
+            if (label.includes('Your Name') || wrapperText.includes('Your Name')) triggerReactChange(el, addr.name);
+            if (label.includes('Mobile Number') || wrapperText.includes('Mobile Number')) triggerReactChange(el, addr.mobile);
+            if (label.includes('Full Address') || wrapperText.includes('Full Address')) triggerReactChange(el, addr.address);
+        });
+
+        // Scroll gracefully to the form input
+        inputs[0].scrollIntoView({behavior: "smooth", block: "center"});
+    };
+
+    window.parent.deleteSavedAddress = function(event, idx) {
+        event.stopPropagation();
+        let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+        book.splice(idx, 1);
+        window.parent.localStorage.setItem('oura_address_book', JSON.stringify(book));
+        renderAddressBook();
+    };
+
+    renderAddressBook();
+    </script>
+    """
+    st_components.html(addr_book_ui_js, height=0, width=0)
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
@@ -1809,22 +1865,19 @@ if st.session_state.cart:
             cust_name = st.text_input("Your Name / Shop Name")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             
-            # --- AUTO FILL LOCATION & SAVE USER DETAILS ---
+            # --- GET CURRENT GPS LOCATION BUTTON ---
             loc_html = """
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: -15px;">
-                <button onclick="fetchLocation(true)" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Refresh Location</button>
+                <button onclick="fetchLocation(true)" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Fetch My GPS Location</button>
                 <span id="loc-status" style="font-size: 12px; color: #666; font-family: sans-serif;"></span>
             </div>
             <script>
             const statusText = document.getElementById('loc-status');
             const pDoc = window.parent.document;
 
-            // Helper function to trigger React state updates in Streamlit
-            function triggerReactChange(el, value) {
+            function triggerReactChangeLoc(el, value) {
                 let setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, "value")?.set;
                 if (!setter && el.tagName === 'TEXTAREA') setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                if (!setter && el.tagName === 'INPUT') setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                
                 if (setter) {
                     setter.call(el, value);
                     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1832,45 +1885,7 @@ if st.session_state.cart:
                 }
             }
 
-            function setupAutoSave() {
-                const inputs = pDoc.querySelectorAll('input, textarea');
-                let nameInput, mobileInput, addressInput;
-                
-                inputs.forEach(el => {
-                    const ariaLabel = el.getAttribute('aria-label') || "";
-                    const wrapper = el.closest('div[data-testid="stTextInput"], div[data-testid="stTextArea"]');
-                    const wrapperText = wrapper ? wrapper.innerText : "";
-                    
-                    if (ariaLabel.includes('Your Name') || wrapperText.includes('Your Name')) nameInput = el;
-                    if (ariaLabel.includes('Mobile Number') || wrapperText.includes('Mobile Number')) mobileInput = el;
-                    if (ariaLabel.includes('Full Address') || wrapperText.includes('Full Address')) addressInput = el;
-                });
-
-                function bindField(el, storageKey) {
-                    if (el && !el.dataset.bound) {
-                        // 1. Auto-fill from memory if box is empty
-                        const savedVal = window.parent.localStorage.getItem(storageKey);
-                        if (savedVal && el.value.trim() === "") {
-                            triggerReactChange(el, savedVal);
-                        }
-                        // 2. Continuously save to memory as user types
-                        el.addEventListener('input', () => {
-                            window.parent.localStorage.setItem(storageKey, el.value);
-                        });
-                        el.dataset.bound = 'true';
-                    }
-                }
-
-                bindField(nameInput, 'oura_user_name');
-                bindField(mobileInput, 'oura_user_mobile');
-                bindField(addressInput, 'oura_user_address');
-                
-                if (!addressInput) setTimeout(setupAutoSave, 1000);
-            }
-            
-            setTimeout(setupAutoSave, 500);
-
-            function fetchLocation(force = true) {
+            function fetchLocation() {
                 statusText.innerText = "⏳ Fetching...";
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
@@ -1886,20 +1901,17 @@ if st.session_state.cart:
                                 finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
                             }
                             
-                            window.parent.localStorage.setItem('oura_user_address', finalAddress);
-                            
-                            // Find address box and update visually
                             const inputs = pDoc.querySelectorAll('textarea');
                             let addressInput;
                             inputs.forEach(el => {
-                                const ariaLabel = el.getAttribute('aria-label') || "";
+                                const label = el.getAttribute('aria-label') || "";
                                 const wrapper = el.closest('div[data-testid="stTextArea"]');
                                 const wrapperText = wrapper ? wrapper.innerText : "";
-                                if (ariaLabel.includes('Full Address') || wrapperText.includes('Full Address')) addressInput = el;
+                                if (label.includes('Full Address') || wrapperText.includes('Full Address')) addressInput = el;
                             });
                             
                             if (addressInput) {
-                                triggerReactChange(addressInput, finalAddress);
+                                triggerReactChangeLoc(addressInput, finalAddress);
                                 statusText.innerText = "✅ Location Updated!";
                             } else {
                                 statusText.innerText = "❌ Address box not found.";
@@ -1975,7 +1987,7 @@ if st.session_state.cart:
                 if (!isValid) {
                     mobileInput.style.border = '2px solid #ff4b4b'; 
                     mobileInput.style.backgroundColor = '#fff0f0';
-                    mobileInput.style.color = '#000000'; // TEXT COLOR ADDED HERE
+                    mobileInput.style.color = '#000000'; 
                     mobileInput.style.boxShadow = '0 0 5px rgba(255, 75, 75, 0.5)';
                     if (submitBtn) {
                         submitBtn.disabled = true;
@@ -1985,7 +1997,7 @@ if st.session_state.cart:
                 } else {
                     mobileInput.style.border = '2px solid #28a745'; 
                     mobileInput.style.backgroundColor = 'white';
-                    mobileInput.style.color = '#000000'; // TEXT COLOR ADDED HERE
+                    mobileInput.style.color = '#000000'; 
                     mobileInput.style.boxShadow = 'none';
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -2018,13 +2030,38 @@ if st.session_state.cart:
             is_valid = False
 
         if is_valid:
+            
+            # --- SAVE NEW ADDRESS TO PHONE MEMORY ---
+            safe_name = cust_name.strip().replace("'", "").replace('"', '')
+            safe_mobile = cust_mobile.strip()
+            safe_address = cust_address.strip().replace("'", "").replace('"', '').replace('\n', ' ')
+            
+            save_addr_js = f"""
+            <script>
+            let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+            let newEntry = {{
+                name: '{safe_name}',
+                mobile: '{safe_mobile}',
+                address: '{safe_address}'
+            }};
+            let exists = book.some(a => a.mobile === newEntry.mobile && a.address === newEntry.address);
+            if(!exists && newEntry.mobile && newEntry.address) {{
+                book.unshift(newEntry); // Add to top of the list
+                if(book.length > 4) book.pop(); // Keep max 4 saved addresses
+                window.parent.localStorage.setItem('oura_address_book', JSON.stringify(book));
+            }}
+            </script>
+            """
+            st_components.html(save_addr_js, height=0, width=0)
+            # -------------------------------------------
+            
             if st.session_state.cart:
                 auto_last_balance = 0.0
-                safe_name = cust_name.strip().upper() if cust_name else ""
+                safe_name_db = cust_name.strip().upper() if cust_name else ""
                 
-                if safe_name:
+                if safe_name_db:
                     try:
-                        docs = db.collection('ledgers').document(safe_name).collection('transactions').stream()
+                        docs = db.collection('ledgers').document(safe_name_db).collection('transactions').stream()
                         t_bill = 0
                         t_adv = 0
                         for doc in docs:
@@ -2040,8 +2077,8 @@ if st.session_state.cart:
                     st.session_state.cart_total_savings
                 )
                 
-                if safe_name:
-                    safe_file_name = re.sub(r'[\\/*?:"<>|]', "", safe_name).replace(' ', '_')
+                if safe_name_db:
+                    safe_file_name = re.sub(r'[\\/*?:"<>|]', "", safe_name_db).replace(' ', '_')
                 else:
                     safe_file_name = 'Cash'
                     
@@ -2080,9 +2117,9 @@ if st.session_state.cart:
                 current_bill_total = taxable_amount + gst_amt 
                 full_item_details = " | ".join(item_details_list)
                 
-                if safe_name:
+                if safe_name_db:
                     batch = db.batch()
-                    parent_ref = db.collection('ledgers').document(safe_name)
+                    parent_ref = db.collection('ledgers').document(safe_name_db)
                     batch.set(parent_ref, {"active": True}, merge=True)
                     ledger_ref = parent_ref.collection('transactions')
                     
