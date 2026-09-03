@@ -1809,7 +1809,7 @@ if st.session_state.cart:
             cust_name = st.text_input("Your Name / Shop Name")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             
-            # --- AUTO FILL LOCATION ON CHECKOUT (Modified) ---
+            # --- AUTO FILL LOCATION & SAVE USER DETAILS ---
             loc_html = """
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: -15px;">
                 <button onclick="fetchLocation(true)" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Refresh Location</button>
@@ -1817,43 +1817,58 @@ if st.session_state.cart:
             </div>
             <script>
             const statusText = document.getElementById('loc-status');
-            
-            function setTextArea(address, force = false) {
-                const parentDoc = window.parent.document;
-                let addressTextArea = parentDoc.querySelector('textarea[aria-label="Full Address (with City, Pincode)"]');
-                
-                if (!addressTextArea) {
-                    const textAreas = parentDoc.querySelectorAll('textarea');
-                    for (let i = 0; i < textAreas.length; i++) {
-                        const wrapper = textAreas[i].closest('div[data-testid="stTextArea"]');
-                        if (wrapper && wrapper.textContent.includes('Full Address')) {
-                            addressTextArea = textAreas[i];
-                            break;
-                        }
-                    }
-                }
+            const pDoc = window.parent.document;
 
-                if (addressTextArea) {
-                    // Fill if it's empty, or if user explicitly clicked refresh
-                    if (force || addressTextArea.value.trim() === "") {
-                        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                        nativeInputValueSetter.call(addressTextArea, address);
-                        addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
-                        addressTextArea.dispatchEvent(new Event('change', { bubbles: true }));
-                        statusText.innerText = "✅ Location Added!";
-                    }
-                } else {
-                    setTimeout(() => setTextArea(address, force), 1000);
+            // Helper function to trigger React state updates in Streamlit
+            function triggerReactChange(el, value) {
+                let setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, "value")?.set;
+                if (!setter && el.tagName === 'TEXTAREA') setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                if (!setter && el.tagName === 'INPUT') setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                
+                if (setter) {
+                    setter.call(el, value);
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             }
 
-            // On load of this form, check if we have it in localStorage
-            setTimeout(() => {
-                const savedAddress = window.parent.localStorage.getItem('oura_user_address');
-                if (savedAddress) {
-                    setTextArea(savedAddress, false);
+            function setupAutoSave() {
+                const inputs = pDoc.querySelectorAll('input, textarea');
+                let nameInput, mobileInput, addressInput;
+                
+                inputs.forEach(el => {
+                    const ariaLabel = el.getAttribute('aria-label') || "";
+                    const wrapper = el.closest('div[data-testid="stTextInput"], div[data-testid="stTextArea"]');
+                    const wrapperText = wrapper ? wrapper.innerText : "";
+                    
+                    if (ariaLabel.includes('Your Name') || wrapperText.includes('Your Name')) nameInput = el;
+                    if (ariaLabel.includes('Mobile Number') || wrapperText.includes('Mobile Number')) mobileInput = el;
+                    if (ariaLabel.includes('Full Address') || wrapperText.includes('Full Address')) addressInput = el;
+                });
+
+                function bindField(el, storageKey) {
+                    if (el && !el.dataset.bound) {
+                        // 1. Auto-fill from memory if box is empty
+                        const savedVal = window.parent.localStorage.getItem(storageKey);
+                        if (savedVal && el.value.trim() === "") {
+                            triggerReactChange(el, savedVal);
+                        }
+                        // 2. Continuously save to memory as user types
+                        el.addEventListener('input', () => {
+                            window.parent.localStorage.setItem(storageKey, el.value);
+                        });
+                        el.dataset.bound = 'true';
+                    }
                 }
-            }, 500);
+
+                bindField(nameInput, 'oura_user_name');
+                bindField(mobileInput, 'oura_user_mobile');
+                bindField(addressInput, 'oura_user_address');
+                
+                if (!addressInput) setTimeout(setupAutoSave, 1000);
+            }
+            
+            setTimeout(setupAutoSave, 500);
 
             function fetchLocation(force = true) {
                 statusText.innerText = "⏳ Fetching...";
@@ -1863,40 +1878,34 @@ if st.session_state.cart:
                             const lat = position.coords.latitude;
                             const lon = position.coords.longitude;
                             let finalAddress = "";
-                            
                             try {
                                 const res = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon);
-                                if (!res.ok) throw new Error('Nominatim failed');
                                 const data = await res.json();
-                                if (data && data.display_name) {
-                                    finalAddress = data.display_name;
-                                }
+                                if (data && data.display_name) finalAddress = data.display_name;
                             } catch (err1) {
-                                try {
-                                    const res2 = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en');
-                                    if (!res2.ok) throw new Error('BDC failed');
-                                    const data2 = await res2.json();
-                                    let parts = [data2.locality, data2.city, data2.principalSubdivision, data2.countryName];
-                                    finalAddress = parts.filter(p => p && p.trim() !== "").join(", ");
-                                } catch (err2) {
-                                    finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
-                                }
-                            }
-                            
-                            if (!finalAddress || finalAddress.trim() === "") {
                                 finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
                             }
                             
                             window.parent.localStorage.setItem('oura_user_address', finalAddress);
-                            setTextArea(finalAddress, force);
-                        },
-                        (error) => {
-                            if (error.code === error.PERMISSION_DENIED) {
-                                statusText.innerText = "❌ Permission Denied.";
+                            
+                            // Find address box and update visually
+                            const inputs = pDoc.querySelectorAll('textarea');
+                            let addressInput;
+                            inputs.forEach(el => {
+                                const ariaLabel = el.getAttribute('aria-label') || "";
+                                const wrapper = el.closest('div[data-testid="stTextArea"]');
+                                const wrapperText = wrapper ? wrapper.innerText : "";
+                                if (ariaLabel.includes('Full Address') || wrapperText.includes('Full Address')) addressInput = el;
+                            });
+                            
+                            if (addressInput) {
+                                triggerReactChange(addressInput, finalAddress);
+                                statusText.innerText = "✅ Location Updated!";
                             } else {
-                                statusText.innerText = "❌ GPS Error.";
+                                statusText.innerText = "❌ Address box not found.";
                             }
                         },
+                        (error) => { statusText.innerText = "❌ GPS Error / Denied."; },
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
                 } else {
