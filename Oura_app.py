@@ -240,9 +240,9 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
         clean_name = re.sub(r'[^\x00-\x7F]+', ' ', str(item['name'])) 
         
         if d_pct > 0:
-            clean_name += f" ({d_name}: -{d_pct}%)"
+            clean_name += f" (-{d_pct}%)"
             
-        if len(clean_name) > 40: clean_name = clean_name[:37] + "..."
+        if len(clean_name) > 45: clean_name = clean_name[:42] + "..."
         
         pdf.cell(15, 10, str(idx), border=1, align='C')
         pdf.cell(90, 10, clean_name, border=1, align='L')
@@ -469,7 +469,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent"]
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent", "Sizes"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -481,9 +481,11 @@ def load_products():
             if 'Unit_Base' not in df.columns: df['Unit_Base'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T1' not in df.columns: df['Unit_T1'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T2' not in df.columns: df['Unit_T2'] = df.get('Unit_Type', 'Pcs')
+            if 'Sizes' not in df.columns: df['Sizes'] = ""
             df['Unit_Base'].fillna('Pcs', inplace=True)
             df['Unit_T1'].fillna('Pcs', inplace=True)
             df['Unit_T2'].fillna('Pcs', inplace=True)
+            df['Sizes'].fillna('', inplace=True)
             return df
     except: pass
     return pd.DataFrame(columns=expected_columns)
@@ -549,6 +551,7 @@ if 'cart_loaded' not in st.session_state:
                     unit = parts[1] if len(parts) > 1 else "Pcs"
                     price = float(parts[2]) if len(parts) > 2 else 0.0
                     p_type = parts[3] if len(parts) > 3 else ""
+                    p_size = parts[4] if len(parts) > 4 else ""
                     qty = safe_int(qty_str, 1)
                     
                     match = products_df[products_df['ID'].astype(str) == p_id]
@@ -564,14 +567,17 @@ if 'cart_loaded' not in st.session_state:
                         offer_nm = str(row.get('Offer_Name', '')).strip()
 
                         base_name = row.get('Name', 'Item')
-                        final_name = f"{base_name} ({p_type})" if p_type in ["Online", "Cash"] else base_name
+                        final_name = base_name
+                        if p_size: final_name += f" (Size: {p_size})"
+                        if p_type in ["Online", "Cash"]: final_name += f" ({p_type})"
                             
                         st.session_state.cart[k_part] = {
                             "name": final_name,
                             "price": price if price > 0 else safe_float(row.get('Price'), 0.0),
                             "qty": qty, "img_link": img_link,
                             "seller": str(row.get("Seller_Name", "")).strip(), "unit": unit,
-                            "discount_pct": disc_pct, "offer_name": offer_nm
+                            "discount_pct": disc_pct, "offer_name": offer_nm,
+                            "size": p_size
                         }
             except Exception as e:
                 pass
@@ -718,6 +724,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_id: new_id = st.text_input("ID (Keep Unique)")
                 with col_name: new_name = st.text_input("Product Name")
                 
+                new_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें, जैसे S, M, L या 36-37, 38-39. कोई साइज नहीं है तो खाली छोड़ दें)", "")
+                
                 st.markdown("**🎁 Special Offer / Discount**")
                 col_off1, col_off2 = st.columns(2)
                 with col_off1: new_offer_name = st.text_input("Offer Name (e.g., Diwali Offer, 15 Aug Sale)", "")
@@ -792,7 +800,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 "Category": final_cat, "Image_Path": final_path_str,
                                 "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock,
                                 "Unit_Base": new_u_base, "Unit_T1": new_u_t1, "Unit_T2": new_u_t2,
-                                "Offer_Name": new_offer_name.strip(), "Discount_Percent": new_discount
+                                "Offer_Name": new_offer_name.strip(), "Discount_Percent": new_discount,
+                                "Sizes": new_sizes.strip()
                             }
                             db.collection('products').document(str(new_id)).set(data)
                             load_products.clear()
@@ -1343,6 +1352,10 @@ def show_product_card(row, idx, prefix):
         online_html = get_price_html(retail_price, net_retail, "#2b6cb0", "💳 Online:")
         t1_html = get_price_html(t1_price, net_t1, "#d32f2f", "")
         t2_html = get_price_html(t2_price, net_t2, "#d32f2f", "")
+        
+        sizes_str = str(row.get("Sizes", "")).strip()
+        size_options = [s.strip() for s in sizes_str.split(",") if s.strip()]
+        selected_size = ""
 
         if retail_price <= 0:
             st.markdown(f"""
@@ -1409,16 +1422,22 @@ def show_product_card(row, idx, prefix):
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
                 
+                if size_options:
+                    selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
+                
                 qty = st.number_input(f"Quantity ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
                 if st.button("🛒 Add to Cart", key=f"b_{prefix_idx}"):
-                    cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}"
+                    cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}|{selected_size}"
                     
                     if cart_key in st.session_state.cart:
                         st.session_state.cart[cart_key]["qty"] += qty
                     else:
                         base_nm = row.get('Name', 'Item')
-                        final_nm = f"{base_nm} ({buy_type})" if buy_type in ["Online", "Cash"] else base_nm
+                        final_nm = base_nm
+                        if selected_size: final_nm += f" (Size: {selected_size})"
+                        if buy_type in ["Online", "Cash"]: final_nm += f" ({buy_type})"
+                            
                         st.session_state.cart[cart_key] = {
                             "name": final_nm, 
                             "price": buy_price, 
@@ -1427,7 +1446,8 @@ def show_product_card(row, idx, prefix):
                             "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
                             "unit": buy_unit,
                             "discount_pct": disc_pct,
-                            "offer_name": offer_nm
+                            "offer_name": offer_nm,
+                            "size": selected_size
                         }
                     save_cart_to_url()
                     st.success("Added to Cart! 🛒")
@@ -1463,6 +1483,8 @@ def show_product_card(row, idx, prefix):
                     else:
                         st.text_input("Name - Read Only", value=str(row.get("Name", "")), disabled=True, key=f"enm_ro_{prefix_idx}")
                         e_name = str(row.get("Name", ""))
+                    
+                    e_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
                     
                     st.markdown("**🔄 Move Product to another Category:**")
                     all_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
@@ -1529,7 +1551,8 @@ def show_product_card(row, idx, prefix):
                         "Unit_Base": e_u_base, "Unit_T1": e_u_t1, "Unit_T2": e_u_t2,
                         "Free_Delivery": is_free_val,
                         "Offer_Name": e_off_name.strip(),
-                        "Discount_Percent": e_off_pct
+                        "Discount_Percent": e_off_pct,
+                        "Sizes": e_sizes.strip()
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
                     if e_imgs:
@@ -2189,7 +2212,6 @@ if st.session_state.cart:
         st.markdown("---")
         st.success(f"🎉 **Order Confirmed!** Your total bill  **₹{st.session_state.get('ready_bill_total', 0):.2f}** ")
 
-        # अगर कस्टमर ने "Pay Online Now" चुना है
         if "Online" in st.session_state.get('selected_payment_mode', ''):
             available_upis = {}
             if current_config.get("phonepe_upi"): available_upis["PhonePe"] = current_config["phonepe_upi"]
@@ -2202,7 +2224,6 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                # डायरेक्ट UPI बटन (बिना WhatsApp के) - (HTML Component का उपयोग किया गया है ताकि लिंक ब्लॉक न हो)
                 upi_button_html = f"""
                 <!DOCTYPE html>
                 <html>
@@ -2252,11 +2273,9 @@ if st.session_state.cart:
             else:
                 st.warning("⚠️ No UPI IDs configured by Admin.")
                     
-        # अगर कस्टमर ने "Cash" चुना है
         else:
             st.info("💵 You selected **Cash on delivery**. Your order has been placed successfully!")
 
-        # सिर्फ एडमिन और सेलर के लिए पीडीएफ डाउनलोड का ऑप्शन
         if st.session_state.get('admin_logged_in') or st.session_state.get('seller_logged_in'):
             st.markdown("---")
             st.markdown("### 📥 Download Your Bill (Admin / Seller Only)")
