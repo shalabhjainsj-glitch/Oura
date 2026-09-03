@@ -425,6 +425,41 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# --- ON LOAD LOCATION PERMISSION (Background Fetch) ---
+on_load_loc_html = """
+<script>
+if (navigator.geolocation && !window.parent.localStorage.getItem('oura_user_address')) {
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            let finalAddress = "";
+            try {
+                const res = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon);
+                const data = await res.json();
+                if (data && data.display_name) finalAddress = data.display_name;
+            } catch (err1) {
+                try {
+                    const res2 = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en');
+                    const data2 = await res2.json();
+                    let parts = [data2.locality, data2.city, data2.principalSubdivision, data2.countryName];
+                    finalAddress = parts.filter(p => p && p.trim() !== "").join(", ");
+                } catch (err2) {
+                    finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
+                }
+            }
+            if (finalAddress) {
+                window.parent.localStorage.setItem('oura_user_address', finalAddress);
+            }
+        },
+        (error) => { console.log("User denied location or error occurred."); },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+}
+</script>
+"""
+st_components.html(on_load_loc_html, height=0, width=0)
+
 # --- GLOBAL BACKGROUND STYLING ---
 global_bg_color = current_config.get("bg_color", "#f4f6f9")
 st.markdown(f"""
@@ -1774,17 +1809,54 @@ if st.session_state.cart:
             cust_name = st.text_input("Your Name / Shop Name")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             
-            # --- ROBUST AUTO LOCATION HTML & JS FOR WEBVIEW / APK ---
+            # --- AUTO FILL LOCATION ON CHECKOUT (Modified) ---
             loc_html = """
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: -15px;">
-                <button onclick="fetchLocation()" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Get My Location</button>
+                <button onclick="fetchLocation(true)" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Refresh Location</button>
                 <span id="loc-status" style="font-size: 12px; color: #666; font-family: sans-serif;"></span>
             </div>
             <script>
-            function fetchLocation() {
-                const statusText = document.getElementById('loc-status');
-                statusText.innerText = "⏳ Fetching...";
+            const statusText = document.getElementById('loc-status');
+            
+            function setTextArea(address, force = false) {
+                const parentDoc = window.parent.document;
+                let addressTextArea = parentDoc.querySelector('textarea[aria-label="Full Address (with City, Pincode)"]');
                 
+                if (!addressTextArea) {
+                    const textAreas = parentDoc.querySelectorAll('textarea');
+                    for (let i = 0; i < textAreas.length; i++) {
+                        const wrapper = textAreas[i].closest('div[data-testid="stTextArea"]');
+                        if (wrapper && wrapper.textContent.includes('Full Address')) {
+                            addressTextArea = textAreas[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (addressTextArea) {
+                    // Fill if it's empty, or if user explicitly clicked refresh
+                    if (force || addressTextArea.value.trim() === "") {
+                        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                        nativeInputValueSetter.call(addressTextArea, address);
+                        addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                        addressTextArea.dispatchEvent(new Event('change', { bubbles: true }));
+                        statusText.innerText = "✅ Location Added!";
+                    }
+                } else {
+                    setTimeout(() => setTextArea(address, force), 1000);
+                }
+            }
+
+            // On load of this form, check if we have it in localStorage
+            setTimeout(() => {
+                const savedAddress = window.parent.localStorage.getItem('oura_user_address');
+                if (savedAddress) {
+                    setTextArea(savedAddress, false);
+                }
+            }, 500);
+
+            function fetchLocation(force = true) {
+                statusText.innerText = "⏳ Fetching...";
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         async (position) => {
@@ -1814,34 +1886,9 @@ if st.session_state.cart:
                             if (!finalAddress || finalAddress.trim() === "") {
                                 finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
                             }
-
-                            try {
-                                const parentDoc = window.parent.document;
-                                let addressTextArea = parentDoc.querySelector('textarea[aria-label="Full Address (with City, Pincode)"]');
-                                
-                                if (!addressTextArea) {
-                                    const textAreas = parentDoc.querySelectorAll('textarea');
-                                    for (let i = 0; i < textAreas.length; i++) {
-                                        const wrapper = textAreas[i].closest('div[data-testid="stTextArea"]');
-                                        if (wrapper && wrapper.textContent.includes('Full Address')) {
-                                            addressTextArea = textAreas[i];
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (addressTextArea) {
-                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                                    nativeInputValueSetter.call(addressTextArea, finalAddress);
-                                    addressTextArea.dispatchEvent(new Event('input', { bubbles: true }));
-                                    addressTextArea.dispatchEvent(new Event('change', { bubbles: true }));
-                                    statusText.innerText = "✅ Location Added!";
-                                } else {
-                                    statusText.innerText = "❌ Textbox not found.";
-                                }
-                            } catch (err3) {
-                                statusText.innerText = "❌ Error typing in box.";
-                            }
+                            
+                            window.parent.localStorage.setItem('oura_user_address', finalAddress);
+                            setTextArea(finalAddress, force);
                         },
                         (error) => {
                             if (error.code === error.PERMISSION_DENIED) {
