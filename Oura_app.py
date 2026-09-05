@@ -1306,10 +1306,17 @@ def show_product_card(row, idx, prefix):
     image_path_str = str(row.get("Image_Path", ""))
     paths_temp = [p.strip() for p in image_path_str.split('|') if p.strip()]
     img_link_for_wa = ""
-    if paths_temp:
-        img_link_for_wa = paths_temp[0]
-        if not img_link_for_wa.startswith("http"):
-            img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
+    resolved_paths = []
+    
+    for p in paths_temp:
+        if not p.startswith("http"):
+            resolved_url = f"{GITHUB_RAW_URL}{urllib.parse.quote(p.replace('\\', '/'), safe='/')}"
+        else:
+            resolved_url = p
+        resolved_paths.append(resolved_url)
+        
+    if resolved_paths:
+        img_link_for_wa = resolved_paths[0]
 
     show_wholesale = st.session_state.wholesale_mode
 
@@ -1435,13 +1442,37 @@ def show_product_card(row, idx, prefix):
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
                 
-                col_sz_sel, col_cl_sel = st.columns(2)
-                with col_sz_sel:
-                    if size_options:
-                        selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
-                with col_cl_sel:
-                    if color_options:
-                        selected_color = st.selectbox("🎨 Select Color:", color_options, key=f"col_{prefix_idx}")
+                if size_options:
+                    selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
+                else:
+                    selected_size = ""
+                
+                # --- NEW: VISUAL COLOR PICKER ---
+                selected_color = ""
+                if color_options:
+                    st.markdown("<div style='font-size:14px; font-weight:bold; margin-top:10px; margin-bottom:5px;'>🎨 Select Color from Photos:</div>", unsafe_allow_html=True)
+                    state_col_key = f"sel_color_{prefix_idx}"
+                    
+                    if state_col_key not in st.session_state:
+                        st.session_state[state_col_key] = color_options[0]
+                         
+                    c_cols = st.columns(len(color_options))
+                    for i, c_name in enumerate(color_options):
+                        with c_cols[i]:
+                            # Show image if available for this color index
+                            if i < len(resolved_paths):
+                                st.markdown(f"<img src='{resolved_paths[i]}' style='width:100%; height:70px; object-fit:cover; border-radius:6px; margin-bottom:5px; background-color:#f8f9fa; border:1px solid #e2e8f0;'/>", unsafe_allow_html=True)
+                            
+                            # Render select button
+                            if st.session_state[state_col_key] == c_name:
+                                st.button(f"✅ {c_name}", key=f"btn_c_{prefix_idx}_{i}", use_container_width=True, type="primary")
+                            else:
+                                if st.button(c_name, key=f"btn_c_{prefix_idx}_{i}", use_container_width=True):
+                                    st.session_state[state_col_key] = c_name
+                                    st.rerun()
+                                    
+                    selected_color = st.session_state[state_col_key]
+                # --------------------------------
                 
                 qty = st.number_input(f"Quantity ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
