@@ -423,6 +423,33 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# --- GLOBAL JS FOR COLOR CLICK SYSTEM ---
+color_js = """
+<script>
+const parentDoc = window.parent.document;
+if (!window.parent.ouraUpdateColor) {
+    window.parent.ouraUpdateColor = function(prefix, colorName) {
+        const labels = parentDoc.querySelectorAll('label');
+        labels.forEach(lbl => {
+            if (lbl.innerText.includes('Color_Radio_' + prefix)) {
+                const container = lbl.closest('div[data-testid="stRadio"]');
+                if (container) {
+                    const options = container.querySelectorAll('label[data-baseweb="radio"]');
+                    options.forEach(opt => {
+                        if (opt.innerText.trim() === colorName) {
+                            opt.click(); // This updates the Streamlit python variable super fast
+                        }
+                    });
+                }
+            }
+        });
+    };
+}
+</script>
+"""
+st_components.html(color_js, height=0, width=0)
+# ----------------------------------------
+
 # --- GLOBAL BACKGROUND STYLING ---
 global_bg_color = current_config.get("bg_color", "#f4f6f9")
 st.markdown(f"""
@@ -519,10 +546,6 @@ def toggle_fd_callback(doc_id, key):
         db.collection('products').document(doc_id).update({"Free_Delivery": st.session_state[key]})
         load_products.clear()
         
-# Callback function for Fast Color Update
-def update_color_choice(key, val):
-    st.session_state[key] = val
-
 products_df = load_products()
 
 def save_cart_to_url():
@@ -1360,7 +1383,7 @@ def show_product_card(row, idx, prefix):
         if disc_pct > 0:
             st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
-        # --- NEW MAIN IMAGE & FAST COLOR SELECTOR ---
+        # --- NEW MAIN IMAGE & FAST COLOR SELECTOR (5 SMALL BOXES) ---
         if color_options and len(color_options) > 0:
             main_img_idx = color_options.index(selected_color) if selected_color in color_options else 0
             main_img_url = resolved_paths[main_img_idx] if main_img_idx < len(resolved_paths) else (resolved_paths[0] if resolved_paths else "")
@@ -1374,26 +1397,39 @@ def show_product_card(row, idx, prefix):
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Interactive Color Boxes (Up to 5)
+            # Interactive Color Boxes (Up to 5) - PURE HTML/CSS FOR SMALL BOXES
             st.markdown("<div style='font-size:13px; font-weight:bold; margin-top:5px; margin-bottom:5px; color:#2d3748;'>🎨 Select Color:</div>", unsafe_allow_html=True)
+            
             num_colors = min(len(color_options), 5)
-            c_cols = st.columns(num_colors)
+            html_boxes = '<div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 10px;">'
             
             for i in range(num_colors):
                 c_name = color_options[i]
-                with c_cols[i]:
-                    img_src = resolved_paths[i] if i < len(resolved_paths) else ""
-                    if img_src:
-                        border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
-                        st.markdown(f"<img src='{img_src}' style='width:100%; height:50px; object-fit:cover; border-radius:6px; border:{border}; margin-bottom:3px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'/>", unsafe_allow_html=True)
+                img_src = resolved_paths[i] if i < len(resolved_paths) else ""
+                border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
+                bg = "#ebf8ff" if c_name == selected_color else "#ffffff"
+                
+                # HTML Small Box (Very fast, no heavy Streamlit buttons)
+                html_boxes += f'''
+                <div onclick="window.parent.ouraUpdateColor('{prefix_idx}', '{c_name}')" 
+                     style="cursor: pointer; border: {border}; background: {bg}; border-radius: 8px; padding: 4px; text-align: center; min-width: 60px; max-width: 60px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                '''
+                if img_src:
+                    html_boxes += f'<img src="{img_src}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"/>'
+                else:
+                    html_boxes += f'<div style="width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;"></div>'
                     
-                    st.button(
-                        f"{'✅ ' if c_name == selected_color else ''}{c_name[:6]}", 
-                        key=f"btn_c_{prefix_idx}_{i}", 
-                        use_container_width=True,
-                        on_click=update_color_choice,
-                        args=(state_col_key, c_name)
-                    )
+                html_boxes += f'''
+                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{c_name}</div>
+                </div>
+                '''
+            html_boxes += '</div>'
+            st.markdown(html_boxes, unsafe_allow_html=True)
+            
+            # Hidden Streamlit Radio (Javascript clicks this internally)
+            st.markdown(f'<div style="height:0px; overflow:hidden; opacity:0; margin:0; padding:0;">', unsafe_allow_html=True)
+            st.radio(f"Color_Radio_{prefix_idx}", color_options, key=state_col_key, label_visibility="collapsed")
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
             # Show swipe gallery for products without colors
             all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
@@ -1506,11 +1542,14 @@ def show_product_card(row, idx, prefix):
                         if selected_color: final_nm += f" (Color: {selected_color})"
                         if buy_type in ["Online", "Cash"]: final_nm += f" ({buy_type})"
                             
+                        # Get main image url to display in cart correctly based on chosen color
+                        final_img = main_img_url if (color_options and main_img_url) else img_link_for_wa
+                            
                         st.session_state.cart[cart_key] = {
                             "name": final_nm, 
                             "price": buy_price, 
                             "qty": qty, 
-                            "img_link": main_img_url if (color_options and main_img_url) else img_link_for_wa,
+                            "img_link": final_img,
                             "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
                             "unit": buy_unit,
                             "discount_pct": disc_pct,
