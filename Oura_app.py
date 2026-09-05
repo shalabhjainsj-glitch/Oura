@@ -185,8 +185,10 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(20, 6, "Billed To:")
     pdf.set_font("Arial", '', 10)
-    c_name = cust_name if cust_name else "Cash/Walk-in Customer"
-    pdf.cell(100, 6, c_name)
+    
+    # FIX: Remove Non-ASCII (Hindi/Emoji) characters from Name
+    safe_c_name = re.sub(r'[^\x00-\x7F]+', ' ', str(cust_name)) if cust_name else "Cash/Walk-in Customer"
+    pdf.cell(100, 6, safe_c_name)
     
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(30, 6, "Invoice Date: ")
@@ -204,7 +206,9 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     
     if cust_address:
         pdf.cell(20, 6, "")
-        pdf.multi_cell(100, 6, f"Address: {cust_address}")
+        # FIX: Remove Non-ASCII (Hindi/Emoji) characters from Address
+        safe_c_address = re.sub(r'[^\x00-\x7F]+', ' ', str(cust_address))
+        pdf.multi_cell(100, 6, f"Address: {safe_c_address}")
         
     if gst_rate > 0:
         pdf.set_font("Arial", 'B', 10)
@@ -345,7 +349,8 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.set_font("Arial", '', 10)
     pdf.cell(0, 5, "(Authorized Signatory)", ln=True, align='R')
     
-    return pdf.output(dest='S').encode('latin1')
+    # FIX: Ensure it always encodes gracefully without crashing
+    return pdf.output(dest='S').encode('latin1', errors='replace')
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
 
