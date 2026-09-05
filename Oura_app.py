@@ -350,12 +350,28 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura ", page_icon=app_icon_url, layout="wide")
 
+# --- PURE CSS TO HIDE RADIOS AND STYLE APP ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             header {visibility: hidden;}
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
+            
+            /* PURE CSS TO HIDE COLOR RADIO BUTTONS FOREVER */
+            div[aria-label^="COLOR_SELECT_"] {
+                opacity: 0 !important;
+                position: absolute !important;
+                left: -9999px !important;
+                height: 0px !important;
+                overflow: hidden !important;
+            }
+
+            .color-scroll-container {
+                display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 5px;
+                -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            }
+            .color-scroll-container::-webkit-scrollbar { display: none; }
             
             div.stButton > button {
                 background-color: #2b6cb0;
@@ -384,16 +400,6 @@ hide_streamlit_style = """
                 border-color: #cbd5e0 !important;
             }
 
-            div[data-testid="stExpander"] {
-                background-color: #ffffff;
-                border-radius: 8px;
-                border-left: 4px solid #2b6cb0 !important;
-                border-top: 1px solid #e2e8f0;
-                border-right: 1px solid #e2e8f0;
-                border-bottom: 1px solid #e2e8f0;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            }
-
             .swipe-gallery {
                 display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 5px;
                 -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -414,44 +420,9 @@ hide_streamlit_style = """
                 text-align: center; margin-bottom: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
                 border: 1px solid #ffcc00; letter-spacing: 0.5px;
             }
-
-            .cat-card:active {
-                transform: scale(0.92) !important;
-                background-color: #f7fafc !important;
-            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
-# --- GLOBAL JS TO AUTO-HIDE THE RADIO BUTTONS ---
-color_js = """
-<script>
-if (!window.ouraColorConfigured) {
-    window.ouraColorConfigured = true;
-    function hideColorRadios() {
-        const labels = window.parent.document.querySelectorAll('label');
-        labels.forEach(lbl => {
-            if (lbl.textContent.includes('CRADIO_')) {
-                const container = lbl.closest('div[data-testid="stElementContainer"]');
-                if (container && container.style.opacity !== '0') {
-                    container.style.opacity = '0';
-                    container.style.height = '0px';
-                    container.style.width = '0px';
-                    container.style.margin = '0px';
-                    container.style.padding = '0px';
-                    container.style.overflow = 'hidden';
-                    container.style.position = 'absolute';
-                    container.style.zIndex = '-9999';
-                }
-            }
-        });
-    }
-    setInterval(hideColorRadios, 50); 
-}
-</script>
-"""
-st_components.html(color_js, height=0, width=0)
-# ----------------------------------------
 
 # --- GLOBAL BACKGROUND STYLING ---
 global_bg_color = current_config.get("bg_color", "#f4f6f9")
@@ -1403,30 +1374,7 @@ def show_product_card(row, idx, prefix):
             
             num_colors = min(len(color_options), 5)
             
-            # --- IFRAME GENERATION FOR CLICKABLE BOXES ---
-            html_boxes = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-            body {{ margin: 0; padding: 0; font-family: sans-serif; background-color: #ffffff; }}
-            .color-box {{
-                cursor: pointer; border-radius: 8px; padding: 4px; text-align: center;
-                min-width: 60px; max-width: 60px; flex-shrink: 0;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                transition: transform 0.1s;
-            }}
-            .color-box:active {{ transform: scale(0.95); }}
-            .scroll-container {{
-                display: flex; gap: 8px; overflow-x: auto; padding: 5px;
-                -webkit-overflow-scrolling: touch; scrollbar-width: none;
-            }}
-            .scroll-container::-webkit-scrollbar {{ display: none; }}
-            </style>
-            </head>
-            <body>
-            <div class="scroll-container">
-            """
+            html_boxes = '<div class="color-scroll-container">'
             
             for i in range(num_colors):
                 c_name = color_options[i]
@@ -1435,45 +1383,35 @@ def show_product_card(row, idx, prefix):
                 border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
                 bg = "#ebf8ff" if c_name == selected_color else "#ffffff"
                 
-                html_boxes += f'<div class="color-box" onclick="selectColor(\'{c_safe}\')" style="border: {border}; background: {bg};">'
+                # --- PURE INLINE JS : NO IFRAMES, NO BLOCKS ---
+                click_js = f"""
+                const group = document.querySelector('div[aria-label=\\'COLOR_SELECT_{prefix_idx}\\']');
+                if(group) {{
+                    const opts = group.querySelectorAll('label[data-baseweb=\\'radio\\']');
+                    for(let j=0; j<opts.length; j++) {{
+                        if(opts[j].innerText.trim() === '{c_safe}') {{
+                            opts[j].click();
+                            break;
+                        }}
+                    }}
+                }}
+                """
+                
+                html_boxes += f"""
+                <div onclick="{click_js}" style="cursor: pointer; border: {border}; background: {bg}; border-radius: 8px; padding: 4px; text-align: center; min-width: 60px; max-width: 60px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.1s;">
+                """
                 if img_src:
                     html_boxes += f'<img src="{img_src}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"/>'
                 else:
                     html_boxes += f'<div style="width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;"></div>'
+                    
                 html_boxes += f'<div style="font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{c_name}</div></div>'
-                
-            html_boxes += f"""
-            </div>
-            <script>
-            function selectColor(colorName) {{
-                const parentDoc = window.parent.document;
-                const labels = parentDoc.querySelectorAll('label');
-                for(let i=0; i<labels.length; i++){{
-                    if(labels[i].textContent.includes('CRADIO_{prefix_idx}')){{
-                        const group = labels[i].closest('div[data-testid="stElementContainer"]');
-                        if(group){{
-                            const opts = group.querySelectorAll('label[data-baseweb="radio"]');
-                            for(let j=0; j<opts.length; j++){{
-                                if(opts[j].textContent.trim() === colorName.trim()){{
-                                    const inp = opts[j].querySelector('input');
-                                    if(inp) inp.click(); else opts[j].click();
-                                    break;
-                                }}
-                            }}
-                        }}
-                        break;
-                    }}
-                }}
-            }}
-            </script>
-            </body>
-            </html>
-            """
-            st_components.html(html_boxes, height=85)
-            # ---------------------------------------------
+
+            html_boxes += '</div>'
+            st.markdown(html_boxes, unsafe_allow_html=True)
             
             # HIDDEN RADIO BUTTON FOR STREAMLIT TO CATCH THE SELECTION
-            st.radio(f"CRADIO_{prefix_idx}", color_options, key=state_col_key, label_visibility="visible")
+            st.radio(f"COLOR_SELECT_{prefix_idx}", color_options, key=state_col_key, label_visibility="collapsed")
             
         else:
             all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
