@@ -32,25 +32,28 @@ GITHUB_REPO = "shalabhjainsj-glitch/Oura"
 GITHUB_BRANCH = "main"
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/"
 
-# --- INITIALIZE FIREBASE ---
-if not firebase_admin._apps:
-    try:
-        firebase_secrets = st.secrets["FIREBASE_JSON"]
-        if isinstance(firebase_secrets, str):
-            cleaned_str = firebase_secrets.replace('“', '"').replace('”', '"')
-            key_dict = json.loads(cleaned_str, strict=False)
-        else:
-            key_dict = dict(firebase_secrets)
-        
-        if 'private_key' in key_dict:
-            key_dict['private_key'] = key_dict['private_key'].replace('\\n', '\n')
+# --- INITIALIZE FIREBASE (Optimized with Cache Resource) ---
+@st.cache_resource
+def init_db():
+    if not firebase_admin._apps:
+        try:
+            firebase_secrets = st.secrets["FIREBASE_JSON"]
+            if isinstance(firebase_secrets, str):
+                cleaned_str = firebase_secrets.replace('“', '"').replace('”', '"')
+                key_dict = json.loads(cleaned_str, strict=False)
+            else:
+                key_dict = dict(firebase_secrets)
             
-        cred = credentials.Certificate(key_dict)
-        firebase_admin.initialize_app(cred)
-    except Exception as e:
-        st.error(f"🚨 Firebase Setup Error: {e}")
+            if 'private_key' in key_dict:
+                key_dict['private_key'] = key_dict['private_key'].replace('\\n', '\n')
+                
+            cred = credentials.Certificate(key_dict)
+            firebase_admin.initialize_app(cred)
+        except Exception as e:
+            st.error(f"🚨 Firebase Setup Error: {e}")
+    return firestore.client()
 
-db = firestore.client()
+db = init_db()
 
 def upload_image_to_imgbb(file_bytes):
     try:
@@ -68,8 +71,10 @@ def upload_image_to_imgbb(file_bytes):
         if res.status_code == 200:
             return res.json()["data"]["url"]
         else:
+            st.error("Image upload failed.")
             return None
     except Exception as e:
+        st.error(f"Error: {e}")
         return None
 
 def compress_image(image_bytes):
@@ -82,8 +87,7 @@ def compress_image(image_bytes):
         if pil_img.width > max_width:
             ratio = max_width / float(pil_img.width)
             new_height = int((float(pil_img.height) * float(ratio)))
-            # Using BILINEAR for faster processing instead of LANCZOS
-            pil_img = pil_img.resize((max_width, new_height), Image.Resampling.BILINEAR)
+            pil_img = pil_img.resize((max_width, new_height), Image.Resampling.LANCZOS)
             
         compressed_io = io.BytesIO()
         pil_img.save(compressed_io, format='JPEG', quality=75)
@@ -91,6 +95,8 @@ def compress_image(image_bytes):
     except Exception as e:
         return image_bytes, None
 
+# --- CACHED CONFIG LOAD (MASSIVE SPEED BOOST) ---
+@st.cache_data(ttl=600, show_spinner=False)
 def load_config():
     try:
         doc = db.collection('settings').document('config').get()
@@ -109,6 +115,7 @@ def load_config():
 
 def save_config(config):
     db.collection('settings').document('config').set(config)
+    load_config.clear() # Clear cache to fetch new settings instantly
 
 current_config = load_config()
 
@@ -123,7 +130,8 @@ else:
     if migrated:
         save_config(current_config)
 
-@st.cache_data(ttl=300, show_spinner=False)
+# --- LOAD CATEGORY IMAGES ---
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_category_images():
     try:
         doc = db.collection('settings').document('category_images').get()
@@ -133,7 +141,8 @@ def load_category_images():
     return {}
 
 def send_telegram_alert(token, chat_id, text_msg, pdf_bytes=None, pdf_name="Invoice.pdf"):
-    if not token or not chat_id: return False
+    if not token or not chat_id:
+        return False
     try:
         if pdf_bytes:
             url = f"https://api.telegram.org/bot{token}/sendDocument"
@@ -183,6 +192,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.cell(20, 6, "Billed To:")
     pdf.set_font("Arial", '', 10)
     
+    # FIX: Remove Non-ASCII (Hindi/Emoji) characters from Name
     safe_c_name = re.sub(r'[^\x00-\x7F]+', ' ', str(cust_name)) if cust_name else "Cash/Walk-in Customer"
     pdf.cell(100, 6, safe_c_name)
     
@@ -202,6 +212,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     
     if cust_address:
         pdf.cell(20, 6, "")
+        # FIX: Remove Non-ASCII (Hindi/Emoji) characters from Address
         safe_c_address = re.sub(r'[^\x00-\x7F]+', ' ', str(cust_address))
         pdf.multi_cell(100, 6, f"Address: {safe_c_address}")
         
@@ -231,24 +242,31 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     for k, item in cart.items():
         orig_p = item['price']
         d_pct = item.get('discount_pct', 0.0)
+        d_name = item.get('offer_name', '')
         net_p = orig_p - (orig_p * d_pct / 100)
         amt = net_p * item['qty']
         subtotal += amt
         
         clean_name = re.sub(r'[^\x00-\x7F]+', ' ', str(item['name'])) 
-        if d_pct > 0: clean_name += f" (-{d_pct}%)"
+        
+        if d_pct > 0:
+            clean_name += f" (-{d_pct}%)"
+            
         if len(clean_name) > 45: clean_name = clean_name[:42] + "..."
         
         pdf.cell(15, 10, str(idx), border=1, align='C')
         pdf.cell(90, 10, clean_name, border=1, align='L')
+        
         unit_display = item.get('unit', 'Pcs')
         pdf.cell(25, 10, f"{item['qty']} {unit_display[:5]}", border=1, align='C')
+        
         pdf.cell(30, 10, f"{net_p:.2f}", border=1, align='R')
         pdf.cell(30, 10, f"{amt:.2f}", border=1, align='R')
         pdf.ln()
         idx += 1
         
     pdf.ln(2)
+    
     if total_savings > 0:
         pdf.set_font("Arial", 'B', 10)
         pdf.set_text_color(34, 139, 34)
@@ -262,6 +280,7 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     pdf.ln()
     
     taxable_amount = subtotal
+    
     if shipping_charge > 0:
         pdf.cell(160, 10, "Add: Shipping / Courier Charges", border=1, align='R')
         pdf.cell(30, 10, f"{shipping_charge:.2f}", border=1, align='R')
@@ -339,111 +358,113 @@ def generate_pdf_bill(cart, cust_name, cust_mobile, cust_address, cust_gst, gst_
     return pdf.output(dest='S').encode('latin1', errors='replace')
 
 app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("has_logo") else "🛍️"
+
+st.set_page_config(page_title="Oura", page_icon=app_icon_url, layout="wide")
+
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            header {visibility: hidden;}
+            footer {visibility: hidden;}
+            div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
+            
+            div.stButton > button {
+                background-color: #2b6cb0;
+                color: white !important;
+                border: none !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+                transition: background-color 0.2s;
+                padding: 10px !important;
+                min-height: 50px;
+            }
+            div.stButton > button:hover { background-color: #2c5282; }
+            div.stButton > button:active { transform: scale(0.98); }
+
+            div[data-testid="stContainer"] {
+                background-color: #ffffff;
+                border-radius: 10px !important;
+                border: 1px solid #e2e8f0 !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                padding: 15px;
+                transition: box-shadow 0.2s;
+            }
+            div[data-testid="stContainer"]:hover {
+                box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+                border-color: #cbd5e0 !important;
+            }
+
+            div[data-testid="stExpander"] {
+                background-color: #ffffff;
+                border-radius: 8px;
+                border-left: 4px solid #2b6cb0 !important;
+                border-top: 1px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
+                border-bottom: 1px solid #e2e8f0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+
+            .swipe-gallery {
+                display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 5px;
+                -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            }
+            .swipe-gallery::-webkit-scrollbar { display: none; }
+            .swipe-gallery a { scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }
+            .swipe-img { width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}
+
+            @keyframes shine {
+                0% { background-position: -200% center; }
+                100% { background-position: 200% center; }
+            }
+            .offer-tag {
+                background: linear-gradient(90deg, #ff007f 0%, #ff0000 25%, #ff5e00 50%, #ff0000 75%, #ff007f 100%);
+                background-size: 200% auto;
+                color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 13px;
+                animation: shine 2.5s linear infinite;
+                text-align: center; margin-bottom: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                border: 1px solid #ffcc00; letter-spacing: 0.5px;
+            }
+
+            .cat-card:active {
+                transform: scale(0.92) !important;
+                background-color: #f7fafc !important;
+            }
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# --- GLOBAL BACKGROUND STYLING ---
 global_bg_color = current_config.get("bg_color", "#f4f6f9")
-
-st.set_page_config(page_title="Oura ", page_icon=app_icon_url, layout="wide")
-
-# --- COMBINED GLOBAL STYLES (Faster Rendering) ---
-global_css = f"""
+st.markdown(f"""
 <style>
 .stApp {{ background-color: {global_bg_color} !important; }}
-#MainMenu {{visibility: hidden;}}
-header {{visibility: hidden;}}
-footer {{visibility: hidden;}}
-div[data-testid="stDecoration"] {{visibility: hidden; height: 0%; display: none;}}
-
-div.stButton > button {{
-    background-color: #2b6cb0; color: white !important; border: none !important;
-    border-radius: 8px !important; font-weight: 600 !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-    transition: background-color 0.2s; padding: 10px !important; min-height: 50px;
-}}
-div.stButton > button:hover {{ background-color: #2c5282; }}
-div.stButton > button:active {{ transform: scale(0.98); }}
-
-div[data-testid="stContainer"] {{
-    background-color: #ffffff; border-radius: 10px !important;
-    border: 1px solid #e2e8f0 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    padding: 15px; transition: box-shadow 0.2s;
-}}
-div[data-testid="stContainer"]:hover {{
-    box-shadow: 0 6px 12px rgba(0,0,0,0.08); border-color: #cbd5e0 !important;
-}}
-
-div[data-testid="stExpander"] {{
-    background-color: #ffffff; border-radius: 8px;
-    border-left: 4px solid #2b6cb0 !important;
-    border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}}
-
-.swipe-gallery {{
-    display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 5px;
-    -webkit-overflow-scrolling: touch; scrollbar-width: none;
-}}
-.swipe-gallery::-webkit-scrollbar {{ display: none; }}
-.swipe-gallery a {{ scroll-snap-align: center; flex: 0 0 100%; max-width: 100%; text-decoration: none; }}
-.swipe-img {{ width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.3s ease;}}
-
-@keyframes shine {{
-    0% {{ background-position: -200% center; }}
-    100% {{ background-position: 200% center; }}
-}}
-.offer-tag {{
-    background: linear-gradient(90deg, #ff007f 0%, #ff0000 25%, #ff5e00 50%, #ff0000 75%, #ff007f 100%);
-    background-size: 200% auto;
-    color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 13px;
-    animation: shine 2.5s linear infinite;
-    text-align: center; margin-bottom: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-    border: 1px solid #ffcc00; letter-spacing: 0.5px;
-}}
-
-.cat-card:active {{
-    transform: scale(0.92) !important; background-color: #f7fafc !important;
-}}
-
-#basket-float-btn {{
-    position: fixed; bottom: 130px; right: 20px; z-index: 9999999;
-    width: 65px; height: 65px; background-color: #2b6cb0; border-radius: 50%; 
-    display: flex; justify-content: center; align-items: center;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s;
-}}
-#basket-float-btn:hover {{ transform: scale(1.05); background-color: #1a4a79; }}
-#basket-float-btn img {{ width: 35px; height: 35px; filter: brightness(0) invert(1); }}
-.cart-badge {{
-    position: absolute; top: -3px; right: -3px; background-color: #e53e3e; 
-    color: white; border-radius: 50%; width: 26px; height: 26px;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 14px; font-weight: bold; border: 2px solid white; font-family: sans-serif;
-}}
 </style>
-"""
-st.markdown(global_css, unsafe_allow_html=True)
-
-# Helper for Global JS aggregation
-if 'global_js_commands' not in st.session_state:
-    st.session_state.global_js_commands = []
-st.session_state.global_js_commands.clear() # clear on each run to avoid duplicates
+""", unsafe_allow_html=True)
+# ---------------------------------
 
 if current_config.get("has_logo", False) and app_icon_url != "🛍️":
-    st.session_state.global_js_commands.append(f"""
-    let appleIcon = document.head.querySelector('link[rel="apple-touch-icon"]');
+    pwa_js = f"""
+    <script>
+    const parentHead = window.parent.document.head;
+    let appleIcon = parentHead.querySelector('link[rel="apple-touch-icon"]');
     if (!appleIcon) {{
-        appleIcon = document.createElement('link');
+        appleIcon = window.parent.document.createElement('link');
         appleIcon.rel = 'apple-touch-icon';
-        document.head.appendChild(appleIcon);
+        parentHead.appendChild(appleIcon);
     }}
     appleIcon.href = '{app_icon_url}';
-    let mobIcon = document.head.querySelector('link[rel="icon"][sizes="192x192"]');
+    let mobIcon = parentHead.querySelector('link[rel="icon"][sizes="192x192"]');
     if (!mobIcon) {{
-        mobIcon = document.createElement('link');
+        mobIcon = window.parent.document.createElement('link');
         mobIcon.rel = 'icon';
         mobIcon.sizes = '192x192';
-        document.head.appendChild(mobIcon);
+        parentHead.appendChild(mobIcon);
     }}
     mobIcon.href = '{app_icon_url}';
-    """)
+    </script>
+    """
+    st_components.html(pwa_js, height=0, width=0)
 
 def safe_int(val, default=1):
     try:
@@ -586,6 +607,7 @@ if st.session_state.seller_logged_in:
     if seller_name not in valid_sellers:
         st.session_state.seller_logged_in = None
         st.error("⚠️ Your seller account has been closed by Admin!")
+        time.sleep(2)
         st.rerun()
 
 # --- HEADER LAYOUT ---
@@ -674,17 +696,19 @@ if st.session_state.show_login and not (st.session_state.admin_logged_in or st.s
                 else: st.error("❌ Invalid Token! Contact Admin.")
             
             st.markdown("---")
+            st.markdown(f"**Don't have a Seller Token?**")
             admin_wa = current_config.get("admin_whatsapp", "919891587437")
             req_msg = "Hello Admin, I want to become a seller on Oura Products. Please provide me a Seller Token.\n\nMy Brand Name is: \nMy Contact Number is: "
             encoded_req = urllib.parse.quote(req_msg)
             wa_req_link = f"https://wa.me/{admin_wa}?text={encoded_req}"
             
             st.markdown(f'''<a href="{wa_req_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; margin-top:5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📲 Request Token via WhatsApp</a>''', unsafe_allow_html=True)
+
     st.markdown("---")
 
 if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
     if st.session_state.admin_logged_in:
-        st.info("✅ Logged in as Admin. ")
+        st.success("✅ Logged in as Admin. ")
         tab_add, tab_banner, tab_settings, tab_ledger = st.tabs([
             "➕ Add Product", 
             "🖼️ Banner & Logo", 
@@ -692,7 +716,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             "📒 Ledger / Invoices"
         ])
     else:
-        st.info(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)")
+        st.success(f"🏪 Welcome: {st.session_state.seller_logged_in} (Seller)")
         tab_add, = st.tabs(["➕ Add Product"])
     
     with tab_add:
@@ -715,17 +739,17 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 
                 col_sz, col_cl = st.columns(2)
                 with col_sz:
-                    new_sizes = st.text_input("📐 Sizes (comma separated)", "")
+                    new_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", "")
                 with col_cl:
-                    new_colors = st.text_input("🎨 Colors (comma separated)", "")
+                    new_colors = st.text_input("🎨 Colors / कलर (कॉमा लगाकर लिखें, जैसे Red, Blue)", "")
                 
                 st.markdown("**🎁 Special Offer / Discount**")
                 col_off1, col_off2 = st.columns(2)
-                with col_off1: new_offer_name = st.text_input("Offer Name", "")
+                with col_off1: new_offer_name = st.text_input("Offer Name (e.g., Diwali Offer, 15 Aug Sale)", "")
                 with col_off2: new_discount = st.number_input("Discount %", min_value=0.0, max_value=99.0, value=0.0, step=1.0)
                 
                 st.markdown("---")
-                st.markdown("**💰 Pricing Tiers**")
+                st.markdown("**💰 Pricing Tiers (Set Unit and Quantity for each tier)**")
                 unit_options = ["Pcs", "Dozen", "Box", "Set"]
                 
                 st.markdown("**(1) Base / Sample (Online vs Cash)**")
@@ -814,7 +838,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["has_banner"] = True
                     current_config["banner_url"] = b_url
                     save_config(current_config)
-                    st.toast("Banner Saved!", icon="✅")
                     st.rerun()
             if current_config.get("has_banner", False):
                 if st.button("❌ Remove Banner"):
@@ -832,7 +855,6 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     current_config["has_logo"] = True
                     current_config["logo_url"] = l_url
                     save_config(current_config)
-                    st.toast("Logo Saved!", icon="✅")
                     st.rerun()
             if current_config.get("has_logo", False):
                 if st.button("❌ Remove Logo"):
@@ -843,6 +865,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                     
             st.markdown("---")
             st.subheader("📜 Trust Certificates (GST, Udyog Aadhaar, ISO)")
+            st.info("Upload up to 3 certificates (GST, Udyog Aadhaar, ISO/ISI) to be displayed at the top for customer trust.")
             
             c_cert1, c_cert2, c_cert3 = st.columns(3)
             with c_cert1:
@@ -862,6 +885,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             current_config["cert1_url"] = c_url
                             save_config(current_config)
                             st.rerun()
+
             with c_cert2:
                 st.markdown("**2. Udyog Aadhaar**")
                 if current_config.get("cert2_url"):
@@ -879,6 +903,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             current_config["cert2_url"] = c_url
                             save_config(current_config)
                             st.rerun()
+
             with c_cert3:
                 st.markdown("**3. ISO/ISI Certificate**")
                 if current_config.get("cert3_url"):
@@ -888,7 +913,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         save_config(current_config)
                         st.rerun()
                 else:
-                    new_c3 = st.file_uploader("Upload ISO", type=["jpg", "png", "jpeg"], key="up_c3")
+                    new_c3 = st.file_uploader("Upload ISO/ISI", type=["jpg", "png", "jpeg"], key="up_c3")
                     if st.button("Save ISO", key="sv_c3") and new_c3:
                         c_bytes, _ = compress_image(new_c3.getvalue())
                         c_url = upload_image_to_imgbb(c_bytes)
@@ -900,35 +925,46 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
         with tab_settings:
             st.subheader("🤖 Telegram Bot Settings")
             col_tg1, col_tg2 = st.columns(2)
-            with col_tg1: new_tg_token = st.text_input("Telegram Bot Token", value=current_config.get("telegram_token", ""))
-            with col_tg2: new_tg_chat = st.text_input("Telegram Chat ID", value=current_config.get("telegram_chat_id", ""))
+            with col_tg1:
+                new_tg_token = st.text_input("Telegram Bot Token", value=current_config.get("telegram_token", ""))
+            with col_tg2:
+                new_tg_chat = st.text_input("Telegram Chat ID", value=current_config.get("telegram_chat_id", ""))
             
             st.markdown("---")
             st.subheader("👥 Seller Management")
             col_s1, col_s2, col_s3 = st.columns(3)
-            with col_s1: new_s_name = st.text_input("New Seller Brand Name")
-            with col_s2: new_s_phone = st.text_input("Seller WhatsApp")
-            with col_s3: new_s_token = st.text_input("Create Password/Token")
+            with col_s1:
+                new_s_name = st.text_input("New Seller Brand Name")
+            with col_s2:
+                new_s_phone = st.text_input("Seller WhatsApp")
+            with col_s3:
+                new_s_token = st.text_input("Create Password/Token")
                 
             if st.button("➕ Add Seller"):
                 if new_s_name and new_s_token:
                     current_config["sellers"][new_s_token] = {"name": new_s_name, "phone": new_s_phone}
                     save_config(current_config)
-                    st.toast(f"Added Seller: {new_s_name}", icon="✅")
+                    st.success(f"✅ Added Seller: {new_s_name}")
+                    time.sleep(1)
                     st.rerun()
-                else: st.warning("⚠️ Please fill Brand Name and Token.")
+                else:
+                    st.warning("⚠️ Please fill Brand Name and Token.")
             
             if current_config.get("sellers"):
+                st.markdown("**Current Active Sellers:**")
                 for token, s_data in list(current_config["sellers"].items()):
                     s_name = s_data["name"] if isinstance(s_data, dict) else s_data
                     s_phone = s_data.get("phone", "N/A") if isinstance(s_data, dict) else "N/A"
+                    
                     col_sa, col_sb = st.columns([8, 2])
-                    with col_sa: st.info(f"🏪 **{s_name}** | 📞 {s_phone} (Token: `{token}`)")
+                    with col_sa: 
+                        st.info(f"🏪 **{s_name}** | 📞 {s_phone} (Token: `{token}`)")
                     with col_sb:
-                        if st.button("❌ Block", key=f"del_sel_{token}"):
+                        if st.button("❌ Block / Delete", key=f"del_sel_{token}"):
                             del current_config["sellers"][token]
                             save_config(current_config)
-                            st.toast("Seller Blocked!", icon="🚫")
+                            st.success(f"🚫 {s_name}'s account has been closed!")
+                            time.sleep(1)
                             st.rerun()
 
             st.markdown("---")
@@ -947,8 +983,11 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 new_gpay = st.text_input("GPay UPI ID", value=current_config.get("gpay_upi", ""))
                 new_bhim = st.text_input("BHIM UPI ID", value=current_config.get("bhim_upi", ""))
             
+            # --- CATEGORY IMAGES UPLOAD SECTION ---
             st.markdown("---")
             st.subheader("🖼️ Category Photos")
+            st.info("Upload custom photos/icons to display above each category box on the home page.")
+            
             cat_images_dict = load_category_images()
             cats_list_for_img = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
             
@@ -963,6 +1002,7 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                             db.collection('settings').document('category_images').set(cat_images_dict)
                             load_category_images.clear()
                             st.rerun()
+                
                 with col_ci2:
                     new_cat_img = st.file_uploader(f"Upload Photo for '{sel_cat_for_img}'", type=["jpg", "png", "jpeg"], key="up_cat_img")
                     if st.button("Save Category Photo") and new_cat_img:
@@ -973,13 +1013,24 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 cat_images_dict[sel_cat_for_img] = c_url
                                 db.collection('settings').document('category_images').set(cat_images_dict)
                                 load_category_images.clear()
-                                st.toast("Photo Saved!", icon="✅")
+                                st.success("✅ Photo Saved!")
+                                time.sleep(1)
                                 st.rerun()
-            
+            else:
+                st.warning("Please add some products to create categories first.")
+
             st.markdown("---")
             st.subheader("🎨 App Background Color (Live Preview)")
+            
             old_color = current_config.get("bg_color", "#f4f6f9")
-            new_bg_color = st.color_picker("Choose Background color:", value=old_color)
+            new_bg_color = st.color_picker("Click here and use the slider to choose your favorite background color:", value=old_color)
+            
+            if new_bg_color != old_color:
+                st.markdown(f"""
+                <style>
+                .stApp {{ background-color: {new_bg_color} !important; }}
+                </style>
+                """, unsafe_allow_html=True)
 
             if st.button("⚙️ Save All Settings"):
                 current_config["admin_whatsapp"] = new_wa
@@ -992,8 +1043,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 current_config["telegram_token"] = new_tg_token
                 current_config["telegram_chat_id"] = new_tg_chat
                 current_config["bg_color"] = new_bg_color
+                
                 save_config(current_config)
-                st.toast("Settings Saved!", icon="✅")
+                st.success("✅ Saved!")
+                time.sleep(1)
                 st.rerun()
 
             st.markdown("---")
@@ -1001,11 +1054,14 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
             cats_list = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
             if cats_list:
                 col_b1, col_b2 = st.columns(2)
-                with col_b1: b_old_cat = st.selectbox("Old Category (To Move)", cats_list)
+                with col_b1:
+                    b_old_cat = st.selectbox("Old Category (To Move)", cats_list)
                 with col_b2:
                     b_new_cat_choice = st.selectbox("Move To", cats_list + ["Create New..."])
-                    if b_new_cat_choice == "Create New...": b_new_cat = st.text_input("Type new name/emoji:", value=b_old_cat)
-                    else: b_new_cat = b_new_cat_choice
+                    if b_new_cat_choice == "Create New...":
+                        b_new_cat = st.text_input("Type new name/emoji:", value=b_old_cat)
+                    else:
+                        b_new_cat = b_new_cat_choice
 
                 if st.button("🚀 Move / Update All Products", type="primary"):
                     if b_new_cat:
@@ -1017,7 +1073,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 batch.update(doc_ref, {"Category": b_new_cat.strip()})
                             batch.commit()
                             load_products.clear()
-                            st.toast(f"Moved to '{b_new_cat}'!", icon="✅")
+                            st.success(f"✅ All products successfully moved to '{b_new_cat}'!")
+                            time.sleep(2)
                             st.rerun()
 
         with tab_ledger:
@@ -1030,10 +1087,12 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         ledger_amount = st.number_input("Amount (₹)*", min_value=0.0, step=100.0)
                     with col_l2:
                         ledger_status = st.selectbox("Select Category", ["Bill (To Receive)", "Advance (Received)"])
-                        ledger_note = st.text_input("Note")
+                        ledger_note = st.text_input("Note (e.g., Cash from shop, Old balance)")
+                        
                     ledger_date = st.date_input("Date", datetime.datetime.today())
+                    save_ledger_btn = st.form_submit_button("Save Entry 💾")
                     
-                    if st.form_submit_button("Save Entry 💾") and ledger_customer and ledger_amount > 0:
+                    if save_ledger_btn and ledger_customer and ledger_amount > 0:
                         new_entry = {
                             "Date": ledger_date.strftime("%Y-%m-%d"), 
                             "Type": "Bill" if "Bill" in ledger_status else "Advance", 
@@ -1044,12 +1103,15 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         db.collection('ledgers').document(ledger_customer).set({"active": True}, merge=True)
                         db.collection('ledgers').document(ledger_customer).collection('transactions').add(new_entry)
                         load_ledger_data.clear()
-                        st.toast(f"Entry saved for {ledger_customer}!", icon="✅")
+                        st.success(f"✅ Entry saved for {ledger_customer}!")
+                        time.sleep(1)
                         st.rerun()
 
             st.markdown("---")
+            st.markdown("### 👥 All Customer Ledgers")
             all_ledgers = load_ledger_data()
-            if not all_ledgers: st.warning("ℹ️ No customer ledger records found.")
+            if not all_ledgers:
+                st.warning("ℹ️ No customer ledger records found.")
             else:
                 for cust_name, df_ledger in all_ledgers.items():
                     with st.expander(f"👤 {cust_name}"):
@@ -1058,17 +1120,19 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         net_balance = total_bill - total_advance
                         
                         lc1, lc2, lc3 = st.columns(3)
-                        lc1.metric("Total Bill", f"₹ {total_bill:,.2f}")
-                        lc2.metric("Total Advance", f"₹ {total_advance:,.2f}")
-                        if net_balance > 0: lc3.metric("🔴 Due", f"₹ {net_balance:,.2f}")
-                        elif net_balance < 0: lc3.metric("🟢 Extra", f"₹ {abs(net_balance):,.2f}")
+                        lc1.metric("Total Bill (To Receive)", f"₹ {total_bill:,.2f}")
+                        lc2.metric("Total Advance (Received)", f"₹ {total_advance:,.2f}")
+                        
+                        if net_balance > 0: lc3.metric("🔴 Balance Due", f"₹ {net_balance:,.2f}")
+                        elif net_balance < 0: lc3.metric("🟢 Extra Advance", f"₹ {abs(net_balance):,.2f}")
                         else: lc3.metric("⚪ Settled", "₹ 0.00")
 
                         display_df = df_ledger.drop(columns=['doc_id', 'Timestamp'], errors='ignore')
                         display_df['Delete'] = False 
+                        
                         edited_df = st.data_editor(display_df, num_rows="dynamic", use_container_width=True, key=f"ed_{cust_name}")
                         
-                        if st.button(f"💾 Save for {cust_name}", key=f"save_ed_{cust_name}", type="primary"):
+                        if st.button(f"💾 Save Account for {cust_name}", key=f"save_ed_{cust_name}", type="primary"):
                             with st.spinner("Updating on cloud..."):
                                 for idx, row in edited_df.iterrows():
                                     if idx < len(df_ledger): 
@@ -1079,7 +1143,10 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                             original_row = df_ledger.iloc[idx]
                                             if row['Amount'] != original_row['Amount'] or row['Note'] != original_row['Note'] or row['Type'] != original_row['Type'] or row['Date'] != original_row['Date']:
                                                 db.collection('ledgers').document(cust_name).collection('transactions').document(doc_id).update({
-                                                    "Amount": row['Amount'], "Note": row['Note'], "Type": row['Type'], "Date": row['Date']
+                                                    "Amount": row['Amount'],
+                                                    "Note": row['Note'],
+                                                    "Type": row['Type'],
+                                                    "Date": row['Date']
                                                 })
                                     else: 
                                         if not row.get('Delete', False) and not pd.isna(row.get('Amount')):
@@ -1092,13 +1159,18 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                             }
                                             db.collection('ledgers').document(cust_name).set({"active": True}, merge=True)
                                             db.collection('ledgers').document(cust_name).collection('transactions').add(new_entry)
+
                                 load_ledger_data.clear()
-                                st.toast("Account updated!", icon="✅")
+                                st.success("✅ Account successfully updated!")
+                                time.sleep(1)
                                 st.rerun()
 
             st.markdown("---")
             st.markdown("### 📂 Saved Invoices")
+            if not os.path.exists(INVOICE_FOLDER):
+                os.makedirs(INVOICE_FOLDER)
             pdf_files = [f for f in os.listdir(INVOICE_FOLDER) if f.endswith('.pdf')]
+            
             if pdf_files:
                 parsed_files = []
                 for pdf_f in pdf_files:
@@ -1111,26 +1183,52 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                         if len(parts) >= 3:
                             time_str = parts[-1]
                             date_str = parts[-2]
-                            name_part = "_".join(parts[:-2]).replace("_", " ")
-                            date_part = f"{date_str[6:]}-{date_str[4:6]}-{date_str[:4]} | {time_str[:2]}:{time_str[2:]}"
+                            name_str = "_".join(parts[:-2])
+                            
+                            formatted_date = f"{date_str[6:]}-{date_str[4:6]}-{date_str[:4]}"
+                            formatted_time = f"{time_str[:2]}:{time_str[2:]}"
+                            
+                            name_part = name_str.replace("_", " ")
+                            date_part = f"{formatted_date} | {formatted_time}"
                             sort_key = f"{date_str}{time_str}"
-                        else: name_part = clean_name
-                    except: pass
-                    parsed_files.append({"filename": pdf_f, "name": name_part, "date": date_part, "sort_key": sort_key})
+                        else:
+                            name_part = clean_name
+                    except:
+                        pass
+                    
+                    parsed_files.append({
+                        "filename": pdf_f,
+                        "name": name_part,
+                        "date": date_part,
+                        "sort_key": sort_key
+                    })
                     
                 parsed_files.sort(key=lambda x: x["sort_key"], reverse=True)
+                
                 for item in parsed_files:
                     with st.container(border=True):
                         col_info, col_btn1, col_btn2 = st.columns([6, 2, 2])
-                        with col_info: st.markdown(f"👤 **{item['name']}** <br> 📅 <span style='color: gray; font-size: 14px;'>{item['date']}</span>", unsafe_allow_html=True)
+                        with col_info:
+                            st.markdown(f"👤 **{item['name']}** <br> 📅 <span style='color: gray; font-size: 14px;'>{item['date']}</span>", unsafe_allow_html=True)
                         with col_btn1:
                             with open(f"{INVOICE_FOLDER}/{item['filename']}", "rb") as f:
-                                st.download_button(label="📥 Download", data=f.read(), file_name=item['filename'], mime="application/pdf", key=f"dl_pdf_{item['filename']}", use_container_width=True)
+                                st.download_button(
+                                    label="📥 Download", 
+                                    data=f.read(), 
+                                    file_name=item['filename'], 
+                                    mime="application/pdf", 
+                                    key=f"dl_pdf_{item['filename']}",
+                                    use_container_width=True
+                                )
                         with col_btn2:
                             if st.button("🗑️ Delete", key=f"del_pdf_{item['filename']}", type="primary"):
-                                os.remove(f"{INVOICE_FOLDER}/{item['filename']}")
-                                st.toast("Bill deleted!", icon="✅")
-                                st.rerun()
+                                try:
+                                    os.remove(f"{INVOICE_FOLDER}/{item['filename']}")
+                                    st.success("✅ Bill deleted!")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error("⚠️ Error deleting bill.")
 
     st.markdown("---")
 
@@ -1143,9 +1241,12 @@ c3_url = current_config.get("cert3_url", "")
 if c1_url or c2_url or c3_url:
     cert_html = '<div style="display: flex; justify-content: center; gap: 10px; align-items: center; margin-top: 5px; margin-bottom: 15px;">'
     cert_html += '<div style="font-size:12px; font-weight:bold; color:#2b6cb0;">🏆 Verified:</div>'
-    if c1_url: cert_html += f'<img src="{c1_url}" loading="lazy" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px;">'
-    if c2_url: cert_html += f'<img src="{c2_url}" loading="lazy" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px;">'
-    if c3_url: cert_html += f'<img src="{c3_url}" loading="lazy" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px;">'
+    if c1_url:
+        cert_html += f'<img src="{c1_url}" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'
+    if c2_url:
+        cert_html += f'<img src="{c2_url}" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'
+    if c3_url:
+        cert_html += f'<img src="{c3_url}" style="height: 35px; width: auto; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">'
     cert_html += '</div>'
     st.markdown(cert_html, unsafe_allow_html=True)
 
@@ -1156,6 +1257,7 @@ def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""
     if not paths: return []
     
     html_code = '<div style="position: relative;">'
+    
     if wa_link or first_img_link:
         html_code += '<div style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px;">'
         if first_img_link:
@@ -1169,7 +1271,7 @@ def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""
     for src in paths:
         if not src.startswith("http"):
             src = f"{GITHUB_RAW_URL}{urllib.parse.quote(src.replace('\\', '/'), safe='/')}"
-        html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" style="{img_style}" loading="lazy" decoding="async" alt="Product Image"></a>'
+        html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" style="{img_style}" loading="lazy" alt="Product Image"></a>'
     
     html_code += '</div></div>'
     html_code += '<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">Click photo to zoom 🔍</div>'
@@ -1218,24 +1320,33 @@ def show_product_card(row, idx, prefix):
             img_link_for_wa = f"{GITHUB_RAW_URL}{urllib.parse.quote(img_link_for_wa.replace('\\', '/'), safe='/')}"
 
     show_wholesale = st.session_state.wholesale_mode
+
     share_text = f"⚡ *OURA PRODUCTS - {row.get('Name', '')}* ⚡\n\n"
-    if disc_pct > 0: share_text += f"🎉 *{offer_nm} : FLAT {disc_pct}% OFF!* 🎉\n\n"
+    if disc_pct > 0:
+        share_text += f"🎉 *{offer_nm} : FLAT {disc_pct}% OFF!* 🎉\n\n"
+        
     share_text += f"📦 *Rates (After Discount):*\n"
     if show_wholesale:
         if t2_qty > 0 and t2_price > 0: share_text += f"🔹 {t2_qty}+ {u_t2}: ₹{net_t2:.2f} \n"
         if t1_qty > 0 and t1_price > 0: share_text += f"🔹 {t1_qty}+ {u_t1}: ₹{net_t1:.2f} \n"
     share_text += f"🔹 {retail_qty}+ {u_base}: Cash ₹{net_cash:.2f} | Online ₹{net_retail:.2f}\n\n"
+    
     cat_url = urllib.parse.quote(str(row.get('Category', '')))
     app_link = f"https://ouraindia.streamlit.app/?cat={cat_url}"
+    
     share_text += f"🛒 *Book Order:* {app_link}\n"
-    if img_link_for_wa: share_text += f"📷 *Product Photo:* {img_link_for_wa}"
+    if img_link_for_wa:
+        share_text += f"📷 *Product Photo:* {img_link_for_wa}"
     wa_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
 
     with st.container(border=True):
         is_in_stock = row.get("In_Stock", True)
-        if disc_pct > 0: st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
+        
+        if disc_pct > 0:
+            st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
-        show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
+        all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
+        
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
         if pd.notna(seller_val) and str(seller_val).strip() != "":
@@ -1249,8 +1360,10 @@ def show_product_card(row, idx, prefix):
         del_tag = "(Free Delivery)" if show_fd else "<span style='color:#d32f2f;font-size:11px;'>(+ Courier Charge)</span>"
 
         def get_price_html(orig, net, color, lbl):
-            if disc_pct > 0: return f'<span style="color:{color}; font-size:12px;">{lbl} <del style="color:#999;">₹{orig}</del> <b style="font-size:15px;">₹{net:.2f}</b></span>'
-            else: return f'<span style="color:{color}; font-size:14px; font-weight:bold;">{lbl} ₹{orig}</span>'
+            if disc_pct > 0:
+                return f'<span style="color:{color}; font-size:12px;">{lbl} <del style="color:#999;">₹{orig}</del> <b style="font-size:15px;">₹{net:.2f}</b></span>'
+            else:
+                return f'<span style="color:{color}; font-size:14px; font-weight:bold;">{lbl} ₹{orig}</span>'
 
         cash_html = get_price_html(cash_price, net_cash, "#e65100", "💵 Cash:")
         online_html = get_price_html(retail_price, net_retail, "#2b6cb0", "💳 Online:")
@@ -1260,17 +1373,23 @@ def show_product_card(row, idx, prefix):
         sizes_str = str(row.get("Sizes", "")).strip()
         size_options = [s.strip() for s in sizes_str.split(",") if s.strip()]
         selected_size = ""
+        
         colors_str = str(row.get("Colors", "")).strip()
         color_options = [c.strip() for c in colors_str.split(",") if c.strip()]
         selected_color = ""
 
         if retail_price <= 0:
-            st.markdown(f'<div style="background-color:#fff3cd; padding:10px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:10px; text-align:center;"><span style="color:#856404; font-size:15px; font-weight:bold;">🚨 Contact for Price</span></div>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="background-color:#fff3cd; padding:10px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:10px; text-align:center;">
+                <span style="color:#856404; font-size:15px; font-weight:bold;">🚨 Contact for Price</span>
+            </div>
+            """, unsafe_allow_html=True)
             if is_in_stock:
                 ask_qty = st.number_input(f"How many {u_base} required?", min_value=1, value=1, key=f"ask_q_{prefix_idx}")
                 admin_num = current_config.get("admin_whatsapp", "919891587437")
                 wa_msg = urllib.parse.quote(f"Hello Oura Products,\nI need {ask_qty} {u_base} of *{row.get('Name', 'this product')}*. Please quote your best rate.")
-                st.markdown(f'<a href="https://wa.me/{admin_num}?text={wa_msg}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px;">💬 Ask Rate on WhatsApp</a>', unsafe_allow_html=True)
+                wa_btn_link = f"https://wa.me/{admin_num}?text={wa_msg}"
+                st.markdown(f'<a href="{wa_btn_link}" target="_blank" style="display:block; text-align:center; background-color:#25D366; color:white; padding:10px; border-radius:8px; text-decoration:none; font-weight:bold; margin-bottom:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">💬 Ask Rate on WhatsApp for {ask_qty} {u_base}</a>', unsafe_allow_html=True)
         else:
             if show_wholesale and t2_qty > 0 and t2_price > 0: 
                 st.markdown(f"""
@@ -1295,7 +1414,9 @@ def show_product_card(row, idx, prefix):
             else: 
                 st.markdown(f"""
                 <div style="background-color:#f8f9fa; padding:10px; border-radius:8px; border:1px solid #e9ecef; margin-bottom:10px; text-align:center;">
-                    <b>{retail_qty}+ {u_base} Rate:</b><br>{cash_html} | {online_html} <br><span style="font-size:12px;">🛵 {del_tag}</span>
+                    <b>{retail_qty}+ {u_base} Rate:</b><br>
+                    {cash_html} | {online_html} <br>
+                    <span style="font-size:12px;">🛵 {del_tag}</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1307,12 +1428,13 @@ def show_product_card(row, idx, prefix):
                 if cash_price > 0:
                     lbl_ca = f"{retail_qty} {u_base} (💵 Cash: ₹{net_cash:.2f})" if disc_pct > 0 else f"{retail_qty} {u_base} (💵 Cash / Offline - ₹{cash_price})"
                     opts[lbl_ca] = {"price": cash_price, "unit": u_base, "min_q": retail_qty, "type": "Cash"}
+                
                 if show_wholesale:
                     if t1_qty > 0 and t1_price > 0:
-                        lbl_t1 = f"{t1_qty} {u_t1} (Wholesale: ₹{net_t1:.2f})" if disc_pct > 0 else f"{t1_qty} {u_t1} (Wholesale: ₹{t1_price})"
+                        lbl_t1 = f"{t1_qty} {u_t1} (Wholesale: ₹{net_t1:.2f} / {u_t1})" if disc_pct > 0 else f"{t1_qty} {u_t1} (Wholesale: ₹{t1_price} / {u_t1})"
                         opts[lbl_t1] = {"price": t1_price, "unit": u_t1, "min_q": t1_qty, "type": "Wholesale"}
                     if t2_qty > 0 and t2_price > 0:
-                        lbl_t2 = f"{t2_qty} {u_t2} (Super Bulk: ₹{net_t2:.2f})" if disc_pct > 0 else f"{t2_qty} {u_t2} (Super Bulk: ₹{t2_price})"
+                        lbl_t2 = f"{t2_qty} {u_t2} (Super Bulk: ₹{net_t2:.2f} / {u_t2})" if disc_pct > 0 else f"{t2_qty} {u_t2} (Super Bulk: ₹{t2_price} / {u_t2})"
                         opts[lbl_t2] = {"price": t2_price, "unit": u_t2, "min_q": t2_qty, "type": "SuperBulk"}
                     
                 selected_opt = st.selectbox("Select Payment Mode & Package:", list(opts.keys()), key=f"sel_{prefix_idx}")
@@ -1323,37 +1445,50 @@ def show_product_card(row, idx, prefix):
                 
                 col_sz_sel, col_cl_sel = st.columns(2)
                 with col_sz_sel:
-                    if size_options: selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
+                    if size_options:
+                        selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
                 with col_cl_sel:
-                    if color_options: selected_color = st.selectbox("🎨 Select Color:", color_options, key=f"col_{prefix_idx}")
+                    if color_options:
+                        selected_color = st.selectbox("🎨 Select Color:", color_options, key=f"col_{prefix_idx}")
                 
                 qty = st.number_input(f"Quantity ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
                 if st.button("🛒 Add to Cart", key=f"b_{prefix_idx}"):
                     cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}|{selected_size}|{selected_color}"
-                    if cart_key in st.session_state.cart: st.session_state.cart[cart_key]["qty"] += qty
+                    
+                    if cart_key in st.session_state.cart:
+                        st.session_state.cart[cart_key]["qty"] += qty
                     else:
                         base_nm = row.get('Name', 'Item')
                         final_nm = base_nm
                         if selected_size: final_nm += f" (Size: {selected_size})"
                         if selected_color: final_nm += f" (Color: {selected_color})"
                         if buy_type in ["Online", "Cash"]: final_nm += f" ({buy_type})"
+                            
                         st.session_state.cart[cart_key] = {
-                            "name": final_nm, "price": buy_price, "qty": qty, 
-                            "img_link": img_link_for_wa, "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
-                            "unit": buy_unit, "discount_pct": disc_pct, "offer_name": offer_nm,
-                            "size": selected_size, "color": selected_color
+                            "name": final_nm, 
+                            "price": buy_price, 
+                            "qty": qty, 
+                            "img_link": img_link_for_wa,
+                            "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
+                            "unit": buy_unit,
+                            "discount_pct": disc_pct,
+                            "offer_name": offer_nm,
+                            "size": selected_size,
+                            "color": selected_color
                         }
                     save_cart_to_url()
-                    st.toast("Added to Cart! 🛒", icon="✅")
+                    st.success("Added to Cart! 🛒")
             else:
                 st.markdown("<div style='background-color:#ffebee; color:#c62828; padding:10px; border-radius:8px; text-align:center; font-weight:bold; border:1px solid #ef9a9a; margin-top:10px;'>🚫 Out of Stock</div>", unsafe_allow_html=True)
             
         can_edit = False
         if st.session_state.admin_logged_in: can_edit = True
         elif st.session_state.seller_logged_in and st.session_state.seller_logged_in == str(seller_val).strip(): can_edit = True
+            
         can_market = False
         if st.session_state.admin_logged_in or st.session_state.seller_logged_in: can_market = True
+            
         if can_edit or can_market: st.markdown("---")
 
         if can_market:
@@ -1378,8 +1513,10 @@ def show_product_card(row, idx, prefix):
                         e_name = str(row.get("Name", ""))
                     
                     c_e_sz, c_e_col = st.columns(2)
-                    with c_e_sz: e_sizes = st.text_input("📐 Sizes", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
-                    with c_e_col: e_colors = st.text_input("🎨 Colors", value=str(row.get("Colors", "")), key=f"ecol_{prefix_idx}")
+                    with c_e_sz:
+                        e_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
+                    with c_e_col:
+                        e_colors = st.text_input("🎨 Colors / कलर (कॉमा लगाकर लिखें)", value=str(row.get("Colors", "")), key=f"ecol_{prefix_idx}")
                     
                     st.markdown("**🔄 Move Product to another Category:**")
                     all_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
@@ -1388,12 +1525,15 @@ def show_product_card(row, idx, prefix):
                     if all_cats:
                         cat_idx = all_cats.index(current_cat) if current_cat in all_cats else 0
                         e_cat_choice = st.selectbox("Category", all_cats + ["Create New..."], index=cat_idx, key=f"ec_{prefix_idx}")
-                        if e_cat_choice == "Create New...": e_cat = st.text_input("Type new Category Name", value=current_cat, key=f"ec_text_{prefix_idx}")
-                        else: e_cat = e_cat_choice
+                        if e_cat_choice == "Create New...":
+                            e_cat = st.text_input("Type new Category Name", value=current_cat, key=f"ec_text_{prefix_idx}")
+                        else:
+                            e_cat = e_cat_choice
                     else:
                         e_cat = st.text_input("Type new Category Name", value=current_cat, key=f"ec_text_alt_{prefix_idx}")
                         
                     st.markdown("---")
+                    
                     st.markdown("**🎁 Edit Offers**")
                     col_eo1, col_eo2 = st.columns(2)
                     with col_eo1: e_off_name = st.text_input("Offer Name", value=str(row.get("Offer_Name", "")), key=f"eoff_{prefix_idx}")
@@ -1401,6 +1541,7 @@ def show_product_card(row, idx, prefix):
                     
                     st.markdown("**💰 Pricing Tiers**")
                     unit_opts = ["Pcs", "Dozen", "Box", "Set"]
+                    
                     idx_b = next((i for i, opt in enumerate(unit_opts) if u_base in opt), 0)
                     idx_t1 = next((i for i, opt in enumerate(unit_opts) if u_t1 in opt), 0)
                     idx_t2 = next((i for i, opt in enumerate(unit_opts) if u_t2 in opt), 0)
@@ -1427,18 +1568,24 @@ def show_product_card(row, idx, prefix):
                         
                     st.markdown("---")
                     e_fd = st.selectbox("Delivery Option", ["Free Delivery", "Extra Courier Charge"], index=0 if show_fd else 1, key=f"efd_{prefix_idx}")
-                    e_imgs = st.file_uploader("Upload New Photos", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
+                            
+                    e_imgs = st.file_uploader("Upload New Photos (Optional)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key=f"e_img_up_{prefix_idx}")
+                    update_btn = st.form_submit_button("✅ Update & Save")
                     
-                if st.form_submit_button("✅ Update & Save"):
+                if update_btn:
                     target_id = str(row['ID'])
+                    is_free_val = True if e_fd == "Free Delivery" else False
                     update_dict = {
                         "Retail_Qty": e_retail_qty, "Price": e_online_price, "Cash_Price": e_cash_price,
                         "Tier1_Price": e_t1_price, "Tier1_Qty": e_t1_qty, 
                         "Tier2_Price": e_t2_price, "Tier2_Qty": e_t2_qty,
-                        "Category": e_cat.strip(), "Unit_Base": e_u_base, "Unit_T1": e_u_t1, "Unit_T2": e_u_t2,
-                        "Free_Delivery": True if e_fd == "Free Delivery" else False,
-                        "Offer_Name": e_off_name.strip(), "Discount_Percent": e_off_pct,
-                        "Sizes": e_sizes.strip(), "Colors": e_colors.strip()
+                        "Category": e_cat.strip(),
+                        "Unit_Base": e_u_base, "Unit_T1": e_u_t1, "Unit_T2": e_u_t2,
+                        "Free_Delivery": is_free_val,
+                        "Offer_Name": e_off_name.strip(),
+                        "Discount_Percent": e_off_pct,
+                        "Sizes": e_sizes.strip(),
+                        "Colors": e_colors.strip()
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
                     if e_imgs:
@@ -1449,16 +1596,15 @@ def show_product_card(row, idx, prefix):
                                 img_url = upload_image_to_imgbb(compressed_bytes)
                                 if img_url: image_paths.append(img_url)
                             if image_paths: update_dict["Image_Path"] = "|".join(image_paths)
+                                
                     db.collection('products').document(target_id).update(update_dict)
                     load_products.clear()
-                    st.toast("Product Updated!", icon="✅")
                     st.rerun()
 
             st.markdown("---")
             if st.button("🗑️ Delete Product", key=f"del_p_{prefix_idx}"):
                 db.collection('products').document(str(row['ID'])).delete()
                 load_products.clear()
-                st.toast("Product Deleted!", icon="🗑️")
                 st.rerun()
 
 # --- MAIN PAGE: DISPLAY CATEGORIES OR SEARCH RESULTS ---
@@ -1475,12 +1621,14 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "search")
     
     elif st.session_state.selected_category is None:
+       
         valid_categories = products_df['Category'].dropna().unique().tolist()
         
         if len(valid_categories) == 0: 
             st.write("No categories yet.")
         else:
             st.markdown('<div id="hide-cats-marker"></div>', unsafe_allow_html=True)
+            
             for idx, cat in enumerate(valid_categories):
                 if st.button(f"HIDDEN_CAT_{idx}", key=f"hidden_cat_{idx}"):
                     st.session_state.selected_category = cat
@@ -1488,22 +1636,28 @@ else:
                     save_cart_to_url()
                     st.rerun()
             
-            st.session_state.global_js_commands.append("""
+            js_code = """
+            <script>
+            const parentDoc = window.parent.document;
+            
             function setupCategories() {
-                const btns = document.querySelectorAll('button');
+                const btns = parentDoc.querySelectorAll('button');
                 btns.forEach(b => {
                     if(b.innerText && b.innerText.includes('HIDDEN_CAT_')) {
                         const container = b.closest('div[data-testid="stElementContainer"]');
-                        if (container && container.style.display !== 'none') container.style.display = 'none';
+                        if (container && container.style.display !== 'none') {
+                            container.style.display = 'none';
+                        }
                     }
                 });
-                const cards = document.querySelectorAll('.cat-card:not(.click-ready)');
+
+                const cards = parentDoc.querySelectorAll('.cat-card:not(.click-ready)');
                 cards.forEach(card => {
                     card.classList.add('click-ready');
                     card.addEventListener('click', function() {
                         const catIdx = this.getAttribute('data-cat-idx');
                         const targetText = 'HIDDEN_CAT_' + catIdx;
-                        const allBtns = document.querySelectorAll('button');
+                        const allBtns = parentDoc.querySelectorAll('button');
                         for(let i = 0; i < allBtns.length; i++) {
                             if(allBtns[i].innerText && allBtns[i].innerText.includes(targetText)) {
                                 allBtns[i].click();
@@ -1513,52 +1667,83 @@ else:
                     });
                 });
             }
-            setupCategories(); setTimeout(setupCategories, 200); setTimeout(setupCategories, 800);
-            """)
+
+            setupCategories();
+            setTimeout(setupCategories, 150);
+            </script>
+            """
+            st_components.html(js_code, height=0, width=0)
             
             cat_images = load_category_images()
-            html_parts = ['<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0px;">']
+            
+            html_parts = []
+            html_parts.append('<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0px;">')
+            
             for idx, cat in enumerate(valid_categories):
                 img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
+                
                 card = f'<div class="cat-card" data-cat-idx="{idx}" style="background: #ffffff; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; overflow: hidden; height: 100%;">'
-                card += f'<img src="{img_url}" loading="lazy" decoding="async" style="width: 100%; height: 75px; object-fit: cover; background-color: #f8f9fa; border-bottom: 1px solid #e2e8f0;">'
+                
+                card += f'<img src="{img_url}" loading="lazy" style="width: 100%; height: 75px; object-fit: cover; background-color: #f8f9fa; border-bottom: 1px solid #e2e8f0;">'
+                
                 card += f'<div style="padding: 8px 4px; flex-grow: 1; display: flex; align-items: center; justify-content: center;">'
                 card += f'<span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>'
                 card += '</div></div>'
+                
                 html_parts.append(card)
+                
             html_parts.append('</div>')
+            
             st.markdown("\n".join(html_parts), unsafe_allow_html=True)
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
+        
         if st.button("🏠 All Categories", key="float_back_btn"):
             st.session_state.selected_category = None
             if "cat" in st.query_params: del st.query_params["cat"]
             save_cart_to_url()
             st.rerun()
             
-        st.session_state.global_js_commands.append("""
-        const buttons = document.querySelectorAll('button');
+        float_js = """
+        <script>
+        const parentWin = window.parent;
+        const parentDoc = window.parent.document;
+        
+        const buttons = parentDoc.querySelectorAll('button');
         buttons.forEach(btn => {
             if (btn.innerText && btn.innerText.includes('All Categories')) {
-                btn.style.position = 'fixed'; btn.style.bottom = '120px'; btn.style.left = '15px';
-                btn.style.zIndex = '999999'; btn.style.background = '#2b6cb0'; btn.style.color = 'white';
-                btn.style.padding = '12px 18px'; btn.style.borderRadius = '50px'; btn.style.border = '2px solid white';
-                btn.style.fontWeight = 'bold'; btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                btn.style.minHeight = 'auto'; btn.style.width = 'auto'; btn.style.animation = 'none';
+                btn.style.position = 'fixed';
+                btn.style.bottom = '120px';
+                btn.style.left = '15px';
+                btn.style.zIndex = '999999';
+                btn.style.background = '#2b6cb0'; 
+                btn.style.color = 'white';
+                btn.style.padding = '12px 18px';
+                btn.style.borderRadius = '50px';
+                btn.style.border = '2px solid white';
+                btn.style.fontWeight = 'bold';
+                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                btn.style.minHeight = 'auto'; 
+                btn.style.width = 'auto';
+                btn.style.animation = 'none';
             }
         });
-        if (!window.ouraMobileBackConfigured) {
-            window.ouraMobileBackConfigured = true;
-            window.addEventListener('popstate', function(event) {
-                const btns = document.querySelectorAll('button');
-                btns.forEach(b => { if (b.innerText && b.innerText.includes('All Categories')) b.click(); });
+
+        if (!parentWin.ouraMobileBackConfigured) {
+            parentWin.ouraMobileBackConfigured = true;
+            parentWin.addEventListener('popstate', function(event) {
+                const btns = parentWin.document.querySelectorAll('button');
+                btns.forEach(b => {
+                    if (b.innerText && (b.innerText.includes('All Categories'))) {
+                        b.click(); 
+                    }
+                });
             });
         }
-        if (!window.history.state || window.history.state.oura !== 'in_category') {
-            window.history.pushState({ oura: 'in_category' }, "Category", window.location.href);
-        }
-        """)
+        </script>
+        """
+        st_components.html(float_js, height=0, width=0)
 
         cat_products = products_df[products_df['Category'] == st.session_state.selected_category]
         if cat_products.empty: st.write("No products in this category yet.")
@@ -1568,10 +1753,12 @@ else:
                 with cols[idx % 3]: show_product_card(row, idx, "cat_view")
 
 st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) 
+
 st.markdown('<div id="cart-section-anchor" style="position:relative; top:-50px;"></div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.header("🛒 Cart")
+st.header("🛒")
+
 st.session_state.cart_total_savings = 0.0
 
 if st.session_state.cart:
@@ -1583,9 +1770,11 @@ if st.session_state.cart:
         orig_p = item['price']
         d_pct = item.get('discount_pct', 0.0)
         d_name = item.get('offer_name', '')
+        
         net_p = orig_p - (orig_p * d_pct / 100)
         subtotal = net_p * item['qty']
         savings = (orig_p - net_p) * item['qty']
+        
         total += subtotal
         total_savings += savings
         
@@ -1596,10 +1785,13 @@ if st.session_state.cart:
         with col_details:
             st.write(f"✔️ **{item['name']}**")
             c1, c2 = st.columns([8, 2])
+            
             unit_display = item.get('unit', 'Pcs')
             with c1: 
-                if d_pct > 0: st.markdown(f"**Qty:** {item['qty']} {unit_display} x <del style='color:gray;'>₹{orig_p:.2f}</del> ₹{net_p:.2f} = **₹{subtotal:.2f}** <br><span style='color:green; font-weight:bold;'>🎉 Saved ₹{savings:.2f} ({d_name})</span>", unsafe_allow_html=True)
-                else: st.write(f"Qty: {item['qty']} {unit_display} x ₹{orig_p:.2f} = **₹{subtotal:.2f}**")
+                if d_pct > 0:
+                    st.markdown(f"**Qty:** {item['qty']} {unit_display} x <del style='color:gray;'>₹{orig_p:.2f}</del> ₹{net_p:.2f} = **₹{subtotal:.2f}** <br><span style='color:green; font-weight:bold;'>🎉 Saved ₹{savings:.2f} ({d_name})</span>", unsafe_allow_html=True)
+                else:
+                    st.write(f"Qty: {item['qty']} {unit_display} x ₹{orig_p:.2f} = **₹{subtotal:.2f}**")
             with c2:
                 if st.button("❌", key=f"del_item_{k}"):
                     del st.session_state.cart[k]
@@ -1609,57 +1801,106 @@ if st.session_state.cart:
         count += 1
     
     st.session_state.cart_total_savings = total_savings
+    
     st.subheader(f"Total Amount: ₹{total:.2f}")
-    if total_savings > 0: st.markdown(f"<h4 style='color:green;'>🎉 Total Savings: ₹{total_savings:.2f}</h4>", unsafe_allow_html=True)
+    if total_savings > 0:
+        st.markdown(f"<h4 style='color:green;'>🎉 Total Savings: ₹{total_savings:.2f}</h4>", unsafe_allow_html=True)
+    
     st.markdown("---")
     
     st.markdown("### 📍 Delivery Details")
     st.markdown('<div id="address-book-anchor"></div>', unsafe_allow_html=True)
     
-    st.session_state.global_js_commands.append("""
+    addr_book_ui_js = """
+    <script>
+    const parentDoc = window.parent.document;
+
     function triggerReactChange(el, value) {
         let nativeSetter;
-        if (el.tagName === 'INPUT') nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        else if (el.tagName === 'TEXTAREA') nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+        if (el.tagName === 'INPUT') {
+            nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        } else if (el.tagName === 'TEXTAREA') {
+            nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+        }
+        
         if (nativeSetter) {
             nativeSetter.call(el, value);
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
+
     function renderAddressBook() {
-        let anchor = document.getElementById('address-book-anchor');
-        if(!anchor) { setTimeout(renderAddressBook, 500); return; }
-        let book = JSON.parse(window.localStorage.getItem('oura_address_book') || '[]');
-        if(book.length === 0) { anchor.innerHTML = ''; return; }
-        let html = `<div style="background: #fdfdfd; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);"><div style="color: #4a5568; font-size: 14px; margin-bottom: 15px; text-align: center; font-weight: bold;">--- Or Select from saved addresses ---</div><div style="display: flex; flex-direction: column; gap: 12px;">`;
+        let anchor = parentDoc.getElementById('address-book-anchor');
+        if(!anchor) {
+            setTimeout(renderAddressBook, 500);
+            return;
+        }
+
+        let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+
+        if(book.length === 0) {
+            anchor.innerHTML = '';
+            return;
+        }
+
+        let html = `
+        <div style="background: #fdfdfd; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #4a5568; font-size: 14px; margin-bottom: 15px; text-align: center; font-weight: bold;">--- Or Select from saved addresses ---</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+        `;
+
         book.forEach((addr, idx) => {
-            html += `<div onclick="window.fillSavedAddress(${idx})" style="border: 1px solid #d32f2f; border-radius: 8px; padding: 15px; background: #ffffff; cursor: pointer; position: relative; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"><div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><span style="background: #ffebee; color: #d32f2f; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">📍 Saved ${idx+1}</span><span style="font-weight: bold; font-size: 14px; color: #1a202c;">${addr.name}</span></div><div style="font-size: 13px; color: #4a5568; line-height: 1.4; margin-bottom: 8px;">${addr.address}</div><div style="font-size: 13px; color: #2d3748; font-weight: bold;">📞 ${addr.mobile}</div><button onclick="window.deleteSavedAddress(event, ${idx})" style="position: absolute; right: 15px; bottom: 15px; background: none; border: 1px solid #cbd5e0; border-radius: 6px; padding: 5px 10px; font-size: 12px; color: #4a5568; cursor: pointer; font-weight: bold;">❌ Remove</button></div>`;
+            html += `
+            <div onclick="window.parent.fillSavedAddress(${idx})" style="border: 1px solid #d32f2f; border-radius: 8px; padding: 15px; background: #ffffff; cursor: pointer; position: relative; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="background: #ffebee; color: #d32f2f; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">📍 Saved ${idx+1}</span>
+                    <span style="font-weight: bold; font-size: 14px; color: #1a202c;">${addr.name}</span>
+                </div>
+                <div style="font-size: 13px; color: #4a5568; line-height: 1.4; margin-bottom: 8px;">${addr.address}</div>
+                <div style="font-size: 13px; color: #2d3748; font-weight: bold;">📞 ${addr.mobile}</div>
+                
+                <button onclick="window.parent.deleteSavedAddress(event, ${idx})" style="position: absolute; right: 15px; bottom: 15px; background: none; border: 1px solid #cbd5e0; border-radius: 6px; padding: 5px 10px; font-size: 12px; color: #4a5568; cursor: pointer; font-weight: bold;">❌ Remove</button>
+            </div>
+            `;
         });
+
         html += `</div></div>`;
         anchor.innerHTML = html;
     }
-    window.fillSavedAddress = function(idx) {
-        let book = JSON.parse(window.localStorage.getItem('oura_address_book') || '[]');
-        let addr = book[idx]; if(!addr) return;
-        const inputs = document.querySelectorAll('input, textarea');
+
+    window.parent.fillSavedAddress = function(idx) {
+        let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+        let addr = book[idx];
+        if(!addr) return;
+
+        const inputs = parentDoc.querySelectorAll('input, textarea');
         inputs.forEach(el => {
             const label = el.getAttribute('aria-label') || "";
             const wrapper = el.closest('div[data-testid="stTextInput"], div[data-testid="stTextArea"]');
             const wrapperText = wrapper ? wrapper.innerText : "";
+
             if (label.includes('Your Name') || wrapperText.includes('Your Name')) triggerReactChange(el, addr.name);
             if (label.includes('Mobile Number') || wrapperText.includes('Mobile Number')) triggerReactChange(el, addr.mobile);
             if (label.includes('Full Address') || wrapperText.includes('Full Address')) triggerReactChange(el, addr.address);
         });
+
+        const targetInput = Array.from(inputs).find(el => el.getAttribute('aria-label') && el.getAttribute('aria-label').includes('Your Name'));
+        if (targetInput) targetInput.scrollIntoView({behavior: "smooth", block: "center"});
     };
-    window.deleteSavedAddress = function(event, idx) {
+
+    window.parent.deleteSavedAddress = function(event, idx) {
         event.stopPropagation();
-        let book = JSON.parse(window.localStorage.getItem('oura_address_book') || '[]');
-        book.splice(idx, 1); window.localStorage.setItem('oura_address_book', JSON.stringify(book));
+        let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+        book.splice(idx, 1);
+        window.parent.localStorage.setItem('oura_address_book', JSON.stringify(book));
         renderAddressBook();
     };
+
     renderAddressBook();
-    """)
+    </script>
+    """
+    st_components.html(addr_book_ui_js, height=0, width=0)
     
     with st.form("billing_form"):
         col_d1, col_d2 = st.columns(2)
@@ -1675,44 +1916,70 @@ if st.session_state.cart:
             <script>
             const statusText = document.getElementById('loc-status');
             const pDoc = window.parent.document;
+
             function triggerReactChangeLoc(el, value) {
-                let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                if (nativeSetter) { nativeSetter.call(el, value); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+                let nativeSetter;
+                if (el.tagName === 'INPUT') {
+                    nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                } else if (el.tagName === 'TEXTAREA') {
+                    nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                }
+                
+                if (nativeSetter) {
+                    nativeSetter.call(el, value);
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             }
+
             function fetchLocation() {
                 statusText.innerText = "⏳ Fetching...";
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         async (position) => {
-                            const lat = position.coords.latitude; const lon = position.coords.longitude;
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
                             let finalAddress = "";
                             try {
                                 const res = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon);
                                 const data = await res.json();
                                 if (data && data.display_name) finalAddress = data.display_name;
-                            } catch (err1) { finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5); }
+                            } catch (err1) {
+                                finalAddress = "Lat: " + lat.toFixed(5) + ", Lon: " + lon.toFixed(5);
+                            }
+                            
                             const inputs = pDoc.querySelectorAll('textarea');
                             let addressInput;
                             inputs.forEach(el => {
-                                const label = el.getAttribute('aria-label') || ""; const wrapper = el.closest('div[data-testid="stTextArea"]');
-                                if (label.includes('Full Address') || (wrapper && wrapper.innerText.includes('Full Address'))) addressInput = el;
+                                const label = el.getAttribute('aria-label') || "";
+                                const wrapper = el.closest('div[data-testid="stTextArea"]');
+                                const wrapperText = wrapper ? wrapper.innerText : "";
+                                if (label.includes('Full Address') || wrapperText.includes('Full Address')) addressInput = el;
                             });
-                            if (addressInput) { triggerReactChangeLoc(addressInput, finalAddress); statusText.innerText = "✅ Location Updated!"; }
-                            else { statusText.innerText = "❌ Address box not found."; }
+                            
+                            if (addressInput) {
+                                triggerReactChangeLoc(addressInput, finalAddress);
+                                statusText.innerText = "✅ Location Updated!";
+                            } else {
+                                statusText.innerText = "❌ Address box not found.";
+                            }
                         },
                         (error) => { statusText.innerText = "❌ GPS Error / Denied."; },
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
-                } else { statusText.innerText = "❌ GPS not supported."; }
+                } else {
+                    statusText.innerText = "❌ GPS not supported.";
+                }
             }
             </script>
             """
-            st_components.html(loc_html, height=50) # Keep this single block for visual button rendering
+            st_components.html(loc_html, height=50)
             
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
             bill_date = st.date_input("Invoice Date", datetime.date.today())
             gst_choice = st.selectbox("Select Bill Type:", ["Without GST (Estimate)", "GST @ 5%", "GST @ 12%", "GST @ 18%", "GST @ 28%"])
+            
             gst_percent = 0
             if "5%" in gst_choice: gst_percent = 5
             elif "12%" in gst_choice: gst_percent = 12
@@ -1721,43 +1988,85 @@ if st.session_state.cart:
             
             cust_gst = st.text_input("Customer GST Number (15 chars)") if gst_percent > 0 else ""
             shipping_cost = st.number_input("🚚 Courier / Packing Charge (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
+            
             amount_paid = st.number_input("💸 Amount Paid Now (₹)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
 
         st.markdown("---")
         payment_mode = st.radio("💳 Choose Payment Mode for this Order:", ["💵 Cash on delivery", "📱 Pay Online  (UPI)"], horizontal=True)
-        submit_billing = st.form_submit_button("✅ Order now")
 
-    st.session_state.global_js_commands.append("""
+        submit_billing = st.form_submit_button("✅   Order now")
+
+    mobile_validation_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    
     function applyMobileValidation() {
-        const labels = document.querySelectorAll('label');
-        let mobileInput = null; let formContainer = null;
+        const labels = parentDoc.querySelectorAll('label');
+        let mobileInput = null;
+        let formContainer = null;
+        
         labels.forEach(label => {
             if (label.innerText.includes('Mobile Number')) {
                 const container = label.closest('div[data-testid="stTextInput"]');
-                if (container) { mobileInput = container.querySelector('input'); formContainer = label.closest('div[data-testid="stForm"]'); }
-            }
-        });
-        if (mobileInput && formContainer) {
-            let submitBtn = formContainer.querySelector('button[data-testid="baseButton-formSubmit"]');
-            function checkValid() {
-                const val = mobileInput.value.trim(); const isValid = /^\\d{10}$/.test(val); 
-                if (!isValid) {
-                    mobileInput.style.border = '2px solid #ff4b4b'; mobileInput.style.backgroundColor = '#fff0f0';
-                    if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.4'; submitBtn.style.pointerEvents = 'none'; }
-                } else {
-                    mobileInput.style.border = '2px solid #28a745'; mobileInput.style.backgroundColor = 'white';
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; submitBtn.style.pointerEvents = 'auto'; }
+                if (container) {
+                    mobileInput = container.querySelector('input');
+                    formContainer = label.closest('div[data-testid="stForm"]');
                 }
             }
-            if (!mobileInput.dataset.valAttached) { mobileInput.addEventListener('input', checkValid); mobileInput.dataset.valAttached = 'true'; }
+        });
+
+        if (mobileInput && formContainer) {
+            let submitBtn = formContainer.querySelector('button[data-testid="baseButton-formSubmit"]');
+            if (!submitBtn) {
+                const buttons = formContainer.querySelectorAll('button');
+                buttons.forEach(b => {
+                    if (b.innerText.includes('Prepare Bill') || b.innerText.includes('Order now')) {
+                        submitBtn = b;
+                    }
+                });
+            }
+            
+            function checkValid() {
+                const val = mobileInput.value.trim();
+                const isValid = /^\\d{10}$/.test(val); 
+                
+                if (!isValid) {
+                    mobileInput.style.border = '2px solid #ff4b4b'; 
+                    mobileInput.style.backgroundColor = '#fff0f0';
+                    mobileInput.style.color = '#000000'; 
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.4';
+                        submitBtn.style.pointerEvents = 'none'; 
+                    }
+                } else {
+                    mobileInput.style.border = '2px solid #28a745'; 
+                    mobileInput.style.backgroundColor = 'white';
+                    mobileInput.style.color = '#000000'; 
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '1';
+                        submitBtn.style.pointerEvents = 'auto'; 
+                    }
+                }
+            }
+            
+            if (!mobileInput.dataset.valAttached) {
+                mobileInput.addEventListener('input', checkValid);
+                mobileInput.dataset.valAttached = 'true';
+            }
             checkValid();
         }
     }
+    
     setTimeout(applyMobileValidation, 1000);
-    """)
+    </script>
+    """
+    st_components.html(mobile_validation_js, height=0, width=0)
 
     if submit_billing:
         is_valid = True
+        
         if not cust_mobile or not cust_mobile.strip().isdigit() or len(cust_mobile.strip()) != 10:
             st.error("⚠️ Please enter a valid 10-digit mobile number.")
             is_valid = False
@@ -1767,15 +2076,23 @@ if st.session_state.cart:
             safe_mobile = cust_mobile.strip()
             safe_address = cust_address.strip().replace("'", "").replace('"', '').replace('\n', ' ')
             
-            st.session_state.global_js_commands.append(f"""
-            let book = JSON.parse(window.localStorage.getItem('oura_address_book') || '[]');
-            let newEntry = {{ name: '{safe_name}', mobile: '{safe_mobile}', address: '{safe_address}' }};
+            save_addr_js = f"""
+            <script>
+            let book = JSON.parse(window.parent.localStorage.getItem('oura_address_book') || '[]');
+            let newEntry = {{
+                name: '{safe_name}',
+                mobile: '{safe_mobile}',
+                address: '{safe_address}'
+            }};
             let exists = book.some(a => a.mobile === newEntry.mobile && a.address === newEntry.address);
             if(!exists && newEntry.mobile && newEntry.address) {{
-                book.unshift(newEntry); if(book.length > 4) book.pop(); 
-                window.localStorage.setItem('oura_address_book', JSON.stringify(book));
+                book.unshift(newEntry);
+                if(book.length > 4) book.pop();
+                window.parent.localStorage.setItem('oura_address_book', JSON.stringify(book));
             }}
-            """)
+            </script>
+            """
+            st_components.html(save_addr_js, height=0, width=0)
             
             if st.session_state.cart:
                 auto_last_balance = 0.0
@@ -1784,7 +2101,8 @@ if st.session_state.cart:
                 if safe_name_db:
                     try:
                         docs = db.collection('ledgers').document(safe_name_db).collection('transactions').stream()
-                        t_bill = 0; t_adv = 0
+                        t_bill = 0
+                        t_adv = 0
                         for doc in docs:
                             d = doc.to_dict()
                             if d.get("Type") == "Bill": t_bill += d.get("Amount", 0)
@@ -1798,13 +2116,21 @@ if st.session_state.cart:
                     st.session_state.cart_total_savings
                 )
                 
-                safe_file_name = re.sub(r'[\\/*?:"<>|]', "", safe_name_db).replace(' ', '_') if safe_name_db else 'Cash'
+                if safe_name_db:
+                    safe_file_name = re.sub(r'[\\/*?:"<>|]', "", safe_name_db).replace(' ', '_')
+                else:
+                    safe_file_name = 'Cash'
+                    
                 date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
                 st.session_state.ready_filename = f"OURA_Bill_{safe_file_name}_{date_str}.pdf"
                 st.session_state.ready_pdf = pdf_bytes
 
+                if not os.path.exists(INVOICE_FOLDER):
+                    os.makedirs(INVOICE_FOLDER)
+
                 pdf_path = f"{INVOICE_FOLDER}/{st.session_state.ready_filename}"
-                with open(pdf_path, "wb") as f: f.write(pdf_bytes)
+                with open(pdf_path, "wb") as f:
+                    f.write(pdf_bytes)
 
                 item_details_list = []
                 whatsapp_items_text = ""
@@ -1812,9 +2138,12 @@ if st.session_state.cart:
                 idx = 1
                 for k, item in st.session_state.cart.items():
                     item_unit = item.get('unit', 'Pcs')
-                    orig_p = item['price']; d_pct = item.get('discount_pct', 0.0)
+                    
+                    orig_p = item['price']
+                    d_pct = item.get('discount_pct', 0.0)
                     net_p = orig_p - (orig_p * d_pct / 100)
                     sub_amt = item['qty'] * net_p
+                    
                     offer_txt = f" (Discount: {d_pct}%)" if d_pct > 0 else ""
                     
                     item_details_list.append(f"{item['name']} ({item['qty']} {item_unit})")
@@ -1833,26 +2162,55 @@ if st.session_state.cart:
                     batch.set(parent_ref, {"active": True}, merge=True)
                     ledger_ref = parent_ref.collection('transactions')
                     
-                    bill_entry = {"Date": bill_date.strftime("%Y-%m-%d"), "Type": "Bill", "Amount": current_bill_total, "Note": full_item_details, "Timestamp": firestore.SERVER_TIMESTAMP}
+                    bill_entry = {
+                        "Date": bill_date.strftime("%Y-%m-%d"),
+                        "Type": "Bill", 
+                        "Amount": current_bill_total, 
+                        "Note": full_item_details,
+                        "Timestamp": firestore.SERVER_TIMESTAMP
+                    }
                     batch.set(ledger_ref.document(), bill_entry)
                     
                     if amount_paid > 0:
-                        adv_entry = {"Date": bill_date.strftime("%Y-%m-%d"), "Type": "Advance", "Amount": amount_paid, "Note": "Cash/Online paid with bill", "Timestamp": firestore.SERVER_TIMESTAMP}
+                        adv_entry = {
+                            "Date": bill_date.strftime("%Y-%m-%d"),
+                            "Type": "Advance", 
+                            "Amount": amount_paid, 
+                            "Note": "Cash/Online paid with bill",
+                            "Timestamp": firestore.SERVER_TIMESTAMP
+                        }
                         batch.set(ledger_ref.document(), adv_entry)
+                    
                     batch.commit()
                     load_ledger_data.clear()
 
-                msg = f"🛍️ *OURA - NEW ORDER RECEIVED* 🛍️\n------------------------------------\n"
-                msg += f"👤 *Customer:* {cust_name if cust_name else 'Walk-in Customer'}\n📞 *Mobile:* {cust_mobile if cust_mobile else 'N/A'}\n"
-                if cust_address: msg += f"📍 *Address:* {cust_address}\n"
-                msg += f"------------------------------------\n📦 *Ordered Items:*\n\n{whatsapp_items_text}------------------------------------\n"
-                if st.session_state.cart_total_savings > 0: msg += f"🎉 *TOTAL SAVINGS:* ₹{st.session_state.cart_total_savings:.2f}\n------------------------------------\n"
-                if shipping_cost > 0: msg += f"🚚 *Courier Charge:* ₹{shipping_cost:.2f}\n"
-                if gst_percent > 0: msg += f"📊 *GST ({gst_percent}%):* ₹{gst_amt:.2f}\n"
+                msg = f"🛍️ *OURA  - NEW ORDER RECEIVED* 🛍️\n"
+                msg += f"------------------------------------\n"
+                msg += f"👤 *Customer:* {cust_name if cust_name else 'Walk-in Customer'}\n"
+                msg += f"📞 *Mobile:* {cust_mobile if cust_mobile else 'N/A'}\n"
+                if cust_address:
+                    msg += f"📍 *Address:* {cust_address}\n"
+                msg += f"------------------------------------\n"
+                msg += f"📦 *Ordered Items:*\n\n{whatsapp_items_text}"
+                msg += f"------------------------------------\n"
+                if st.session_state.cart_total_savings > 0:
+                    msg += f"🎉 *TOTAL SAVINGS:* ₹{st.session_state.cart_total_savings:.2f}\n"
+                    msg += f"------------------------------------\n"
+                    
+                if shipping_cost > 0:
+                    msg += f"🚚 *Courier Charge:* ₹{shipping_cost:.2f}\n"
+                if gst_percent > 0:
+                    msg += f"📊 *GST ({gst_percent}%):* ₹{gst_amt:.2f}\n"
                 msg += f"💰 *Total Bill Amount:* ₹{current_bill_total:.2f}\n"
-                if amount_paid > 0: msg += f"\n✅ *Amount Paid Now:* ₹{amount_paid:.2f} 💸\n🔴 *Net Balance Due:* ₹{current_bill_total - amount_paid:.2f}\n"
-                else: msg += f"\n❌ *No Advance Payment Received.* (₹0.00)\n"
-                msg += f"------------------------------------\n📱 *Date:* {bill_date.strftime('%d-%m-%Y')}\n"
+                
+                if amount_paid > 0:
+                    msg += f"\n✅ *Amount Paid Now:* ₹{amount_paid:.2f} 💸\n"
+                    msg += f"🔴 *Net Balance Due:* ₹{current_bill_total - amount_paid:.2f}\n"
+                else:
+                    msg += f"\n❌ *No Advance Payment Received.* (₹0.00)\n"
+                
+                msg += f"------------------------------------\n"
+                msg += f"📱 *Date:* {bill_date.strftime('%d-%m-%Y')}\n"
                 
                 st.session_state.ready_msg_for_admin = msg
                 st.session_state.ready_bill_total = current_bill_total
@@ -1860,12 +2218,15 @@ if st.session_state.cart:
 
                 tg_token = current_config.get("telegram_token", "")
                 tg_chat = current_config.get("telegram_chat_id", "")
-                if tg_token and tg_chat: send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
+                if tg_token and tg_chat:
+                    send_telegram_alert(tg_token, tg_chat, st.session_state.ready_msg_for_admin, pdf_bytes, st.session_state.ready_filename)
+
                 st.balloons()
 
     if 'ready_pdf' in st.session_state:
         st.markdown("---")
-        st.success(f"🎉 **Order Confirmed!** Your total bill **₹{st.session_state.get('ready_bill_total', 0):.2f}**")
+        st.success(f"🎉 **Order Confirmed!** Your total bill  **₹{st.session_state.get('ready_bill_total', 0):.2f}** ")
+
         if "Online" in st.session_state.get('selected_payment_mode', ''):
             available_upis = {}
             if current_config.get("phonepe_upi"): available_upis["PhonePe"] = current_config["phonepe_upi"]
@@ -1877,26 +2238,59 @@ if st.session_state.cart:
                 first_upi_id = list(available_upis.values())[0]
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
-                st.markdown(f'<a href="{pay_url}" style="display: block; text-align: center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 18px; border-radius: 12px; text-decoration: none; font-size: 20px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f7a71; font-family: sans-serif; margin-top: 15px; margin-bottom: 5px;">🚀 TAP HERE TO PAY VIA UPI APP</a><p style="color: gray; font-size: 14px; text-align: center; font-family: sans-serif;">(Clicking this will directly open GPay, PhonePe, or Paytm)</p>', unsafe_allow_html=True)
 
-                with st.expander("💻 Paying Scan QR Code"):
+                st.markdown(f"""
+                <a href="{pay_url}" style="
+                    display: block; 
+                    text-align: center; 
+                    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
+                    color: white; 
+                    padding: 18px; 
+                    border-radius: 12px; 
+                    text-decoration: none; 
+                    font-size: 20px; 
+                    font-weight: bold; 
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+                    border: 2px solid #0f7a71; 
+                    font-family: sans-serif;
+                    margin-top: 15px;
+                    margin-bottom: 5px;
+                ">
+                    🚀 TAP HERE TO PAY VIA UPI APP
+                </a>
+                <p style="color: gray; font-size: 14px; text-align: center; font-family: sans-serif;">
+                    (Clicking this will directly open GPay, PhonePe, or Paytm)
+                </p>
+                """, unsafe_allow_html=True)
+
+                with st.expander("💻 Paying  Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
                     for idx, (name, upi_id) in enumerate(available_upis.items()):
                         with qr_tabs[idx]:
                             qr_data = f"upi://pay?pa={upi_id}&pn=Oura_Products&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
                             st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}", width=200)
-                            st.info(f"**{name} UPI ID:** `{upi_id}`")
-            else: st.warning("⚠️ No UPI IDs configured by Admin.")
-        else: st.info("💵 You selected **Cash on delivery**. Your order has been placed successfully!")
+                            st.success(f"**{name} UPI ID:** `{upi_id}`")
+            else:
+                st.warning("⚠️ No UPI IDs configured by Admin.")
+                    
+        else:
+            st.info("💵 You selected **Cash on delivery**. Your order has been placed successfully!")
 
         if st.session_state.get('admin_logged_in') or st.session_state.get('seller_logged_in'):
             st.markdown("---")
             st.markdown("### 📥 Download Your Bill (Admin / Seller Only)")
-            st.download_button(label="📄 Download Professional PDF Bill", data=st.session_state.ready_pdf, file_name=st.session_state.ready_filename, mime="application/pdf", use_container_width=True)
+            st.download_button(
+                label="📄 Download Professional PDF Bill",
+                data=st.session_state.ready_pdf,
+                file_name=st.session_state.ready_filename,
+                mime="application/pdf",
+                use_container_width=True
+            )
 
         st.markdown("---")
         with st.expander("🎧 Customer Support"):
-            st.markdown(f"**📞 Phone / WhatsApp:** +91 9891587437\n**📧 Email:** Shalabh.jain.sj@gmail.com")
+            st.markdown(f"**📞 Phone / WhatsApp:** +91 9891587437")
+            st.markdown(f"**📧 Email:** Shalabh.jain.sj@gmail.com")
 
     if st.button("🗑️ Empty Basket"):
         st.session_state.cart = {}
@@ -1907,37 +2301,90 @@ if st.session_state.cart:
 
 if len(st.session_state.cart) > 0:
     unique_items_count = len(st.session_state.cart)
-    st.session_state.global_js_commands.append(f"""
-    let existingWidget = document.getElementById('oura-basket-widget');
-    if (existingWidget) existingWidget.remove();
-    const widgetDiv = document.createElement('div');
-    widgetDiv.id = 'oura-basket-widget';
-    widgetDiv.innerHTML = `<div id="basket-float-btn"><span class="cart-badge">{unique_items_count}</span><img src="https://img.icons8.com/ios-filled/50/000000/shopping-cart.png" alt="Cart"/></div>`;
-    document.body.appendChild(widgetDiv);
-    document.getElementById('basket-float-btn').addEventListener('click', function() {{
-        const target = document.getElementById('cart-section-anchor');
-        if(target) target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-        else window.scrollTo({{ top: document.body.scrollHeight, behavior: 'smooth' }});
-    }});
-    """)
-else:
-    st.session_state.global_js_commands.append("let existingWidget = document.getElementById('oura-basket-widget'); if (existingWidget) existingWidget.remove();")
-
-# --- CONSOLIDATED GLOBAL JAVASCRIPT INJECTION ---
-# This runs ONCE at the end of the script instead of 7 different iframes throughout.
-# It makes Streamlit significantly faster and removes UI lag.
-if st.session_state.global_js_commands:
-    combined_js = "\n".join(st.session_state.global_js_commands)
-    final_js_html = f"""
+    
+    basket_js = f"""
     <script>
-    (function() {{
-        const pDoc = window.parent.document;
-        // Inject script securely into the parent Streamlit window
-        let script = pDoc.createElement('script');
-        script.type = 'text/javascript';
-        script.innerHTML = `{combined_js}`;
-        pDoc.body.appendChild(script);
-    }})();
+    const parentDoc = window.parent.document;
+    
+    let existingWidget = parentDoc.getElementById('oura-basket-widget');
+    if (existingWidget) {{
+        existingWidget.remove();
+    }}
+
+    const widgetDiv = parentDoc.createElement('div');
+    widgetDiv.id = 'oura-basket-widget';
+    widgetDiv.innerHTML = `
+    <style>
+    #basket-float-btn {{
+        position: fixed; 
+        bottom: 130px; 
+        right: 20px; 
+        z-index: 9999999;
+        width: 65px; 
+        height: 65px; 
+        background-color: #2b6cb0; 
+        border-radius: 50%; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        cursor: pointer;
+        transition: transform 0.2s, background-color 0.2s;
+    }}
+    #basket-float-btn:hover {{
+        transform: scale(1.05);
+        background-color: #1a4a79;
+    }}
+    #basket-float-btn img {{
+        width: 35px;
+        height: 35px;
+        filter: brightness(0) invert(1);
+    }}
+    .cart-badge {{
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        background-color: #e53e3e; 
+        color: white;
+        border-radius: 50%;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 14px;
+        font-weight: bold;
+        border: 2px solid white;
+        font-family: sans-serif;
+    }}
+    </style>
+    
+    <div id="basket-float-btn">
+        <span class="cart-badge">{unique_items_count}</span>
+        <img src="https://img.icons8.com/ios-filled/50/000000/shopping-cart.png" alt="Cart"/>
+    </div>
+    `;
+    parentDoc.body.appendChild(widgetDiv);
+
+    parentDoc.getElementById('basket-float-btn').addEventListener('click', function() {{
+        const target = parentDoc.getElementById('cart-section-anchor');
+        if(target) {{
+            target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+        }} else {{
+            window.parent.scrollTo({{ top: parentDoc.body.scrollHeight, behavior: 'smooth' }});
+        }}
+    }});
     </script>
     """
-    st_components.html(final_js_html, height=0, width=0)
+    st_components.html(basket_js, height=0, width=0)
+else:
+    remove_js = """
+    <script>
+    const parentDoc = window.parent.document;
+    let existingWidget = parentDoc.getElementById('oura-basket-widget');
+    if (existingWidget) {
+        existingWidget.remove();
+    }
+    </script>
+    """
+    st_components.html(remove_js, height=0, width=0)
