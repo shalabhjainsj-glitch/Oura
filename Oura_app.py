@@ -416,7 +416,6 @@ hide_streamlit_style = """
                 border: 1px solid #ffcc00; letter-spacing: 0.5px;
             }
 
-            /* Custom Grid active state */
             .cat-card:active {
                 transform: scale(0.92) !important;
                 background-color: #f7fafc !important;
@@ -1824,12 +1823,15 @@ if st.session_state.cart:
     const parentDoc = window.parent.document;
 
     function triggerReactChange(el, value) {
-        let setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, "value")?.set;
-        if (!setter && el.tagName === 'TEXTAREA') setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-        if (!setter && el.tagName === 'INPUT') setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-
-        if (setter) {
-            setter.call(el, value);
+        let nativeSetter;
+        if (el.tagName === 'INPUT') {
+            nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        } else if (el.tagName === 'TEXTAREA') {
+            nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+        }
+        
+        if (nativeSetter) {
+            nativeSetter.call(el, value);
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -1891,7 +1893,8 @@ if st.session_state.cart:
         });
 
         // Scroll gracefully to the form input
-        inputs[0].scrollIntoView({behavior: "smooth", block: "center"});
+        const targetInput = Array.from(inputs).find(el => el.getAttribute('aria-label') && el.getAttribute('aria-label').includes('Your Name'));
+        if (targetInput) targetInput.scrollIntoView({behavior: "smooth", block: "center"});
     };
 
     window.parent.deleteSavedAddress = function(event, idx) {
@@ -1924,10 +1927,15 @@ if st.session_state.cart:
             const pDoc = window.parent.document;
 
             function triggerReactChangeLoc(el, value) {
-                let setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, "value")?.set;
-                if (!setter && el.tagName === 'TEXTAREA') setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                if (setter) {
-                    setter.call(el, value);
+                let nativeSetter;
+                if (el.tagName === 'INPUT') {
+                    nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                } else if (el.tagName === 'TEXTAREA') {
+                    nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                }
+                
+                if (nativeSetter) {
+                    nativeSetter.call(el, value);
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
@@ -2249,17 +2257,9 @@ if st.session_state.cart:
                 merchant_name = urllib.parse.quote("Oura Products")
                 pay_url = f"upi://pay?pa={first_upi_id}&pn={merchant_name}&am={st.session_state.get('ready_bill_total', 0):.2f}&cu=INR"
 
-                upi_button_html = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                <style>
-                @keyframes pulse {{
-                    0% {{ transform: scale(1); }}
-                    50% {{ transform: scale(1.02); }}
-                    100% {{ transform: scale(1); }}
-                }}
-                .upi-btn {{
+                # FIXED UPI BUTTON
+                st.markdown(f"""
+                <a href="{pay_url}" style="
                     display: block; 
                     text-align: center; 
                     background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
@@ -2271,22 +2271,16 @@ if st.session_state.cart:
                     font-weight: bold; 
                     box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
                     border: 2px solid #0f7a71; 
-                    animation: pulse 1.5s infinite;
                     font-family: sans-serif;
-                }}
-                </style>
-                </head>
-                <body style="margin:0; text-align:center;">
-                    <a href="{pay_url}" target="_top" class="upi-btn">
-                        🚀 TAP HERE TO PAY VIA UPI APP
-                    </a>
-                    <p style="color: gray; font-size: 14px; margin-top: 10px; font-family: sans-serif;">
-                        (Clicking this will directly open GPay, PhonePe, or Paytm)
-                    </p>
-                </body>
-                </html>
-                """
-                st_components.html(upi_button_html, height=130)
+                    margin-top: 15px;
+                    margin-bottom: 5px;
+                ">
+                    🚀 TAP HERE TO PAY VIA UPI APP
+                </a>
+                <p style="color: gray; font-size: 14px; text-align: center; font-family: sans-serif;">
+                    (Clicking this will directly open GPay, PhonePe, or Paytm)
+                </p>
+                """, unsafe_allow_html=True)
 
                 with st.expander("💻 Paying  Scan QR Code"):
                     qr_tabs = st.tabs(list(available_upis.keys()))
