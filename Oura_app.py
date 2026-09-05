@@ -423,27 +423,47 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- GLOBAL JS FOR COLOR CLICK SYSTEM ---
+# --- GLOBAL JS FOR COLOR CLICK SYSTEM & HIDING RADIO BUTTONS ---
 color_js = """
 <script>
 const parentDoc = window.parent.document;
-if (!window.parent.ouraUpdateColor) {
+if (!window.parent.ouraColorConfigured) {
+    window.parent.ouraColorConfigured = true;
+    
+    // Function to click the hidden radio option when image is tapped
     window.parent.ouraUpdateColor = function(prefix, colorName) {
         const labels = parentDoc.querySelectorAll('label');
         labels.forEach(lbl => {
-            if (lbl.innerText.includes('Color_Radio_' + prefix)) {
+            if (lbl.innerText.includes('CRADIO_' + prefix)) {
                 const container = lbl.closest('div[data-testid="stRadio"]');
                 if (container) {
                     const options = container.querySelectorAll('label[data-baseweb="radio"]');
                     options.forEach(opt => {
                         if (opt.innerText.trim() === colorName) {
-                            opt.click(); // This updates the Streamlit python variable super fast
+                            opt.click();
                         }
                     });
                 }
             }
         });
     };
+
+    // Auto-Hide Function: Finds Streamlit radio buttons starting with CRADIO_ and hides them completely
+    function hideColorRadios() {
+        const labels = parentDoc.querySelectorAll('label');
+        labels.forEach(lbl => {
+            if (lbl.innerText.includes('CRADIO_')) {
+                const container = lbl.closest('div[data-testid="stElementContainer"]');
+                if (container && container.style.display !== 'none') {
+                    container.style.display = 'none';
+                    container.style.height = '0px';
+                    container.style.margin = '0px';
+                    container.style.padding = '0px';
+                }
+            }
+        });
+    }
+    setInterval(hideColorRadios, 100); // Runs quickly to keep them hidden
 }
 </script>
 """
@@ -1388,7 +1408,6 @@ def show_product_card(row, idx, prefix):
             main_img_idx = color_options.index(selected_color) if selected_color in color_options else 0
             main_img_url = resolved_paths[main_img_idx] if main_img_idx < len(resolved_paths) else (resolved_paths[0] if resolved_paths else "")
             
-            # Show Main Image based on selected color
             if main_img_url:
                 img_style = "" if is_in_stock else "filter: grayscale(100%) opacity(60%);"
                 st.markdown(f"""
@@ -1397,11 +1416,10 @@ def show_product_card(row, idx, prefix):
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Interactive Color Boxes (Up to 5) - PURE HTML/CSS FOR SMALL BOXES
             st.markdown("<div style='font-size:13px; font-weight:bold; margin-top:5px; margin-bottom:5px; color:#2d3748;'>🎨 Select Color:</div>", unsafe_allow_html=True)
             
             num_colors = min(len(color_options), 5)
-            html_boxes = '<div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 10px;">'
+            html_boxes = "<div style='display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 0px;'>"
             
             for i in range(num_colors):
                 c_name = color_options[i]
@@ -1409,29 +1427,21 @@ def show_product_card(row, idx, prefix):
                 border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
                 bg = "#ebf8ff" if c_name == selected_color else "#ffffff"
                 
-                # HTML Small Box (Very fast, no heavy Streamlit buttons)
-                html_boxes += f'''
-                <div onclick="window.parent.ouraUpdateColor('{prefix_idx}', '{c_name}')" 
-                     style="cursor: pointer; border: {border}; background: {bg}; border-radius: 8px; padding: 4px; text-align: center; min-width: 60px; max-width: 60px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                '''
+                # HTML Small Box (Single line to prevent Streamlit text parsing issues)
+                html_boxes += f"<div onclick=\"window.parent.ouraUpdateColor('{prefix_idx}', '{c_name}')\" style=\"cursor: pointer; border: {border}; background: {bg}; border-radius: 8px; padding: 4px; text-align: center; min-width: 60px; max-width: 60px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);\">"
                 if img_src:
-                    html_boxes += f'<img src="{img_src}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"/>'
+                    html_boxes += f"<img src=\"{img_src}\" style=\"width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;\"/>"
                 else:
-                    html_boxes += f'<div style="width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;"></div>'
-                    
-                html_boxes += f'''
-                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{c_name}</div>
-                </div>
-                '''
-            html_boxes += '</div>'
+                    html_boxes += f"<div style=\"width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;\"></div>"
+                html_boxes += f"<div style=\"font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">{c_name}</div></div>"
+                
+            html_boxes += "</div>"
             st.markdown(html_boxes, unsafe_allow_html=True)
             
-            # Hidden Streamlit Radio (Javascript clicks this internally)
-            st.markdown(f'<div style="height:0px; overflow:hidden; opacity:0; margin:0; padding:0;">', unsafe_allow_html=True)
-            st.radio(f"Color_Radio_{prefix_idx}", color_options, key=state_col_key, label_visibility="collapsed")
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Streamlit Radio will be automatically hidden by the global JS above
+            st.radio(f"CRADIO_{prefix_idx}", color_options, key=state_col_key, label_visibility="visible")
+            
         else:
-            # Show swipe gallery for products without colors
             all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
         # ---------------------------------------------
         
