@@ -350,28 +350,12 @@ app_icon_url = current_config.get("logo_url", "🛍️") if current_config.get("
 
 st.set_page_config(page_title="Oura ", page_icon=app_icon_url, layout="wide")
 
-# --- PURE CSS TO HIDE RADIOS AND STYLE APP ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             header {visibility: hidden;}
             footer {visibility: hidden;}
             div[data-testid="stDecoration"] {visibility: hidden; height: 0%; display: none;}
-            
-            /* PURE CSS TO HIDE COLOR RADIO BUTTONS FOREVER */
-            div[aria-label^="COLOR_SELECT_"] {
-                opacity: 0 !important;
-                position: absolute !important;
-                left: -9999px !important;
-                height: 0px !important;
-                overflow: hidden !important;
-            }
-
-            .color-scroll-container {
-                display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 5px;
-                -webkit-overflow-scrolling: touch; scrollbar-width: none;
-            }
-            .color-scroll-container::-webkit-scrollbar { display: none; }
             
             div.stButton > button {
                 background-color: #2b6cb0;
@@ -400,6 +384,16 @@ hide_streamlit_style = """
                 border-color: #cbd5e0 !important;
             }
 
+            div[data-testid="stExpander"] {
+                background-color: #ffffff;
+                border-radius: 8px;
+                border-left: 4px solid #2b6cb0 !important;
+                border-top: 1px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
+                border-bottom: 1px solid #e2e8f0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+
             .swipe-gallery {
                 display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 5px;
                 -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -419,6 +413,11 @@ hide_streamlit_style = """
                 animation: shine 2.5s linear infinite;
                 text-align: center; margin-bottom: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
                 border: 1px solid #ffcc00; letter-spacing: 0.5px;
+            }
+
+            .cat-card:active {
+                transform: scale(0.92) !important;
+                background-color: #f7fafc !important;
             }
             </style>
             """
@@ -1264,7 +1263,7 @@ def show_swipe_gallery(path_str, is_in_stock=True, wa_link="", first_img_link=""
         html_code += f'<a href="{src}" target="_blank"><img src="{src}" class="swipe-img" style="{img_style}" loading="lazy" alt="Product Image"></a>'
     
     html_code += '</div></div>'
-    html_code += '<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">Click photo to zoom 🔍</div>'
+    html_code += '<div style="text-align:center; font-size:12px; color:gray; margin-top:-5px; margin-bottom:10px;">👆 Click photo to zoom | Swipe to see more ➡️</div>'
     st.markdown(html_code, unsafe_allow_html=True)
     return paths
 
@@ -1275,16 +1274,9 @@ def show_product_card(row, idx, prefix):
     # --- SIZE & COLOR DATA LOGIC ---
     sizes_str = str(row.get("Sizes", "")).strip()
     size_options = [s.strip() for s in sizes_str.split(",") if s.strip()]
-    selected_size = ""
     
     colors_str = str(row.get("Colors", "")).strip()
     color_options = [c.strip() for c in colors_str.split(",") if c.strip()]
-    
-    state_col_key = f"sel_color_{prefix_idx}"
-    if color_options and state_col_key not in st.session_state:
-        st.session_state[state_col_key] = color_options[0]
-        
-    selected_color = st.session_state.get(state_col_key, "")
     # ---------------------------------
 
     disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
@@ -1357,65 +1349,9 @@ def show_product_card(row, idx, prefix):
         if disc_pct > 0:
             st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
-        # --- NEW MAIN IMAGE & FAST COLOR SELECTOR (5 SMALL BOXES) ---
-        if color_options and len(color_options) > 0:
-            main_img_idx = color_options.index(selected_color) if selected_color in color_options else 0
-            main_img_url = resolved_paths[main_img_idx] if main_img_idx < len(resolved_paths) else (resolved_paths[0] if resolved_paths else "")
-            
-            if main_img_url:
-                img_style = "" if is_in_stock else "filter: grayscale(100%) opacity(60%);"
-                st.markdown(f"""
-                <div style="position: relative; margin-bottom: 5px;">
-                    <img src="{main_img_url}" style="width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s ease; {img_style}">
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("<div style='font-size:13px; font-weight:bold; margin-top:5px; margin-bottom:5px; color:#2d3748;'>🎨 Select Color:</div>", unsafe_allow_html=True)
-            
-            num_colors = min(len(color_options), 5)
-            
-            html_boxes = '<div class="color-scroll-container">'
-            
-            for i in range(num_colors):
-                c_name = color_options[i]
-                c_safe = c_name.replace("'", "\\'")
-                img_src = resolved_paths[i] if i < len(resolved_paths) else ""
-                border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
-                bg = "#ebf8ff" if c_name == selected_color else "#ffffff"
-                
-                # --- PURE INLINE JS : NO IFRAMES, NO BLOCKS ---
-                click_js = f"""
-                const group = document.querySelector('div[aria-label=\\'COLOR_SELECT_{prefix_idx}\\']');
-                if(group) {{
-                    const opts = group.querySelectorAll('label[data-baseweb=\\'radio\\']');
-                    for(let j=0; j<opts.length; j++) {{
-                        if(opts[j].innerText.trim() === '{c_safe}') {{
-                            opts[j].click();
-                            break;
-                        }}
-                    }}
-                }}
-                """
-                
-                html_boxes += f"""
-                <div onclick="{click_js}" style="cursor: pointer; border: {border}; background: {bg}; border-radius: 8px; padding: 4px; text-align: center; min-width: 60px; max-width: 60px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.1s;">
-                """
-                if img_src:
-                    html_boxes += f'<img src="{img_src}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"/>'
-                else:
-                    html_boxes += f'<div style="width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;"></div>'
-                    
-                html_boxes += f'<div style="font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{c_name}</div></div>'
-
-            html_boxes += '</div>'
-            st.markdown(html_boxes, unsafe_allow_html=True)
-            
-            # HIDDEN RADIO BUTTON FOR STREAMLIT TO CATCH THE SELECTION
-            st.radio(f"COLOR_SELECT_{prefix_idx}", color_options, key=state_col_key, label_visibility="collapsed")
-            
-        else:
-            all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
-        # ---------------------------------------------
+        # --- ORIGINAL SWIPE GALLERY (RELIABLE & WORKS EVERYWHERE) ---
+        all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
+        # ------------------------------------------------------------
         
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
@@ -1505,10 +1441,19 @@ def show_product_card(row, idx, prefix):
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
                 
-                if size_options:
+                # --- NATIVE SIZE & COLOR SELECTORS (WILL NEVER FAIL ON MOBILE) ---
+                selected_size = ""
+                selected_color = ""
+
+                if size_options and color_options:
+                    c_sz, c_cl = st.columns(2)
+                    with c_sz: selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
+                    with c_cl: selected_color = st.selectbox("🎨 Select Color:", color_options, key=f"cl_{prefix_idx}")
+                elif size_options:
                     selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
-                else:
-                    selected_size = ""
+                elif color_options:
+                    selected_color = st.selectbox("🎨 Select Color:", color_options, key=f"cl_{prefix_idx}")
+                # ------------------------------------------------------------------
                 
                 qty = st.number_input(f"Quantity ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
@@ -1524,8 +1469,14 @@ def show_product_card(row, idx, prefix):
                         if selected_color: final_nm += f" (Color: {selected_color})"
                         if buy_type in ["Online", "Cash"]: final_nm += f" ({buy_type})"
                             
-                        # Get main image url to display in cart correctly based on chosen color
-                        final_img = main_img_url if (color_options and main_img_url) else img_link_for_wa
+                        # Automatically fetch the correct image URL if they selected a color
+                        main_img_url = ""
+                        if color_options and selected_color in color_options:
+                            c_idx = color_options.index(selected_color)
+                            if c_idx < len(resolved_paths):
+                                main_img_url = resolved_paths[c_idx]
+
+                        final_img = main_img_url if main_img_url else img_link_for_wa
                             
                         st.session_state.cart[cart_key] = {
                             "name": final_nm, 
