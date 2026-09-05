@@ -423,41 +423,17 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- GLOBAL JS FOR COLOR CLICK SYSTEM & HIDING RADIO BUTTONS (FIXED DISPLAY ISSUE) ---
+# --- GLOBAL JS TO AUTO-HIDE THE RADIO BUTTONS ---
 color_js = """
 <script>
-const parentDoc = window.parent.document;
-if (!window.parent.ouraColorConfigured) {
-    window.parent.ouraColorConfigured = true;
-    
-    // Function to click the hidden radio option when image is tapped
-    window.parent.ouraUpdateColor = function(prefix, colorName) {
-        const labels = parentDoc.querySelectorAll('label');
-        for (let i = 0; i < labels.length; i++) {
-            if (labels[i].textContent.includes('CRADIO_' + prefix)) {
-                const container = labels[i].closest('div[data-testid="stRadio"]');
-                if (container) {
-                    const options = container.querySelectorAll('label[data-baseweb="radio"]');
-                    for (let j = 0; j < options.length; j++) {
-                        if (options[j].textContent.trim() === colorName.trim()) {
-                            options[j].click(); // Triggers the Streamlit variable update instantly
-                            break;
-                        }
-                    }
-                }
-                break;
-            }
-        }
-    };
-
-    // Auto-Hide Function: Finds Streamlit radio buttons and makes them invisible but STILL CLICKABLE
+if (!window.ouraColorConfigured) {
+    window.ouraColorConfigured = true;
     function hideColorRadios() {
-        const labels = parentDoc.querySelectorAll('label');
+        const labels = window.parent.document.querySelectorAll('label');
         labels.forEach(lbl => {
             if (lbl.textContent.includes('CRADIO_')) {
                 const container = lbl.closest('div[data-testid="stElementContainer"]');
                 if (container && container.style.opacity !== '0') {
-                    // CRITICAL FIX: Do not use 'display: none', use opacity and dimensions to keep it clickable!
                     container.style.opacity = '0';
                     container.style.height = '0px';
                     container.style.width = '0px';
@@ -470,7 +446,7 @@ if (!window.parent.ouraColorConfigured) {
             }
         });
     }
-    setInterval(hideColorRadios, 100); 
+    setInterval(hideColorRadios, 50); 
 }
 </script>
 """
@@ -1426,26 +1402,77 @@ def show_product_card(row, idx, prefix):
             st.markdown("<div style='font-size:13px; font-weight:bold; margin-top:5px; margin-bottom:5px; color:#2d3748;'>🎨 Select Color:</div>", unsafe_allow_html=True)
             
             num_colors = min(len(color_options), 5)
-            html_boxes = "<div style='display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 0px;'>"
+            
+            # --- IFRAME GENERATION FOR CLICKABLE BOXES ---
+            html_boxes = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <style>
+            body {{ margin: 0; padding: 0; font-family: sans-serif; background-color: #ffffff; }}
+            .color-box {{
+                cursor: pointer; border-radius: 8px; padding: 4px; text-align: center;
+                min-width: 60px; max-width: 60px; flex-shrink: 0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                transition: transform 0.1s;
+            }}
+            .color-box:active {{ transform: scale(0.95); }}
+            .scroll-container {{
+                display: flex; gap: 8px; overflow-x: auto; padding: 5px;
+                -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            }}
+            .scroll-container::-webkit-scrollbar {{ display: none; }}
+            </style>
+            </head>
+            <body>
+            <div class="scroll-container">
+            """
             
             for i in range(num_colors):
                 c_name = color_options[i]
+                c_safe = c_name.replace("'", "\\'")
                 img_src = resolved_paths[i] if i < len(resolved_paths) else ""
                 border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
                 bg = "#ebf8ff" if c_name == selected_color else "#ffffff"
                 
-                # HTML Small Box (Single line to prevent Streamlit text parsing issues)
-                html_boxes += f"<div onclick=\"window.parent.ouraUpdateColor('{prefix_idx}', '{c_name}')\" style=\"cursor: pointer; border: {border}; background: {bg}; border-radius: 8px; padding: 4px; text-align: center; min-width: 60px; max-width: 60px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);\">"
+                html_boxes += f'<div class="color-box" onclick="selectColor(\'{c_safe}\')" style="border: {border}; background: {bg};">'
                 if img_src:
-                    html_boxes += f"<img src=\"{img_src}\" style=\"width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;\"/>"
+                    html_boxes += f'<img src="{img_src}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"/>'
                 else:
-                    html_boxes += f"<div style=\"width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;\"></div>"
-                html_boxes += f"<div style=\"font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">{c_name}</div></div>"
+                    html_boxes += f'<div style="width: 100%; height: 40px; background: #f0f2f6; border-radius: 4px;"></div>'
+                html_boxes += f'<div style="font-size: 11px; font-weight: bold; margin-top: 4px; color: #1a202c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{c_name}</div></div>'
                 
-            html_boxes += "</div>"
-            st.markdown(html_boxes, unsafe_allow_html=True)
+            html_boxes += f"""
+            </div>
+            <script>
+            function selectColor(colorName) {{
+                const parentDoc = window.parent.document;
+                const labels = parentDoc.querySelectorAll('label');
+                for(let i=0; i<labels.length; i++){{
+                    if(labels[i].textContent.includes('CRADIO_{prefix_idx}')){{
+                        const group = labels[i].closest('div[data-testid="stElementContainer"]');
+                        if(group){{
+                            const opts = group.querySelectorAll('label[data-baseweb="radio"]');
+                            for(let j=0; j<opts.length; j++){{
+                                if(opts[j].textContent.trim() === colorName.trim()){{
+                                    const inp = opts[j].querySelector('input');
+                                    if(inp) inp.click(); else opts[j].click();
+                                    break;
+                                }}
+                            }}
+                        }}
+                        break;
+                    }}
+                }}
+            }}
+            </script>
+            </body>
+            </html>
+            """
+            st_components.html(html_boxes, height=85)
+            # ---------------------------------------------
             
-            # Streamlit Radio will be automatically hidden by the global JS above
+            # HIDDEN RADIO BUTTON FOR STREAMLIT TO CATCH THE SELECTION
             st.radio(f"CRADIO_{prefix_idx}", color_options, key=state_col_key, label_visibility="visible")
             
         else:
