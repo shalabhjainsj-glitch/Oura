@@ -423,7 +423,7 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- GLOBAL JS FOR COLOR CLICK SYSTEM & HIDING RADIO BUTTONS ---
+# --- GLOBAL JS FOR COLOR CLICK SYSTEM & HIDING RADIO BUTTONS (FIXED DISPLAY ISSUE) ---
 color_js = """
 <script>
 const parentDoc = window.parent.document;
@@ -433,37 +433,44 @@ if (!window.parent.ouraColorConfigured) {
     // Function to click the hidden radio option when image is tapped
     window.parent.ouraUpdateColor = function(prefix, colorName) {
         const labels = parentDoc.querySelectorAll('label');
-        labels.forEach(lbl => {
-            if (lbl.innerText.includes('CRADIO_' + prefix)) {
-                const container = lbl.closest('div[data-testid="stRadio"]');
+        for (let i = 0; i < labels.length; i++) {
+            if (labels[i].textContent.includes('CRADIO_' + prefix)) {
+                const container = labels[i].closest('div[data-testid="stRadio"]');
                 if (container) {
                     const options = container.querySelectorAll('label[data-baseweb="radio"]');
-                    options.forEach(opt => {
-                        if (opt.innerText.trim() === colorName) {
-                            opt.click();
+                    for (let j = 0; j < options.length; j++) {
+                        if (options[j].textContent.trim() === colorName.trim()) {
+                            options[j].click(); // Triggers the Streamlit variable update instantly
+                            break;
                         }
-                    });
+                    }
                 }
+                break;
             }
-        });
+        }
     };
 
-    // Auto-Hide Function: Finds Streamlit radio buttons starting with CRADIO_ and hides them completely
+    // Auto-Hide Function: Finds Streamlit radio buttons and makes them invisible but STILL CLICKABLE
     function hideColorRadios() {
         const labels = parentDoc.querySelectorAll('label');
         labels.forEach(lbl => {
-            if (lbl.innerText.includes('CRADIO_')) {
+            if (lbl.textContent.includes('CRADIO_')) {
                 const container = lbl.closest('div[data-testid="stElementContainer"]');
-                if (container && container.style.display !== 'none') {
-                    container.style.display = 'none';
+                if (container && container.style.opacity !== '0') {
+                    // CRITICAL FIX: Do not use 'display: none', use opacity and dimensions to keep it clickable!
+                    container.style.opacity = '0';
                     container.style.height = '0px';
+                    container.style.width = '0px';
                     container.style.margin = '0px';
                     container.style.padding = '0px';
+                    container.style.overflow = 'hidden';
+                    container.style.position = 'absolute';
+                    container.style.zIndex = '-9999';
                 }
             }
         });
     }
-    setInterval(hideColorRadios, 100); // Runs quickly to keep them hidden
+    setInterval(hideColorRadios, 100); 
 }
 </script>
 """
