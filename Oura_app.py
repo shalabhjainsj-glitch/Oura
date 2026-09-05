@@ -124,7 +124,6 @@ else:
     if migrated:
         save_config(current_config)
 
-# --- LOAD CATEGORY IMAGES ---
 @st.cache_data(ttl=300, show_spinner=False)
 def load_category_images():
     try:
@@ -416,7 +415,6 @@ hide_streamlit_style = """
                 border: 1px solid #ffcc00; letter-spacing: 0.5px;
             }
 
-            /* Custom Grid active state */
             .cat-card:active {
                 transform: scale(0.92) !important;
                 background-color: #f7fafc !important;
@@ -432,7 +430,6 @@ st.markdown(f"""
 .stApp {{ background-color: {global_bg_color} !important; }}
 </style>
 """, unsafe_allow_html=True)
-# ---------------------------------
 
 if current_config.get("has_logo", False) and app_icon_url != "🛍️":
     pwa_js = f"""
@@ -521,6 +518,10 @@ def toggle_fd_callback(doc_id, key):
     if key in st.session_state:
         db.collection('products').document(doc_id).update({"Free_Delivery": st.session_state[key]})
         load_products.clear()
+        
+# Callback function for Fast Color Update
+def update_color_choice(key, val):
+    st.session_state[key] = val
 
 products_df = load_products()
 
@@ -783,11 +784,11 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 else:
                     final_cat = selected_cat
                 
-                uploaded_imgs = st.file_uploader("Upload Photos (Max 3)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
+                uploaded_imgs = st.file_uploader("Upload Photos (Max 5)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="add_imgs")
                 submit_btn = st.form_submit_button("Save Product")
                 
                 if submit_btn and new_id and new_name and uploaded_imgs and final_cat:
-                    if len(uploaded_imgs) > 3: st.error("⚠️ Please select max 3 photos.")
+                    if len(uploaded_imgs) > 5: st.error("⚠️ Please select max 5 photos.")
                     else:
                         with st.spinner("Saving..."):
                             image_paths = []
@@ -1274,6 +1275,21 @@ def show_product_card(row, idx, prefix):
     prefix_idx = f"{prefix}_{idx}"
     p_id = str(row.get('ID', prefix_idx)) 
 
+    # --- SIZE & COLOR DATA LOGIC ---
+    sizes_str = str(row.get("Sizes", "")).strip()
+    size_options = [s.strip() for s in sizes_str.split(",") if s.strip()]
+    selected_size = ""
+    
+    colors_str = str(row.get("Colors", "")).strip()
+    color_options = [c.strip() for c in colors_str.split(",") if c.strip()]
+    
+    state_col_key = f"sel_color_{prefix_idx}"
+    if color_options and state_col_key not in st.session_state:
+        st.session_state[state_col_key] = color_options[0]
+        
+    selected_color = st.session_state.get(state_col_key, "")
+    # ---------------------------------
+
     disc_pct = safe_float(row.get('Discount_Percent'), 0.0)
     offer_nm = str(row.get('Offer_Name', '')).strip()
 
@@ -1344,7 +1360,44 @@ def show_product_card(row, idx, prefix):
         if disc_pct > 0:
             st.markdown(f'<div class="offer-tag">✨ {offer_nm} : {disc_pct}% OFF! ✨</div>', unsafe_allow_html=True)
             
-        all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
+        # --- NEW MAIN IMAGE & FAST COLOR SELECTOR ---
+        if color_options and len(color_options) > 0:
+            main_img_idx = color_options.index(selected_color) if selected_color in color_options else 0
+            main_img_url = resolved_paths[main_img_idx] if main_img_idx < len(resolved_paths) else (resolved_paths[0] if resolved_paths else "")
+            
+            # Show Main Image based on selected color
+            if main_img_url:
+                img_style = "" if is_in_stock else "filter: grayscale(100%) opacity(60%);"
+                st.markdown(f"""
+                <div style="position: relative; margin-bottom: 5px;">
+                    <img src="{main_img_url}" style="width: 100%; height: 300px; object-fit: contain; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s ease; {img_style}">
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Interactive Color Boxes (Up to 5)
+            st.markdown("<div style='font-size:13px; font-weight:bold; margin-top:5px; margin-bottom:5px; color:#2d3748;'>🎨 Select Color:</div>", unsafe_allow_html=True)
+            num_colors = min(len(color_options), 5)
+            c_cols = st.columns(num_colors)
+            
+            for i in range(num_colors):
+                c_name = color_options[i]
+                with c_cols[i]:
+                    img_src = resolved_paths[i] if i < len(resolved_paths) else ""
+                    if img_src:
+                        border = "2px solid #2b6cb0" if c_name == selected_color else "1px solid #e2e8f0"
+                        st.markdown(f"<img src='{img_src}' style='width:100%; height:50px; object-fit:cover; border-radius:6px; border:{border}; margin-bottom:3px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'/>", unsafe_allow_html=True)
+                    
+                    st.button(
+                        f"{'✅ ' if c_name == selected_color else ''}{c_name[:6]}", 
+                        key=f"btn_c_{prefix_idx}_{i}", 
+                        use_container_width=True,
+                        on_click=update_color_choice,
+                        args=(state_col_key, c_name)
+                    )
+        else:
+            # Show swipe gallery for products without colors
+            all_paths = show_swipe_gallery(image_path_str, is_in_stock, wa_link, img_link_for_wa)
+        # ---------------------------------------------
         
         st.write(f"**{row.get('Name', 'Unknown')}**")
         seller_val = row.get("Seller_Name")
@@ -1369,14 +1422,6 @@ def show_product_card(row, idx, prefix):
         t1_html = get_price_html(t1_price, net_t1, "#d32f2f", "")
         t2_html = get_price_html(t2_price, net_t2, "#d32f2f", "")
         
-        sizes_str = str(row.get("Sizes", "")).strip()
-        size_options = [s.strip() for s in sizes_str.split(",") if s.strip()]
-        selected_size = ""
-        
-        colors_str = str(row.get("Colors", "")).strip()
-        color_options = [c.strip() for c in colors_str.split(",") if c.strip()]
-        selected_color = ""
-
         if retail_price <= 0:
             st.markdown(f"""
             <div style="background-color:#fff3cd; padding:10px; border-radius:8px; border:1px solid #ffeeba; margin-bottom:10px; text-align:center;">
@@ -1447,33 +1492,6 @@ def show_product_card(row, idx, prefix):
                 else:
                     selected_size = ""
                 
-                # --- NEW: VISUAL COLOR PICKER ---
-                selected_color = ""
-                if color_options:
-                    st.markdown("<div style='font-size:14px; font-weight:bold; margin-top:10px; margin-bottom:5px;'>🎨 Select Color from Photos:</div>", unsafe_allow_html=True)
-                    state_col_key = f"sel_color_{prefix_idx}"
-                    
-                    if state_col_key not in st.session_state:
-                        st.session_state[state_col_key] = color_options[0]
-                         
-                    c_cols = st.columns(len(color_options))
-                    for i, c_name in enumerate(color_options):
-                        with c_cols[i]:
-                            # Show image if available for this color index
-                            if i < len(resolved_paths):
-                                st.markdown(f"<img src='{resolved_paths[i]}' style='width:100%; height:70px; object-fit:cover; border-radius:6px; margin-bottom:5px; background-color:#f8f9fa; border:1px solid #e2e8f0;'/>", unsafe_allow_html=True)
-                            
-                            # Render select button
-                            if st.session_state[state_col_key] == c_name:
-                                st.button(f"✅ {c_name}", key=f"btn_c_{prefix_idx}_{i}", use_container_width=True, type="primary")
-                            else:
-                                if st.button(c_name, key=f"btn_c_{prefix_idx}_{i}", use_container_width=True):
-                                    st.session_state[state_col_key] = c_name
-                                    st.rerun()
-                                    
-                    selected_color = st.session_state[state_col_key]
-                # --------------------------------
-                
                 qty = st.number_input(f"Quantity ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
                 if st.button("🛒 Add to Cart", key=f"b_{prefix_idx}"):
@@ -1492,7 +1510,7 @@ def show_product_card(row, idx, prefix):
                             "name": final_nm, 
                             "price": buy_price, 
                             "qty": qty, 
-                            "img_link": img_link_for_wa,
+                            "img_link": main_img_url if (color_options and main_img_url) else img_link_for_wa,
                             "seller": str(seller_val).strip() if pd.notna(seller_val) else "",
                             "unit": buy_unit,
                             "discount_pct": disc_pct,
@@ -1537,9 +1555,9 @@ def show_product_card(row, idx, prefix):
                     
                     c_e_sz, c_e_col = st.columns(2)
                     with c_e_sz:
-                        e_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
+                        e_sizes = st.text_input("📐 Sizes / साइज", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
                     with c_e_col:
-                        e_colors = st.text_input("🎨 Colors / कलर (कॉमा लगाकर लिखें)", value=str(row.get("Colors", "")), key=f"ecol_{prefix_idx}")
+                        e_colors = st.text_input("🎨 Colors / कलर", value=str(row.get("Colors", "")), key=f"ecol_{prefix_idx}")
                     
                     st.markdown("**🔄 Move Product to another Category:**")
                     all_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
@@ -1650,10 +1668,8 @@ else:
         if len(valid_categories) == 0: 
             st.write("No categories yet.")
         else:
-            # --- FIXED 4-COLUMN GRID WITH PHOTOS ---
             st.markdown('<div id="hide-cats-marker"></div>', unsafe_allow_html=True)
             
-            # 1. Render Buttons First (Using ID instead of Category Name for better stability)
             for idx, cat in enumerate(valid_categories):
                 if st.button(f"HIDDEN_CAT_{idx}", key=f"hidden_cat_{idx}"):
                     st.session_state.selected_category = cat
@@ -1661,13 +1677,11 @@ else:
                     save_cart_to_url()
                     st.rerun()
             
-            # 2. Hide Buttons Function & Setup Click Event (OPTIMIZED FOR SPEED)
             js_code = """
             <script>
             const parentDoc = window.parent.document;
             
             function setupCategories() {
-                // Hide Streamlit buttons
                 const btns = parentDoc.querySelectorAll('button');
                 btns.forEach(b => {
                     if(b.innerText && b.innerText.includes('HIDDEN_CAT_')) {
@@ -1678,7 +1692,6 @@ else:
                     }
                 });
 
-                // Attach clicks safely without intervals
                 const cards = parentDoc.querySelectorAll('.cat-card:not(.click-ready)');
                 cards.forEach(card => {
                     card.classList.add('click-ready');
@@ -1704,7 +1717,6 @@ else:
             """
             st_components.html(js_code, height=0, width=0)
             
-            # 3. Render 4-Column Grid
             cat_images = load_category_images()
             
             html_parts = []
@@ -1713,12 +1725,8 @@ else:
             for idx, cat in enumerate(valid_categories):
                 img_url = cat_images.get(cat, "https://img.icons8.com/color/96/000000/open-box.png")
                 
-                # --- UPDATED CARD DESIGN ---
                 card = f'<div class="cat-card" data-cat-idx="{idx}" style="background: #ffffff; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.1s ease; display: flex; flex-direction: column; overflow: hidden; height: 100%;">'
-                
-                # loading="lazy" added for speed optimization
                 card += f'<img src="{img_url}" loading="lazy" style="width: 100%; height: 75px; object-fit: cover; background-color: #f8f9fa; border-bottom: 1px solid #e2e8f0;">'
-                
                 card += f'<div style="padding: 8px 4px; flex-grow: 1; display: flex; align-items: center; justify-content: center;">'
                 card += f'<span style="font-size: 11px; font-weight: 700; color: #1a202c; line-height: 1.2; word-wrap: break-word;">{cat}</span>'
                 card += '</div></div>'
@@ -1726,9 +1734,7 @@ else:
                 html_parts.append(card)
                 
             html_parts.append('</div>')
-            
             st.markdown("\n".join(html_parts), unsafe_allow_html=True)
-            # ---------------------------------------------------------------
             
     else:
         st.subheader(f"📂 {st.session_state.selected_category}")
@@ -1846,7 +1852,6 @@ if st.session_state.cart:
     
     st.markdown("---")
     
-    # --- ADDRESS BOOK ANCHOR ---
     st.markdown("### 📍 Delivery Details")
     st.markdown('<div id="address-book-anchor"></div>', unsafe_allow_html=True)
     
@@ -1921,7 +1926,6 @@ if st.session_state.cart:
             if (label.includes('Full Address') || wrapperText.includes('Full Address')) triggerReactChange(el, addr.address);
         });
 
-        // Scroll gracefully to the form input
         inputs[0].scrollIntoView({behavior: "smooth", block: "center"});
     };
 
@@ -1944,7 +1948,6 @@ if st.session_state.cart:
             cust_name = st.text_input("Your Name / Shop Name")
             cust_mobile = st.text_input("Mobile Number (10 digits)*")
             
-            # --- GET CURRENT GPS LOCATION BUTTON ---
             loc_html = """
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: -15px;">
                 <button onclick="fetchLocation(true)" type="button" style="background-color: #2b6cb0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📍 Fetch My GPS Location</button>
@@ -2006,7 +2009,6 @@ if st.session_state.cart:
             </script>
             """
             st_components.html(loc_html, height=50)
-            # -------------------------------
             
             cust_address = st.text_area("Full Address (with City, Pincode)")
         with col_d2:
@@ -2109,8 +2111,6 @@ if st.session_state.cart:
             is_valid = False
 
         if is_valid:
-            
-            # --- SAVE NEW ADDRESS TO PHONE MEMORY ---
             safe_name = cust_name.strip().replace("'", "").replace('"', '')
             safe_mobile = cust_mobile.strip()
             safe_address = cust_address.strip().replace("'", "").replace('"', '').replace('\n', ' ')
@@ -2125,14 +2125,13 @@ if st.session_state.cart:
             }};
             let exists = book.some(a => a.mobile === newEntry.mobile && a.address === newEntry.address);
             if(!exists && newEntry.mobile && newEntry.address) {{
-                book.unshift(newEntry); // Add to top of the list
-                if(book.length > 4) book.pop(); // Keep max 4 saved addresses
+                book.unshift(newEntry);
+                if(book.length > 4) book.pop(); 
                 window.parent.localStorage.setItem('oura_address_book', JSON.stringify(book));
             }}
             </script>
             """
             st_components.html(save_addr_js, height=0, width=0)
-            # -------------------------------------------
             
             if st.session_state.cart:
                 auto_last_balance = 0.0
@@ -2263,7 +2262,6 @@ if st.session_state.cart:
 
                 st.balloons()
 
-    # --- CONDITIONAL RENDERING OF PAYMENT SECTION AFTER ORDER PLACEMENT ---
     if 'ready_pdf' in st.session_state:
         st.markdown("---")
         st.success(f"🎉 **Order Confirmed!** Your total bill  **₹{st.session_state.get('ready_bill_total', 0):.2f}** ")
