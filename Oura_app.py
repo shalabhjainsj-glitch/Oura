@@ -469,7 +469,7 @@ def safe_float(val, default=0.0):
         return float(val)
     except: return default
 
-expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent", "Sizes"]
+expected_columns = ["ID", "Name", "Retail_Qty", "Price", "Cash_Price", "Tier1_Price", "Tier1_Qty", "Tier2_Price", "Tier2_Qty", "Category", "Image_Path", "Free_Delivery", "Seller_Name", "In_Stock", "Unit_Base", "Unit_T1", "Unit_T2", "Offer_Name", "Discount_Percent", "Sizes", "Colors"]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_products():
@@ -482,10 +482,12 @@ def load_products():
             if 'Unit_T1' not in df.columns: df['Unit_T1'] = df.get('Unit_Type', 'Pcs')
             if 'Unit_T2' not in df.columns: df['Unit_T2'] = df.get('Unit_Type', 'Pcs')
             if 'Sizes' not in df.columns: df['Sizes'] = ""
+            if 'Colors' not in df.columns: df['Colors'] = ""
             df['Unit_Base'].fillna('Pcs', inplace=True)
             df['Unit_T1'].fillna('Pcs', inplace=True)
             df['Unit_T2'].fillna('Pcs', inplace=True)
             df['Sizes'].fillna('', inplace=True)
+            df['Colors'].fillna('', inplace=True)
             return df
     except: pass
     return pd.DataFrame(columns=expected_columns)
@@ -552,6 +554,7 @@ if 'cart_loaded' not in st.session_state:
                     price = float(parts[2]) if len(parts) > 2 else 0.0
                     p_type = parts[3] if len(parts) > 3 else ""
                     p_size = parts[4] if len(parts) > 4 else ""
+                    p_color = parts[5] if len(parts) > 5 else ""
                     qty = safe_int(qty_str, 1)
                     
                     match = products_df[products_df['ID'].astype(str) == p_id]
@@ -569,6 +572,7 @@ if 'cart_loaded' not in st.session_state:
                         base_name = row.get('Name', 'Item')
                         final_name = base_name
                         if p_size: final_name += f" (Size: {p_size})"
+                        if p_color: final_name += f" (Color: {p_color})"
                         if p_type in ["Online", "Cash"]: final_name += f" ({p_type})"
                             
                         st.session_state.cart[k_part] = {
@@ -577,7 +581,7 @@ if 'cart_loaded' not in st.session_state:
                             "qty": qty, "img_link": img_link,
                             "seller": str(row.get("Seller_Name", "")).strip(), "unit": unit,
                             "discount_pct": disc_pct, "offer_name": offer_nm,
-                            "size": p_size
+                            "size": p_size, "color": p_color
                         }
             except Exception as e:
                 pass
@@ -724,7 +728,11 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                 with col_id: new_id = st.text_input("ID (Keep Unique)")
                 with col_name: new_name = st.text_input("Product Name")
                 
-                new_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें, जैसे S, M, L या 36-37, 38-39. कोई साइज नहीं है तो खाली छोड़ दें)", "")
+                col_sz, col_cl = st.columns(2)
+                with col_sz:
+                    new_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", "")
+                with col_cl:
+                    new_colors = st.text_input("🎨 Colors / कलर (कॉमा लगाकर लिखें, जैसे Red, Blue)", "")
                 
                 st.markdown("**🎁 Special Offer / Discount**")
                 col_off1, col_off2 = st.columns(2)
@@ -801,7 +809,8 @@ if st.session_state.admin_logged_in or st.session_state.seller_logged_in:
                                 "Free_Delivery": is_free, "Seller_Name": seller_val, "In_Stock": new_in_stock,
                                 "Unit_Base": new_u_base, "Unit_T1": new_u_t1, "Unit_T2": new_u_t2,
                                 "Offer_Name": new_offer_name.strip(), "Discount_Percent": new_discount,
-                                "Sizes": new_sizes.strip()
+                                "Sizes": new_sizes.strip(),
+                                "Colors": new_colors.strip()
                             }
                             db.collection('products').document(str(new_id)).set(data)
                             load_products.clear()
@@ -1356,6 +1365,10 @@ def show_product_card(row, idx, prefix):
         sizes_str = str(row.get("Sizes", "")).strip()
         size_options = [s.strip() for s in sizes_str.split(",") if s.strip()]
         selected_size = ""
+        
+        colors_str = str(row.get("Colors", "")).strip()
+        color_options = [c.strip() for c in colors_str.split(",") if c.strip()]
+        selected_color = ""
 
         if retail_price <= 0:
             st.markdown(f"""
@@ -1422,13 +1435,18 @@ def show_product_card(row, idx, prefix):
                 min_q = opts[selected_opt]["min_q"]
                 buy_type = opts[selected_opt]["type"]
                 
-                if size_options:
-                    selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
+                col_sz_sel, col_cl_sel = st.columns(2)
+                with col_sz_sel:
+                    if size_options:
+                        selected_size = st.selectbox("📏 Select Size:", size_options, key=f"sz_{prefix_idx}")
+                with col_cl_sel:
+                    if color_options:
+                        selected_color = st.selectbox("🎨 Select Color:", color_options, key=f"col_{prefix_idx}")
                 
                 qty = st.number_input(f"Quantity ({buy_unit})", min_value=min_q, value=min_q, key=f"q_{prefix_idx}")
                 
                 if st.button("🛒 Add to Cart", key=f"b_{prefix_idx}"):
-                    cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}|{selected_size}"
+                    cart_key = f"{p_id}|{buy_unit}|{buy_price}|{buy_type}|{selected_size}|{selected_color}"
                     
                     if cart_key in st.session_state.cart:
                         st.session_state.cart[cart_key]["qty"] += qty
@@ -1436,6 +1454,7 @@ def show_product_card(row, idx, prefix):
                         base_nm = row.get('Name', 'Item')
                         final_nm = base_nm
                         if selected_size: final_nm += f" (Size: {selected_size})"
+                        if selected_color: final_nm += f" (Color: {selected_color})"
                         if buy_type in ["Online", "Cash"]: final_nm += f" ({buy_type})"
                             
                         st.session_state.cart[cart_key] = {
@@ -1447,7 +1466,8 @@ def show_product_card(row, idx, prefix):
                             "unit": buy_unit,
                             "discount_pct": disc_pct,
                             "offer_name": offer_nm,
-                            "size": selected_size
+                            "size": selected_size,
+                            "color": selected_color
                         }
                     save_cart_to_url()
                     st.success("Added to Cart! 🛒")
@@ -1484,7 +1504,11 @@ def show_product_card(row, idx, prefix):
                         st.text_input("Name - Read Only", value=str(row.get("Name", "")), disabled=True, key=f"enm_ro_{prefix_idx}")
                         e_name = str(row.get("Name", ""))
                     
-                    e_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
+                    c_e_sz, c_e_col = st.columns(2)
+                    with c_e_sz:
+                        e_sizes = st.text_input("📐 Sizes / साइज (कॉमा लगाकर लिखें)", value=str(row.get("Sizes", "")), key=f"esz_{prefix_idx}")
+                    with c_e_col:
+                        e_colors = st.text_input("🎨 Colors / कलर (कॉमा लगाकर लिखें)", value=str(row.get("Colors", "")), key=f"ecol_{prefix_idx}")
                     
                     st.markdown("**🔄 Move Product to another Category:**")
                     all_cats = products_df['Category'].dropna().unique().tolist() if not products_df.empty else []
@@ -1552,7 +1576,8 @@ def show_product_card(row, idx, prefix):
                         "Free_Delivery": is_free_val,
                         "Offer_Name": e_off_name.strip(),
                         "Discount_Percent": e_off_pct,
-                        "Sizes": e_sizes.strip()
+                        "Sizes": e_sizes.strip(),
+                        "Colors": e_colors.strip()
                     }
                     if st.session_state.admin_logged_in: update_dict["Name"] = e_name
                     if e_imgs:
